@@ -96,10 +96,6 @@ function samplevisible(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor
    hh
 end
 
-function samplevisible(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(vprob(rbm, hh, factor))
-end
-
 function samplevisible(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    bernoulli!(vprob(bgrbm, h, factor))
 end
@@ -2022,8 +2018,7 @@ function bayesianinformationcriterion(bm::AbstractBM, nsamples::Int, loglikeliho
    -2*loglikelihood + BMs.nmodelparameters(bm)*log(nsamples)
 end
 
-include("MonitoringPlots.jl")
-const BMPlots = MonitoringPlots
+include("BMPlots.jl")
 
 end # of module BoltzmannMachines
 

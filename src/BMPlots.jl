@@ -2,7 +2,7 @@
 Contains all plotting functions for displaying information collected
 in module BoltzmannMachines.
 "
-module MonitoringPlots
+module BMPlots
 
 import ..BoltzmannMachines
 const BMs = BoltzmannMachines
@@ -144,7 +144,6 @@ function bivariategaussiandensity(x1::Vector{Float64}, x2::Vector{Float64})
    (x,y) -> factor * exp(-0.5 * dot([x;y] - mu, sinv * ([x;y] - mu)))
 end
 
-using Compose
 "
 Makes pair plot for each variable of the data set `x` versus each other variable.
 "
@@ -237,4 +236,4 @@ function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
 
 end
 
-end # module MonitoringPlots
+end # module BMPlots
