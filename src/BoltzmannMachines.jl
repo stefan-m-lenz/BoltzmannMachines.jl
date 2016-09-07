@@ -1822,17 +1822,17 @@ function aisimportanceweights(rbm::BernoulliRBM,
 
       for k=2:(ntemperatures + 1)
 
+         hinput = hiddeninput(rbm, v)
+         impweights[j] *= exp((beta[k] - beta[k-1]) * dot(visbiasdiff, v)) *
+               prod((1 + exp(beta[k]   * hinput)) ./
+                    (1 + exp(beta[k-1] * hinput)))
+
          # Gibbs transition
          for burn=1:burnin
             h = bernoulli!(hprob(rbm, v, beta[k]))
             vinput = beta[k] * visibleinput(rbm, h) + (1 - beta[k]) * visbias
             v = bernoulli!(sigm(vinput))
          end
-
-         hinput = hiddeninput(rbm, v)
-         impweights[j] *= exp((beta[k] - beta[k-1]) * dot(visbiasdiff, v)) *
-               prod((1 + exp(beta[k]   * hinput)) ./
-                    (1 + exp(beta[k-1] * hinput)))
       end
    end
 
