@@ -745,26 +745,18 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::DBMParam,
    end
 end
 
-function monitorloglikelihood!(monitor::Monitor, rbm::BernoulliRBM,
-      visbias::Array{Float64,1}, epoch::Int, datadict::DataDict)
-
-   impweights = BMs.aisimportanceweights(rbm, visbias) # TODO parameter evtl. anpassen
-   r = mean(impweights)
-   sd = BMs.aisstandarddeviation(impweights)
-   logz = BMs.logpartitionfunction(rbm, visbias, r)
-   push!(monitor,
-         MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(BMs.monitoraisr, epoch, r, ""))
-   for (datasetname, x) in datadict
-      push!(monitor, MonitoringItem(BMs.monitorloglikelihood, epoch,
-            BMs.loglikelihood(rbm, x, logz), datasetname))
-   end
-end
-
 function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
-      epoch::Int, datadict::DataDict)
+      epoch::Int, datadict::DataDict;
+      # optional arguments for AIS:
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 10)
 
-   impweights = BMs.aisimportanceweights(rbm) # TODO parameter evtl. anpassen
+   impweights = BMs.aisimportanceweights(rbm;
+         ntemperatures = ntemperatures, beta = beta,
+         nparticles = nparticles, burnin = burnin)
+
    r = mean(impweights)
    sd = BMs.aisstandarddeviation(impweights)
    logz = BMs.logpartitionfunction(rbm, r)
@@ -1319,8 +1311,9 @@ end
 
 "
     aisimportanceweights(dbm; ...)
-Computes an array of importance weights in the Annealed Importance Sampling
-algorithm for the given BMs.
+Computes the importance weights using the Annealed Importance Sampling algorithm
+for estimating the ratio of the partition functions of the given `dbm` to the
+base-rate DBM with all weights being zero.
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
 "
 function aisimportanceweights(dbm::Array{BernoulliRBM,1};
@@ -1385,21 +1378,23 @@ function aisstandarddeviation(impweights::Array{Float64,1})
 end
 
 """
-    logpartitionfunction(rbm, visbias)
-    logpartitionfunction(rbm, visbias, r)
+    logpartitionfunction(rbm)
+    logpartitionfunction(rbm, r)
+    logpartitionfunction(rbm, r, visbias)
 Calculates the log of the partition function of the RBM from the estimator `r`.
 `r` is an estimator of the ratio of the RBM's partition function to the
 partition function of the RBM with zero weights and visible bias `visbias`, Z_0.
 If the estimator `r` is not given as argument, Annealed Importance Sampling
 is performed to get a value for it.
+By default, `visbias` is the visible bias of the `rbm`.
 The estimated partition function of the Boltzmann Machine is Z = r * Z_0
 with `r` being the mean of the importance weights.
 Therefore, the log of the estimated partition function is
 log(Z) = log(r) + log(Z_0)
 """
 function logpartitionfunction(rbm::BernoulliRBM,
-      visbias::Array{Float64,1},
-      r::Float64 = mean(aisimportanceweights(rbm, visbias)))
+      r::Float64 = mean(aisimportanceweights(rbm, visbias)),
+      visbias::Vector{Float64} = rbm.a)
 
    nhidden = length(rbm.b)
    # Uses equation 43 in [Salakhutdinov, 2008]
@@ -1800,14 +1795,24 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
 end
 
 """
-    aisimportanceweights(rbm, visbias; ...)
-Computes the importance weights for estimating the ratios of the partition
-functions for the given RBM to the RBM with Parameters {0,visbias,0} using the
-Annealed Importance Sampling algorithm, like described in section 4.1.3 of
-[Salakhutdinov, 2008].
+    aisimportanceweights(rbm; ...)
+Computes the importance weights for estimating the ratio of the partition
+functions of the given `rbm` to the RBM with zeros weights, zero hidden bias
+and visible bias `visbias` using the Annealed Importance Sampling algorithm,
+like described in section 4.1.3 of [Salakhutdinov, 2008].
+`visbias` is given as optional keyword argument and is by default the visible
+bias of the given `rbm`.
+
+# Optional keyword arguments (for all types):
+* `ntemperatures`: Number of temperatures for annealing from the starting model
+  to the target model
+* `beta`: Vector of temperatures. By default `ntemperatures` ascending
+  numbers, equally spaced from 0.0 to 1.0
+* `nparticles`: Number of parallel chains and calculated weights
+* `burnin`: Number of steps to sample for the Gibbs transition between models
 """
-function aisimportanceweights(rbm::BernoulliRBM,
-      visbias::Array{Float64,1};
+function aisimportanceweights(rbm::BernoulliRBM;
+      visbias::Array{Float64,1} = rbm.a,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -1842,9 +1847,9 @@ end
 """
     aisimportanceweights(gbrbm; ...)
 Computes the importance weights using the Annealed Importance Sampling algorithm
-for estimating the ratios of the partition functions of the given
-GaussianBernoulliRBM `gbrbm` to the GaussianBernoulliRBM with same hidden and visible
-biases and same standard deviation but with zero weights.
+for estimating the ratio of the partition functions of the given
+GaussianBernoulliRBM `gbrbm` to the GaussianBernoulliRBM with same hidden and
+visible biases and same standard deviation but with zero weights.
 """
 function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
       ntemperatures::Int = 100,
@@ -1932,10 +1937,6 @@ or estimates the partition function with Annealed Importance Sampling.
 """
 function loglikelihood(rbm::AbstractRBM, x::Array{Float64,2}, logz::Float64)
    -freeenergy(rbm, x) - logz
-end
-
-function loglikelihood(rbm::BernoulliRBM, x::Array{Float64,2})
-   loglikelihood(rbm, x, BMs.logpartitionfunction(rbm, initvisiblebias(x)))
 end
 
 function loglikelihood(rbm::AbstractRBM, x::Array{Float64,2})
