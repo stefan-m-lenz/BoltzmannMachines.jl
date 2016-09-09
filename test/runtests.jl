@@ -1,5 +1,7 @@
-using BoltzmannMachines
 using Base.Test
+
+using BoltzmannMachines
+const BMs = BoltzmannMachines
 
 include("BMTest.jl")
 
