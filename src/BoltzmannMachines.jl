@@ -5,6 +5,7 @@ const BMs = BoltzmannMachines
 export BernoulliRBM, fitrbm, samplerbm, hprob, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm, comparedbms
 
 abstract AbstractRBM
+abstract AbstractDBM
 
 type BernoulliRBM <: AbstractRBM
    weights::Array{Float64,2}
@@ -34,14 +35,47 @@ type BernoulliGaussianRBM <: AbstractRBM
    b::Array{Float64,1}
 end
 
-type DBMParam2
+type DBMParam2 <: AbstractDBM
    weights::Vector{Matrix{Float64}}
    biases::Vector{Vector{Float64}}
 end
 
-type MultivisionDBM
+"""
+A MultivisionDBM consists of several visible layers (may have different
+input types) and binary hidden layers.
+Nodes of different visible layers are connected to non-overlapping parts
+of the first hidden layer.
+"""
+type MultivisionDBM <: AbstractDBM
    visrbms::Vector{AbstractRBM}
+   visrbmshiddenranges::Array{UnitRange{Int}}
+
    hiddbm::DBMParam2
+
+   function MultivisionDBM(visrbms, hiddbm)
+      # initialize ranges of hidden units for different RBMs
+      nvisrbms = length(visrbms)
+      visrbmshiddenranges = Array{UnitRange{Int}}(nvisrbms)
+      rangestart = 1
+      for i = 1:nvisrbms
+         nhiddenofcurrentvisrbm = length(visrbm[i])
+         visrbmshiddenranges[i] = rangestart:nhiddenofcurrentvisrbm
+         rangestart += nhiddenofcurrentvisrbm + 1
+      end
+      new(visrbms, visrbmshiddenranges, hiddbm)
+   end
+end
+
+function MultivisionDBM(visrbms::Vector{AbstractRBM})
+   # no weights between hidden layers because there is only one hidden layer
+   weights = Vector{Matrix{Float64}}()
+
+   # concatenated hidden biases of visrbms become bias of first layer of hiddbm
+   biases = Vector{Vector{Float64}}(1)
+   biases[1] = vcat(map(rbm -> rbm.b, visrbms)...)
+
+   hiddbm = DBMParam2(weights, biases)
+   MultivisionDBM(visrbms, hiddbm)
 end
 
 type MultivisionParticles
@@ -58,7 +92,7 @@ function DBMParam2(rbms::Vector{BernoulliRBM})
       biases[i] = rbms[i-1].b + rbms[i].a
    end
    biases[nrbms + 1] = rbms[nrbms].b
-   DBM(weights, biases)
+   DBMParam2(weights, biases)
 end
 
 # function hiddeninput(dbm::DBMParam2, particles::Particles, hiddenlayer::Int)
@@ -579,45 +613,63 @@ function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
    mu
 end
 
-function gibbssample!(multiparticles::MultivisionParticles,
-      multidbm::MultivisionDBM, steps::Int = 5, beta::Float64 = 1.0)
+function gibbssample!(mvparticles::MultivisionParticles,
+      mvdbm::MultivisionDBM,
+      nsteps::Int = 5, beta::Float64 = 1.0)
 
-   nvisrbms = 1:length(multiparticles.visrbms)
+   nhiddenlayers = length(hidrbms.biases)
 
-   for step in 1:steps
-      for i = nvisrbms
-         
+   for step in 1:nsteps
+
+      # save state of first hidden layer
+      oldstate = copy(mvparticles.hidparticles[1])
+
+      for i = eachindex(mvdbm.visrbms)
+         hiddenrange = mvdbm.visrbmshiddenranges[i]
+
+         # sample first hidden from visible
+         mvparticles.hidparticles[1][hiddenrange] =
+               hprob(mvdbm.visrbms[i], mvparticles.visparticles[i], beta)
+
+         # sample visible from old first hidden
+         mvparticles.visparticles[i] =
+               vprob(mvdbm.visrbms[i], oldstate[hiddenrange], beta)
       end
-      # multiparticles.hidparticles[1] = # input from visrbms
-      gibbsstep!(hidparticles, multidbm.hiddbm, beta)
+
+      # sample other hidden layers
+      for i = 2:nhiddenlayers
+         input = oldstate * mvdvm.hiddbm.weights[i-1]
+         if i < nhiddenlayers
+            input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm.weights[i]'
+         end
+         broadcast!(+, input, input, (mvdbm.hiddbm.biases[i])')
+         oldstate = copy(mvparticles.hidparticles[i])
+         mvparticles.hidparticles[i] = bernoulli(sigm(beta * input))
+      end
    end
 
 end
 
-function gibbsstep!(particles::Particles, dbm::DBMParam2, beta::Float64 = 1.0)
-   oldstate = copy(particles[1])
+function gibbssample!(particles::Particles,
+      dbm::DBMParam2,
+      nsteps::Int = 5, beta::Float64 = 1.0)
+
    nlayers = length(particles)
 
-   for i = 1:nlayers
-      input = zeros(particles[i])
-      if i > 1
-         input += oldstate*dbm[i-1].weights
+   for step in 1:nsteps
+      oldstate = copy(particles[1])
+      for i = 1:nlayers
+         input = zeros(particles[i])
+         if i > 1
+            input += oldstate * dbm.weights[i-1]
+         end
+         if i < nlayers
+            input += particles[i+1] * dbm.weights[i]'
+         end
+         broadcast!(+, input, input, (dbm.biases[i])')
+         oldstate = copy(particles[i])
+         particles[i] = bernoulli(sigm(beta * input))
       end
-      if i < nlayers
-         input += particles[i+1]*dbm.weights[i]'
-      end
-      broadcast!(+, input, input, (dbm.biases[i])')
-      oldstate = copy(particles[i])
-      particles[i] = bernoulli(sigm(beta * input))
-   end
-   particles
-end
-
-function gibbssample!(particles::Particles, dbm::DBMParam2,
-      steps::Int = 5, beta::Float64 = 1.0)
-
-   for step in 1:steps
-      gibbsstep!(particles, dbm, beta)
    end
    particles
 end
@@ -646,10 +698,12 @@ function gibbssample!(particles::Particles, dbm::DBMParam,
 end
 
 "
-Creates particles for Gibbs sampling in a DBM and initializes them randomly.
+    initparticles(dbm, nparticles)
+Creates particles for Gibbs sampling in a DBM and initializes them with random
+Bernoulli distributed (p=0.5) values.
 Returns an array containing in the i'th entry a matrix of size
-(number of particles X number of nodes in layer i).
-The particles are contained in the rows of these matrices.
+(`nparticles`, number of nodes in layer i) such that
+the particles are contained in the rows of these matrices.
 "
 function initparticles(dbm::DBMParam, nparticles::Int)
    nlayers = length(dbm) + 1
@@ -658,8 +712,25 @@ function initparticles(dbm::DBMParam, nparticles::Int)
    for i in 2:nlayers
       particles[i] = rand([0.0 1.0], nparticles, length(dbm[i-1].b))
    end
-
    particles
+end
+
+function initparticles(dbm::DBMParam2, nparticles::Int)
+   nlayers = length(dbm.biases)
+   particles = Particles(nlayers)
+   for i = 1:nlayers
+      particles[i] = rand([0.0 1.0], nparticles, length(dbm.biases[i]))
+   end
+   particles
+end
+
+function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
+   visparticles = Particles(length(mvdbm.visrbms))
+   for i = 1:length(visrbms)
+      visparticles[i] = rand([0.0 1.0], nparticles, length(mvdbm.visrbms[i]))
+   end
+   hidparticles = initparticles(mvdbm.hiddbm, nparticles)
+   MultivisionParticles(visparticles, hidparticles)
 end
 
 function fitpartdbm(x::Array{Float64,2},
@@ -970,18 +1041,23 @@ function samplefrequencies{T}(x::Array{T,2})
 end
 
 """
+    empiricalloglikelihood(x, xgen)
     empiricalloglikelihood(bm, x, nparticles)
     empiricalloglikelihood(bm, x, nparticles, burnin)
-    empiricalloglikelihood(bm, x, xgen)
 Computes the mean empirical loglikelihood for the data set `x`.
 The probability of a sample is estimated to be the empirical probability of the
-sample in a dataset generated by the BM. This data set can be given as `xgen`
-or it is generated by running a Gibbs sampler with `nparticles` and `burnin`
-(default 5).
+sample in a dataset generated by the model. This data set can be given as `xgen`
+or it is generated by running a Gibbs sampler with `nparticles` for `burnin`
+steps (default 5) in the Boltzmann Machine `bm`.
 Throws an error if a sample in `x` is not contained in the generated data set.
 """
 function empiricalloglikelihood(bm::AbstractBM, x::Matrix{Float64},
-      xgen::Matrix{Float64})
+      nparticles::Int, burnin::Int = 5)
+
+   empiricalloglikelihood(x, sampleparticles(bm, nparticles, burnin)[1])
+end
+
+function empiricalloglikelihood(x::Matrix{Float64}, xgen::Matrix{Float64})
 
    genfreq = samplefrequencies(xgen)
    loglikelihood = 0.0
@@ -996,12 +1072,6 @@ function empiricalloglikelihood(bm::AbstractBM, x::Matrix{Float64},
    end
    loglikelihood /= norigsamples
    loglikelihood
-end
-
-function empiricalloglikelihood(bm::AbstractBM, x::Matrix{Float64},
-      nparticles::Int, burnin::Int = 5)
-
-   empiricalloglikelihood(bm, x, sampleparticles(bm, nparticles, burnin)[1])
 end
 
 function comparecrosstab(x::Array{Float64,2}, z::Array{Float64,2})
@@ -1989,6 +2059,8 @@ function nmodelparameters(bm::AbstractBM)
    nunits = BMs.nunits(bm)
    prod(nunits) + sum(nunits)
 end
+
+# TODO add nmodelparameters for GaussianBernoulli
 
 "
     akaikeinformationcriterion(bm, loglikelihood)
