@@ -1454,7 +1454,7 @@ function logpartitionfunction(rbm::BernoulliRBM,
 end
 
 function logpartitionfunction(rbm::BernoulliRBM,
-      visbias::Vector{Float64} = rbm.a,
+      visbias::Vector{Float64},
       r::Float64 = mean(aisimportanceweights(rbm; visbias = visbias)))
 
    nhidden = length(rbm.b)
