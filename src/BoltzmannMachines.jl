@@ -585,8 +585,9 @@ function fitpartdbmcore(x::Array{Float64,2},
       nhiddens::Array{Int,1},
       visibleindex,
       epochs::Int = 10,
-      nparticles::Int = 100)
-      
+      nparticles::Int = 100;
+      learningrate::Float64 = 0.005)
+
    nparts = length(visibleindex)
    p = size(x)[2]
 
@@ -599,7 +600,7 @@ function fitpartdbmcore(x::Array{Float64,2},
    partparams = Array{Array{BMs.BernoulliRBM,1},1}(nparts)
 
    for i=1:nparts
-      partparams[i] = fitdbm(x[:,visibleindex[i]],vec(nhiddensmat[i,:]),epochs,nparticles)
+      partparams[i] = fitdbm(x[:,visibleindex[i]],vec(nhiddensmat[i,:]),epochs,nparticles,learningrate=learningrate)
    end
 
    params = Array{BMs.BernoulliRBM,1}(length(nhiddens))
@@ -631,14 +632,15 @@ function fitpartdbmcore(x::Array{Float64,2},
       end
    end
 
-   fitbm(x, params, epochs = epochs, nparticles = nparticles)
+   fitbm(x, params, epochs = epochs, nparticles = nparticles,learningrate=learningrate)
 end
 
 function fitpartdbm(x::Array{Float64,2},
       nhiddens::Array{Int,1},
       nparts::Int = 2,
       epochs::Int = 10,
-      nparticles::Int = 100)
+      nparticles::Int = 100;
+      learningrate::Float64 = 0.005)
 
    if (nparts < 2)
       return fitdbm(x,nhiddens,epochs,nparticles)
@@ -650,14 +652,14 @@ function fitpartdbm(x::Array{Float64,2},
 
    visibleindex = BMs.vispartcore(BMs.vistabs(x),collect(1:size(x)[2]),partitions)
 
-   fitpartdbmcore(x,nhiddens,visibleindex,epochs,nparticles)
+   fitpartdbmcore(x,nhiddens,visibleindex,epochs,nparticles,learningrate=learningrate)
 end
 
 "
 Convenience Wrapper to pretrain an RBM-Stack and to jointly adjust the weights using fitbm
 "
-function fitdbm(x, nhiddens::Array{Int,1}, epochs=10, nparticles=100)
-   pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens, epochs = epochs, predbm = true)
+function fitdbm(x, nhiddens::Array{Int,1}, epochs=10, nparticles=100; learningrate::Float64 = 0.005)
+   pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens, epochs = epochs, predbm = true, learningrate=learningrate)
    fitbm(x, pretraineddbm, epochs = epochs, nparticles = nparticles)
 end
 
@@ -675,7 +677,8 @@ and a pre-trained Deep Boltzmann machine `dbm` as arguments.
 function fitbm(x::Array{Float64,2}, dbm::DBMParam;
       epochs::Int = 10,
       nparticles::Int = 100,
-      learningrates::Array{Float64,1} = 0.005*11.0 ./ (10.0 + (1:epochs)),
+      learningrate::Float64 = 0.005,
+      learningrates::Array{Float64,1} = learningrate*11.0 ./ (10.0 + (1:epochs)),
       monitoring::Function = ((dbm, epoch) -> nothing))
 
    if length(learningrates) < epochs
