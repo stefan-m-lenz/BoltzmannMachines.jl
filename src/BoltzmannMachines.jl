@@ -580,21 +580,15 @@ function initparticles(dbm::DBMParam, nparticles::Int)
    particles
 end
 
-function fitpartdbm(x::Array{Float64,2},
+
+function fitpartdbmcore(x::Array{Float64,2},
       nhiddens::Array{Int,1},
-      nparts::Int = 2,
+      visibleindex,
       epochs::Int = 10,
       nparticles::Int = 100)
-
-   if (nparts < 2)
-      return fitdbm(x,nhiddens,epochs,nparticles)
-   end
-
-   partitions = Int(ceil(log(2,nparts)))
-   nparts = 2^partitions
+      
+   nparts = length(visibleindex)
    p = size(x)[2]
-
-   visibleindex = BMs.vispartcore(BMs.vistabs(x),collect(1:size(x)[2]),partitions)
 
    nhiddensmat = zeros(Int,nparts,length(nhiddens))
    for i=1:(nparts-1)
@@ -638,6 +632,25 @@ function fitpartdbm(x::Array{Float64,2},
    end
 
    fitbm(x, params, epochs = epochs, nparticles = nparticles)
+end
+
+function fitpartdbm(x::Array{Float64,2},
+      nhiddens::Array{Int,1},
+      nparts::Int = 2,
+      epochs::Int = 10,
+      nparticles::Int = 100)
+
+   if (nparts < 2)
+      return fitdbm(x,nhiddens,epochs,nparticles)
+   end
+
+   partitions = Int(ceil(log(2,nparts)))
+   nparts = 2^partitions
+   p = size(x)[2]
+
+   visibleindex = BMs.vispartcore(BMs.vistabs(x),collect(1:size(x)[2]),partitions)
+
+   fitpartdbmcore(x,nhiddens,visibleindex,epochs,nparticles)
 end
 
 "
