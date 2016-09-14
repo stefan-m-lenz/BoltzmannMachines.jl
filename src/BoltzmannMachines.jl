@@ -5,7 +5,6 @@ const BMs = BoltzmannMachines
 export BernoulliRBM, fitrbm, samplerbm, hprob, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm, comparedbms
 
 abstract AbstractRBM
-abstract AbstractDBM
 
 type BernoulliRBM <: AbstractRBM
    weights::Array{Float64,2}
@@ -35,22 +34,17 @@ type BernoulliGaussianRBM <: AbstractRBM
    b::Array{Float64,1}
 end
 
-type DBMParam2 <: AbstractDBM
-   weights::Vector{Matrix{Float64}}
-   biases::Vector{Vector{Float64}}
-end
-
 """
 A MultivisionDBM consists of several visible layers (may have different
 input types) and binary hidden layers.
 Nodes of different visible layers are connected to non-overlapping parts
 of the first hidden layer.
 """
-type MultivisionDBM <: AbstractDBM
+type MultivisionDBM
    visrbms::Vector{AbstractRBM}
    visrbmshiddenranges::Array{UnitRange{Int}}
 
-   hiddbm::DBMParam2
+   hiddbm::DBMParam
 
    function MultivisionDBM(visrbms, hiddbm)
       # initialize ranges of hidden units for different RBMs
@@ -67,45 +61,13 @@ type MultivisionDBM <: AbstractDBM
 end
 
 function MultivisionDBM(visrbms::Vector{AbstractRBM})
-   # no weights between hidden layers because there is only one hidden layer
-   weights = Vector{Matrix{Float64}}()
-
-   # concatenated hidden biases of visrbms become bias of first layer of hiddbm
-   biases = Vector{Vector{Float64}}(1)
-   biases[1] = vcat(map(rbm -> rbm.b, visrbms)...)
-
-   hiddbm = DBMParam2(weights, biases)
-   MultivisionDBM(visrbms, hiddbm)
+   MultivisionDBM(visrbms, DBMParam())
 end
 
 type MultivisionParticles
    hidparticles::Particles
    visparticles::Particles
 end
-
-function DBMParam2(rbms::Vector{BernoulliRBM})
-   nrbms = length(rbms)
-   weights = [rbms[i].weights for i=1:nrbms]
-   biases = Vector{Vector{Float64}}(nrbms + 1)
-   biases[1] = rbms[1].a
-   for i = 2:nrbms
-      biases[i] = rbms[i-1].b + rbms[i].a
-   end
-   biases[nrbms + 1] = rbms[nrbms].b
-   DBMParam2(weights, biases)
-end
-
-# function hiddeninput(dbm::DBMParam2, particles::Particles, hiddenlayer::Int)
-#    input = particles[hiddenlayer-1]*dbm.weights[hiddenlayer]
-#    if hiddenlayer < length(dbm.weights)
-#       input += particles[hiddenlayer+1]*dbm.weights[hiddenlayer+1]'
-#    end
-#    broadcast!(+, input, input, (dbm.biases[hiddenlayer+1])')
-# end
-#
-# function hprob(dbm::DBMParam2, particles::Particles, hiddenlayer::Int, beta::Float64)
-#    sigm(beta * hiddeninput(dbm, particles, hiddenlayer))
-# end
 
 "
 Computes the activation probability of the visible units in an RBM, given the
@@ -570,22 +532,28 @@ function stackrbms(x::Array{Float64,2};
    dbmn
 end
 
-"
-Computes the mean-field approximation for input vectors given in the rows of the
-matrix x.
-`eps` is the convergence criterion for the fix-point iterations.
-Returns a matrix of particles for the DBM.
-"
+"""
+    meanfield(dbm, x)
+    meanfield(dbm, x, eps)
+Computes the mean-field approximation for the data set `x` and
+returns a matrix of particles for the DBM.
+The number of particles is equal to the number of samples in `x`.
+`eps` is the convergence criterion for the fix-point iteration, default 0.001.
+"""
 function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
-   nlayers = length(dbm) + 1
 
+   nlayers = length(dbm) + 1
    mu = Particles(nlayers)
+
+   # Initialization with single bottom-up pass using twice the weights for all
+   # but the topmost layer (see [Salakhutdinov+Hinton, 2012], p. 1985)
    mu[1] = x
    for i=2:(nlayers-1)
       mu[i] = hprob(dbm[i-1], mu[i-1], 2.0)
    end
    mu[nlayers] = hprob(dbm[nlayers-1], mu[nlayers-1])
 
+   # mean-field updates until convergence criterion is met
    delta = 1.0
    while delta > eps
       delta = 0.0
@@ -617,7 +585,7 @@ function gibbssample!(mvparticles::MultivisionParticles,
       mvdbm::MultivisionDBM,
       nsteps::Int = 5, beta::Float64 = 1.0)
 
-   nhiddenlayers = length(hidrbms.biases)
+   nhiddenlayers = length(mvdbm.hiddbm) + 1
 
    for step in 1:nsteps
 
@@ -638,11 +606,12 @@ function gibbssample!(mvparticles::MultivisionParticles,
 
       # sample other hidden layers
       for i = 2:nhiddenlayers
-         input = oldstate * mvdvm.hiddbm.weights[i-1]
+         input = oldstate * mvdvm.hiddbm[i-1].weights
+         broadcast!(+, input, inputmvdvm.hiddbm[i-1].b')
          if i < nhiddenlayers
-            input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm.weights[i]'
+            input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm[i]'
+            broadcast!(+, input, input, mvdvm.hiddbm[i].a')
          end
-         broadcast!(+, input, input, (mvdbm.hiddbm.biases[i])')
          oldstate = copy(mvparticles.hidparticles[i])
          mvparticles.hidparticles[i] = bernoulli(sigm(beta * input))
       end
@@ -650,47 +619,23 @@ function gibbssample!(mvparticles::MultivisionParticles,
 
 end
 
-function gibbssample!(particles::Particles,
-      dbm::DBMParam2,
-      nsteps::Int = 5, beta::Float64 = 1.0)
-
-   nlayers = length(particles)
-
-   for step in 1:nsteps
-      oldstate = copy(particles[1])
-      for i = 1:nlayers
-         input = zeros(particles[i])
-         if i > 1
-            input += oldstate * dbm.weights[i-1]
-         end
-         if i < nlayers
-            input += particles[i+1] * dbm.weights[i]'
-         end
-         broadcast!(+, input, input, (dbm.biases[i])')
-         oldstate = copy(particles[i])
-         particles[i] = bernoulli(sigm(beta * input))
-      end
-   end
-   particles
-end
-
 function gibbssample!(particles::Particles, dbm::DBMParam,
       steps::Int = 5, beta::Float64 = 1.0)
 
    for step in 1:steps
       oldstate = copy(particles[1])
-      for i=1:length(particles)
-         etamat = zeros(particles[i])
+      for i = 1:length(particles)
+         input = zeros(particles[i])
          if i < length(particles)
-            etamat += particles[i+1]*dbm[i].weights'
-            broadcast!(+, etamat, etamat, (dbm[i].a)')
+            input += particles[i+1] * dbm[i].weights'
+            broadcast!(+, input, input, dbm[i].a')
          end
          if i > 1
-            etamat += oldstate*dbm[i-1].weights
-            broadcast!(+, etamat, etamat, (dbm[i-1].b)')
+            input += oldstate * dbm[i-1].weights
+            broadcast!(+, input, input, dbm[i-1].b')
          end
          oldstate = copy(particles[i])
-         particles[i] = bernoulli(sigm(beta * etamat))
+         particles[i] = bernoulli(sigm(beta * input))
       end
    end
 
@@ -711,15 +656,6 @@ function initparticles(dbm::DBMParam, nparticles::Int)
    particles[1] = rand([0.0 1.0], nparticles, length(dbm[1].a))
    for i in 2:nlayers
       particles[i] = rand([0.0 1.0], nparticles, length(dbm[i-1].b))
-   end
-   particles
-end
-
-function initparticles(dbm::DBMParam2, nparticles::Int)
-   nlayers = length(dbm.biases)
-   particles = Particles(nlayers)
-   for i = 1:nlayers
-      particles[i] = rand([0.0 1.0], nparticles, length(dbm.biases[i]))
    end
    particles
 end
