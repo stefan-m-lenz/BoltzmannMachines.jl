@@ -586,7 +586,8 @@ function fitpartdbmcore(x::Array{Float64,2},
       visibleindex,
       epochs::Int = 10,
       nparticles::Int = 100;
-      learningrate::Float64 = 0.005)
+      learningrate::Float64 = 0.005,
+      jointlearningrate::Float64 = learningrate)
 
    nparts = length(visibleindex)
    p = size(x)[2]
@@ -632,7 +633,7 @@ function fitpartdbmcore(x::Array{Float64,2},
       end
    end
 
-   fitbm(x, params, epochs = epochs, nparticles = nparticles,learningrate=learningrate)
+   fitbm(x, params, epochs = epochs, nparticles = nparticles,learningrate=jointlearningrate)
 end
 
 function fitpartdbm(x::Array{Float64,2},
@@ -640,7 +641,8 @@ function fitpartdbm(x::Array{Float64,2},
       nparts::Int = 2,
       epochs::Int = 10,
       nparticles::Int = 100;
-      learningrate::Float64 = 0.005)
+      learningrate::Float64 = 0.005,
+      jointlearningrate::Float64 = learningrate)
 
    if (nparts < 2)
       return fitdbm(x,nhiddens,epochs,nparticles)
@@ -652,7 +654,7 @@ function fitpartdbm(x::Array{Float64,2},
 
    visibleindex = BMs.vispartcore(BMs.vistabs(x),collect(1:size(x)[2]),partitions)
 
-   fitpartdbmcore(x,nhiddens,visibleindex,epochs,nparticles,learningrate=learningrate)
+   fitpartdbmcore(x,nhiddens,visibleindex,epochs,nparticles,learningrate=learningrate,jointlearningrate=jointlearningrate)
 end
 
 "
