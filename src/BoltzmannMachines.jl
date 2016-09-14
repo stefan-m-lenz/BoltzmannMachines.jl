@@ -588,7 +588,8 @@ function fitpartdbmcore(x::Array{Float64,2},
       nparticles::Int = 100;
       jointepochs::Int = epochs,
       learningrate::Float64 = 0.005,
-      jointlearningrate::Float64 = learningrate)
+      jointlearningrate::Float64 = learningrate,
+      jointinitscale::Float64 = 1.0)
 
    nparts = length(visibleindex)
    p = size(x)[2]
@@ -610,7 +611,7 @@ function fitpartdbmcore(x::Array{Float64,2},
    for i=1:length(nhiddens)
       curin = (i == 1 ? p : nhiddens[i-1])
       curout = nhiddens[i]
-      weights = randn(curin,curout) / curin
+      weights = randn(curin,curout) / curin * jointinitscale
       a = zeros(curin)
       b = zeros(curout)
 
