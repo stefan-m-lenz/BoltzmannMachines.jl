@@ -634,6 +634,10 @@ function fitpartdbmcore(x::Array{Float64,2},
       end
    end
 
+   if jointepochs == 0
+      return params
+   end
+
    fitbm(x, params, epochs = jointepochs, nparticles = nparticles,learningrate=jointlearningrate)
 end
 
