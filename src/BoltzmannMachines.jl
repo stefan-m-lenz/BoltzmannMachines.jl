@@ -51,11 +51,11 @@ type MultivisionDBM
       # initialize ranges of hidden units for different RBMs
       nvisrbms = length(visrbms)
       visrbmshiddenranges = Array{UnitRange{Int}}(nvisrbms)
-      rangestart = 1
+      lastrangeend = 0
       for i = 1:nvisrbms
-         nhiddenofcurrentvisrbm = length(visrbm[i])
-         visrbmshiddenranges[i] = rangestart:nhiddenofcurrentvisrbm
-         rangestart += nhiddenofcurrentvisrbm + 1
+         nhiddenofcurrentvisrbm = length(visrbms[i].b)
+         visrbmshiddenranges[i] = lastrangeend + (1:nhiddenofcurrentvisrbm)
+         lastrangeend += nhiddenofcurrentvisrbm
       end
       new(visrbms, visrbmshiddenranges, hiddbm)
    end
@@ -63,8 +63,63 @@ end
 
 #typealias AbstractDBM Union{DBMParam, MultivisionDBM}
 
-function MultivisionDBM(visrbms::Vector{AbstractRBM})
+function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, DBMParam())
+end
+
+function addlayer!(mvdbm::MultivisionDBM, x;
+      islast::Bool = false,
+      nhidden::Int = length(mvdbm.hiddbm[end]),
+      epochs::Int = 10,
+      learningrate::Float64 = 0.005,
+      learningrates::Vector{Float64} = learningrate * ones(epochs),
+      pcd::Bool = true,
+      cdsteps::Int = 1,
+      monitoring::Function = ((rbm, epoch) -> nothing))
+
+   upfactor = downfactor = 2.0
+   if (islast)
+      upfactor = 1.0
+   end
+
+   # TODO bei jedem Layer neu den input von 0 an berechnen?
+   # Aufwand geschenkt, weil anders zu kompliziert??
+   # x = propagate from first to last layer of mvdbm???????
+
+   rbm = fitrbm(x, nhidden = nhidden, epochs = epochs,
+         learningrate = learningrate,
+         learningrates = learningrates,
+         pcd = pcd, cdsteps = 1,
+         upfactor = upfactor, downfactor = downfactor,
+         monitoring = monitoring)
+
+   push!(mvdbm.hiddbm, rbm)
+   mvdbm
+end
+
+"""
+    visiblestofirsthidden(mvdbm, x)
+Returns the activations induced by the forward pass of the dataset `x`
+as inputs for the visible RBMs.
+The variables/columns of `x` are divided among the visible RBMs.
+"""
+function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
+   nsamples = size(x, 1)
+   nvisrbms = length(mvdbm.visrbms)
+
+   probs = Vector{Matrix{Float64}}(nvisrbms)
+   visibleoffset = 0
+
+   for i = 1:nvisrbms
+      nvisible = length(mvdbm.visrbms[i].a)
+      visiblerange = visibleoffset + (1:nvisible)
+      println(visiblerange)
+      visibleoffset += nvisible
+      input = hiddeninput(mvdbm.visrbms[i], x[:, visiblerange])
+      probs[i] = bernoulli(sigm(2.0 * input))
+   end
+
+   hcat(probs...)
 end
 
 type MultivisionParticles
@@ -584,6 +639,14 @@ function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
    mu
 end
 
+# TODO
+# function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.001)
+#    nhiddenlayers = length(mvdbm.hiddbm) + 1
+#    mu = Particles(nhiddenlayers)
+#    for i=2:(nhiddenlayer -1)
+#    mu
+# end
+
 function gibbssample!(mvparticles::MultivisionParticles,
       mvdbm::MultivisionDBM,
       nsteps::Int = 5, beta::Float64 = 1.0)
@@ -673,9 +736,10 @@ end
 
 function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
    visparticles = Particles(length(mvdbm.visrbms))
-   for i = 1:length(visrbms)
+   # TODO check if there is a hiddbm, give useful error message, if not
+   for i = 1:length(mvdbm.visrbms)
       # TODO treat Gaussian visible differently
-      visparticles[i] = rand([0.0 1.0], nparticles, length(mvdbm.visrbms[i]))
+      visparticles[i] = rand([0.0 1.0], nparticles, length(mvdbm.visrbms[i].a))
    end
    hidparticles = initparticles(mvdbm.hiddbm, nparticles)
    MultivisionParticles(visparticles, hidparticles)
@@ -785,32 +849,75 @@ end
 function traindbm!(dbm::DBMParam, x::Array{Float64,2}, particles::Particles,
       learningrate::Float64)
 
-   nsamples = size(x, 1)
-   nparticles = size(particles[1], 1)
-
    gibbssample!(particles, dbm)
    mu = meanfield(dbm, x)
 
    for i = eachindex(dbm)
-      leftw = mu[i]'*mu[i+1]/nsamples
-      lefta = mean(mu[i],1)[:]
-      leftb = mean(mu[i+1],1)[:]
-
-      rightw = particles[i]'*particles[i+1]/nparticles
-      righta = mean(particles[i],1)[:]
-      rightb = mean(particles[i+1],1)[:]
-
-      dbm[i].weights += learningrate*(leftw - rightw)
-      dbm[i].a += learningrate*(lefta - righta)
-      dbm[i].b += learningrate*(leftb - rightb)
+      updatedbmpart!(dbm[i], learningrate,
+            particles[i], particles[i+1], mu[i], mu[i+1])
    end
 
    dbm
-
 end
 
-function updateparameters!(dbm::DBMParam, mu, particles::Particles)
+function updatedbmpart!(dbmpart::BernoulliRBM,
+      learningrate::Float64,
+      vgibbs::Matrix{Float64},
+      hgibbs::Matrix{Float64},
+      vmeanfield::Matrix{Float64},
+      hmeanfield::Matrix{Float64})
+
+   nsamples = size(vmeanfield, 1)
+   nparticles = size(vgibbs, 1)
+
+   leftw = vmeanfield' * hmeanfield / nsamples
+   lefta = mean(vmeanfield, 1)[:]
+   leftb = mean(hmeanfield, 1)[:]
+
+   rightw = vgibbs' * hgibbs / nparticles
+   righta = mean(vgibbs, 1)[:]
+   rightb = mean(hgibbs, 1)[:]
+
+   dbmpart.weights += learningrate*(leftw - rightw)
+   dbmpart.a += learningrate*(lefta - righta)
+   dbmpart.b += learningrate*(leftb - rightb)
+   nothing
+end
+
+function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
+      learningrate::Float64,
+      vgibbs::Matrix{Float64},
+      hgibbs::Matrix{Float64},
+      vmeanfield::Matrix{Float64},
+      hmeanfield::Matrix{Float64})
+
+   # For respecting standard deviation in update rule
+   # see [Srivastava+Salakhutdinov, 2014], p. 2962
+   vmeanfield = broadcast(./, vmeanfield, dbmpart.sd')
+   vgibbs = broadcast(./, vmeanfield, dbmpart.sd')
+
+   nsamples = size(vmeanfield, 1)
+   nparticles = size(vgibbs, 1)
+
+   leftw = vmeanfield' * hmeanfield / nsamples
+   lefta = mean(vmeanfield, 1)[:]
+   leftb = mean(hmeanfield, 1)[:]
+
+   rightw = vgibbs' * hgibbs / nparticles
+   righta = mean(vgibbs, 1)[:]
+   rightb = mean(hgibbs, 1)[:]
+
+   dbmpart.weights += learningrate*(leftw - rightw)
+   dbmpart.a += learningrate*(lefta - righta)
+   dbmpart.b += learningrate*(leftb - rightb)
+   nothing
+end
+
+function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2}, hidparticles::Particles)
    # TODO
+   # gibbssample!(mvdbm)
+   # meanfield(mvdbm) liefert mvparticles
+   # updatedbmpart fuer jede visible RBM, updatedbmpart fuer jede RBM in hiddbm
 end
 
 function sampledbm(dbm::DBMParam, n::Int, burnin::Int=10, returnall=false)
@@ -2043,3 +2150,4 @@ end # of module BoltzmannMachines
 # [Salakhutdinov+Hinton, 2012]: An Efficient Learning Procedure for Deep Boltzmann Machines
 # [Salakhutdinov, 2008]: Learning and Evaluating Boltzmann Machines
 # [Krizhevsky, 2009] : Learning Multiple Layers of Features from Tiny Images
+# [Srivastava+Salakhutdinov, 2014]: Multimodal Learning with Deep Boltzmann Machines
