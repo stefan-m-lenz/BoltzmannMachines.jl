@@ -93,12 +93,12 @@ function vprob(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64
 end
 
 function hprob(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
-   sigm(factor*(bgrbm.weights'*v + bgrbm.b))
+   factor*(bgrbm.b + bgrbm.weights' * v)
 end
 
 function hprob(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    # factor ignored
-   sigm(broadcast(+, vv*bgrbm.weights, bgrbm.b'))
+   broadcast(+, vv*bgrbm.weights, bgrbm.b')
 end
 
 function hiddeninput(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1})
@@ -391,7 +391,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       if pcd
          # Preserve state of chain in a way that changes are visible to the caller.
          copy!(chainstate, hmodel)
-         bernoulli!(chainstate)
+         bernoulli!(chainstate) # TODO change to support other types of hidden nodes
       end
 
       updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate)
