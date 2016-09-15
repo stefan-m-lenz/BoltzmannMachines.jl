@@ -13,7 +13,7 @@ type BernoulliRBM <: AbstractRBM
 end
 
 typealias DBMParam Array{BernoulliRBM,1}
-typealias AbstractBM Union{DBMParam, AbstractRBM}
+typealias AbstractBM Union{DBMParam, AbstractRBM} # TODO replace DBMParam with AbstractDBM
 typealias Particles Array{Array{Float64,2},1}
 typealias Particle Array{Array{Float64,1},1}
 
@@ -41,6 +41,7 @@ Nodes of different visible layers are connected to non-overlapping parts
 of the first hidden layer.
 """
 type MultivisionDBM
+
    visrbms::Vector{AbstractRBM}
    visrbmshiddenranges::Array{UnitRange{Int}}
 
@@ -59,6 +60,8 @@ type MultivisionDBM
       new(visrbms, visrbmshiddenranges, hiddbm)
    end
 end
+
+#typealias AbstractDBM Union{DBMParam, MultivisionDBM}
 
 function MultivisionDBM(visrbms::Vector{AbstractRBM})
    MultivisionDBM(visrbms, DBMParam())
@@ -592,31 +595,39 @@ function gibbssample!(mvparticles::MultivisionParticles,
       # save state of first hidden layer
       oldstate = copy(mvparticles.hidparticles[1])
 
+      # input of first hidden layer from second hidden layer
+      hinputtop = mvparticles.hidparticles[2] * mvdbm.hiddbm[1].weights'
+      broadcast!(+, hinputtop, hinputtop, mvdbm.hiddbm[1].a')
+
       for i = eachindex(mvdbm.visrbms)
          hiddenrange = mvdbm.visrbmshiddenranges[i]
 
-         # sample first hidden from visible
+         # sample first hidden from visible layers of visrbms
+         # and second hidden layer
+         input = hinputtop[hiddenrange] +
+               hiddeninput(mvdbm.visrbms[i], mvparticles.visparticles[i])
          mvparticles.hidparticles[1][hiddenrange] =
-               hprob(mvdbm.visrbms[i], mvparticles.visparticles[i], beta)
+               bernoulli(sigm(beta * input))
 
          # sample visible from old first hidden
          mvparticles.visparticles[i] =
-               vprob(mvdbm.visrbms[i], oldstate[hiddenrange], beta)
+               samplehidden(mvdbm.visrbms[i], oldstate[hiddenrange], beta)
       end
 
       # sample other hidden layers
       for i = 2:nhiddenlayers
-         input = oldstate * mvdvm.hiddbm[i-1].weights
-         broadcast!(+, input, inputmvdvm.hiddbm[i-1].b')
+         input = oldstate * mvdbm.hiddbm[i-1].weights
+         broadcast!(+, input, inputmvdbm.hiddbm[i-1].b')
          if i < nhiddenlayers
-            input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm[i]'
-            broadcast!(+, input, input, mvdvm.hiddbm[i].a')
+            input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm[i].weights'
+            broadcast!(+, input, input, mvdbm.hiddbm[i].a')
          end
          oldstate = copy(mvparticles.hidparticles[i])
          mvparticles.hidparticles[i] = bernoulli(sigm(beta * input))
       end
    end
 
+   mvparticles
 end
 
 function gibbssample!(particles::Particles, dbm::DBMParam,
@@ -663,6 +674,7 @@ end
 function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
    visparticles = Particles(length(mvdbm.visrbms))
    for i = 1:length(visrbms)
+      # TODO treat Gaussian visible differently
       visparticles[i] = rand([0.0 1.0], nparticles, length(mvdbm.visrbms[i]))
    end
    hidparticles = initparticles(mvdbm.hiddbm, nparticles)
@@ -795,6 +807,10 @@ function traindbm!(dbm::DBMParam, x::Array{Float64,2}, particles::Particles,
 
    dbm
 
+end
+
+function updateparameters!(dbm::DBMParam, mu, particles::Particles)
+   # TODO
 end
 
 function sampledbm(dbm::DBMParam, n::Int, burnin::Int=10, returnall=false)
