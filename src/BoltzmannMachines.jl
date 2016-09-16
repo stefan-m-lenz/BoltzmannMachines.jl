@@ -642,7 +642,7 @@ function fitpartdbmcore(x::Array{Float64,2},
       params[1:length(bottomparams)] = bottomparams
       topweights = randn(nhiddens[end],topn) / nhiddens[end] * jointinitscale
       topa = zeros(nhiddens[end])
-      topb = zeros(top)
+      topb = zeros(topn)
       params[end] = BernoulliRBM(topweights,topa,topb)
    end
 
