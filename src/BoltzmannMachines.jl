@@ -589,7 +589,8 @@ function fitpartdbmcore(x::Array{Float64,2},
       jointepochs::Int = epochs,
       learningrate::Float64 = 0.005,
       jointlearningrate::Float64 = learningrate,
-      jointinitscale::Float64 = 1.0)
+      jointinitscale::Float64 = 1.0,
+      topn::Int=0)
 
    nparts = length(visibleindex)
    p = size(x)[2]
@@ -635,6 +636,16 @@ function fitpartdbmcore(x::Array{Float64,2},
       end
    end
 
+   if topn > 0
+      bottomparams = params
+      params = Array{BMs.BernoulliRBM,1}(length(nhiddens)+1)
+      params[1:length(bottomparams)] = bottomparams
+      topweights = randn(nhiddens[end],topn) / nhiddens[end] * jointinitscale
+      topa = zeros(nhiddens[end])
+      topb = zeros(top)
+      params[end] = BernoulliRBM(topweights,topa,topb)
+   end
+
    if jointepochs == 0
       return params
    end
@@ -649,7 +660,8 @@ function fitpartdbm(x::Array{Float64,2},
       nparticles::Int = 100;
       jointepochs::Int = epochs,
       learningrate::Float64 = 0.005,
-      jointlearningrate::Float64 = learningrate)
+      jointlearningrate::Float64 = learningrate,
+      topn::Int=0)
 
    if (nparts < 2)
       return fitdbm(x,nhiddens,epochs,nparticles)
