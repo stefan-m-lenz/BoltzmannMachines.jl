@@ -612,7 +612,11 @@ function fitpartdbmcore(x::Array{Float64,2},
    for i=1:length(nhiddens)
       curin = (i == 1 ? p : nhiddens[i-1])
       curout = nhiddens[i]
-      weights = randn(curin,curout) / curin * jointinitscale
+      if jointinitscale == 0.0
+         weights = zeros(curin,curout)
+      else
+         weights = randn(curin,curout) / curin * jointinitscale
+      end
       a = zeros(curin)
       b = zeros(curout)
 
