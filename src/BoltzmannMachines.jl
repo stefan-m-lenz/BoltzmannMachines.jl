@@ -67,9 +67,15 @@ function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, DBMParam())
 end
 
-function addlayer!(mvdbm::MultivisionDBM, x;
+"""
+    addlayer!(mvdbm, x)
+Adds a pretrained layer to the MultivisionDBM, given the dataset `x` as input
+for the visible layer.
+The variables/columns of `x` are divided among the visible RBMs.
+"""
+function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
       islast::Bool = false,
-      nhidden::Int = length(mvdbm.hiddbm[end]),
+      nhidden::Int = size(x,2),
       epochs::Int = 10,
       learningrate::Float64 = 0.005,
       learningrates::Vector{Float64} = learningrate * ones(epochs),
@@ -77,16 +83,19 @@ function addlayer!(mvdbm::MultivisionDBM, x;
       cdsteps::Int = 1,
       monitoring::Function = ((rbm, epoch) -> nothing))
 
+   # propagate input x up to last hidden layer
+   hh = visiblestofirsthidden(mvdbm, x)
+   for i = 1:length(mvdbm.hiddbm)
+      hh = hprob(mvdbm.hiddbm[i], hh, 2.0) # intermediate layer, factor is 2.0
+   end
+
    upfactor = downfactor = 2.0
    if (islast)
       upfactor = 1.0
    end
 
-   # TODO bei jedem Layer neu den input von 0 an berechnen?
-   # Aufwand geschenkt, weil anders zu kompliziert??
-   # x = propagate from first to last layer of mvdbm???????
-
-   rbm = fitrbm(x, nhidden = nhidden, epochs = epochs,
+   rbm = fitrbm(hh, nhidden = nhidden, epochs = epochs,
+         rbmtype = BernoulliRBM,
          learningrate = learningrate,
          learningrates = learningrates,
          pcd = pcd, cdsteps = 1,
@@ -100,7 +109,7 @@ end
 """
     visiblestofirsthidden(mvdbm, x)
 Returns the activations induced by the forward pass of the dataset `x`
-as inputs for the visible RBMs.
+as inputs for the visible layer.
 The variables/columns of `x` are divided among the visible RBMs.
 """
 function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
@@ -113,7 +122,6 @@ function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
    for i = 1:nvisrbms
       nvisible = length(mvdbm.visrbms[i].a)
       visiblerange = visibleoffset + (1:nvisible)
-      println(visiblerange)
       visibleoffset += nvisible
       input = hiddeninput(mvdbm.visrbms[i], x[:, visiblerange])
       probs[i] = bernoulli(sigm(2.0 * input))
