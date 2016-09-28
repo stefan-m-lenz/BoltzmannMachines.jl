@@ -685,16 +685,16 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
       delta = max(delta, maximum(abs(mu[2] - newmu)))
       mu[2] = newmu
 
-      for i = 2:(nlayers-1)
-         input = mu[i] * mvdbm.hiddbm[i-1].weights
-         broadcast!(+, input, input, mvdbm.hiddbm[i-1].b')
-         if i < nlayers-1
-            input += mu[i+1] * mvdbm.hiddbm[i].weights'
-            broadcast!(+, input, input, mvdbm.hiddbm[i].a')
+      for i = 3:nlayers
+         input = mu[i-1] * mvdbm.hiddbm[i-2].weights
+         broadcast!(+, input, input, mvdbm.hiddbm[i-2].b')
+         if i < nlayers
+            input += mu[i] * mvdbm.hiddbm[i-1].weights'
+            broadcast!(+, input, input, mvdbm.hiddbm[i-1].a')
          end
-         newmu = bernoulli(sigm(input))
-         delta = max(delta, maximum(abs(mu[i+1] - newmu)))
-         mu[i+1] = newmu
+         newmu = sigm(input)
+         delta = max(delta, maximum(abs(mu[i] - newmu)))
+         mu[i] = newmu
       end
    end
 
@@ -972,6 +972,7 @@ end
 function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2},
       particles::Particles, learningrate::Float64)
 
+      println("PArtiles");println(size(particles[1]));println(size(particles[1]))
    gibbssample!(particles, mvdbm)
    mu = meanfield(mvdbm, x)
 
