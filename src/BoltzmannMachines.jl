@@ -103,7 +103,7 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
    end
 
    upfactor = downfactor = 2.0
-   if (islast)
+   if islast
       upfactor = 1.0
    end
 
@@ -663,7 +663,7 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
    mu[1] = x
    mu[2] = visiblestofirsthidden(mvdbm, x)
    for i = 3:(nlayers-1) # intermediate hidden layers after second
-      mu[i] = hprob(mvdbm.hiddbm[i-1], mu[i], 2.0)
+      mu[i] = hprob(mvdbm.hiddbm[i-2], mu[i-1], 2.0)
    end
    mu[nlayers] = hprob(mvdbm.hiddbm[nlayers-2], mu[nlayers-1])
 
@@ -790,7 +790,12 @@ function initparticles(dbm::DBMParam, nparticles::Int)
 end
 
 function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
-   particles = Particles(length(mvdbm.hiddbm) + 2)
+   nhidrbms = length(mvdbm.hiddbm)
+   if nhidrbms == 0
+      error("Add layers to MultivisionDBM to be able to call `initparticles`")
+   end
+
+   particles = Particles(nhidrbms + 2)
    particles[1] = Matrix{Float64}(nparticles, mvdbm.visrbmsvisranges[end][end])
    for i = 1:length(mvdbm.visrbms)
       visiblerange = mvdbm.visrbmsvisranges[i]
@@ -1309,10 +1314,6 @@ function haraldsloglikelihoods(dbms, x::Array{Float64,2};
       # generate samples from j'th DBM
       generated = BMs.sampledbm(dbms[j], ntogenerate, burnin)
 
-      # TODO entfernen
-      #modelx = load("modelx.jld")["modelx"]
-      #generated = modelx["dbm$j"]
-
       pxmodel = ones(ntrainingsamples)
       for hiddenindex in assochiddengroup
          correlatedvars = (assochiddenindexes .== hiddenindex)
@@ -1504,7 +1505,7 @@ for estimating the ratio of the partition functions of the given `dbm` to the
 base-rate DBM with all weights being zero.
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
 "
-function aisimportanceweights(dbm::Array{BernoulliRBM,1};
+function aisimportanceweights(dbm::DBMParam;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -1904,7 +1905,7 @@ or is calculated by the mean-field method.
 * The `logpartitionfunction` can be specified directly
 or is calculated using the `impweights`.
 "
-function logproblowerbound(dbm::Array{BernoulliRBM,1},
+function logproblowerbound(dbm::DBMParam,
       x::Array{Float64};
       impweights::Array{Float64,1} = aisimportanceweights(dbm),
       mu::Particles = meanfield(dbm, x),
