@@ -654,52 +654,47 @@ end
 
 function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.001)
 
-   nhiddenlayers = length(mvdbm.hiddbm) + 1
+   nlayers = length(mvdbm.hiddbm) + 2
+   nsamples = size(x,1)
    nfirsthidden = length(mvdbm.hiddbm[1].a)
-   mu = Particles(nhiddenlayers)
+   mu = Particles(nlayers)
 
    # Initialization with single bottom-up pass
    mu[1] = x
    mu[2] = visiblestofirsthidden(mvdbm, x)
-   for i = 3:(nhiddenlayers-1)
+   for i = 3:(nlayers-1) # intermediate hidden layers after second
       mu[i] = hprob(mvdbm.hiddbm[i-1], mu[i], 2.0)
    end
-   mu[nhiddenlayers+1] = hprob(mvdbm.hiddbm[nhiddenlayers-1], mu[nhiddenlayers])
+   mu[nlayers] = hprob(mvdbm.hiddbm[nlayers-2], mu[nlayers-1])
 
    # mean-field updates until convergence criterion is met
-   delta = 1.0
+   delta = Inf
    while delta > eps
       delta = 0.0
 
       # input of first hidden layer from second hidden layer
       hinputtop = mu[3] * mvdbm.hiddbm[1].weights'
-      newdelta = 1.0
+      newmu = Matrix{Float64}(nsamples, nfirsthidden)
       for i = eachindex(mvdbm.visrbms)
          hiddenrange = mvdbm.visrbmshidranges[i]
-         visiblerange = mvdbm.visrbmsvisibleranges[i]
+         visiblerange = mvdbm.visrbmsvisranges[i]
 
-         newmu = sigm(hinputtop[:,hiddenrange] +
+         newmu[:,hiddenrange] .= sigm(hinputtop[:,hiddenrange] +
                hiddeninput(mvdbm.visrbms[i], mu[1][:,visiblerange]))
-         newdelta = maximum(newdelta, abs(mu[2][visiblerange] - newmu))
-         mu[1] = newmu
       end
-      if newdelta > delta
-         delta = newdelta
-      end
+      delta = max(delta, maximum(abs(mu[2] - newmu)))
+      mu[2] = newmu
 
-      for i = 2:nhiddenlayers
-         input = mu[i-1] * mvdbm.hiddbm[i-1].weights
+      for i = 2:(nlayers-1)
+         input = mu[i] * mvdbm.hiddbm[i-1].weights
          broadcast!(+, input, input, mvdbm.hiddbm[i-1].b')
-         if i < nhiddenlayers
+         if i < nlayers-1
             input += mu[i+1] * mvdbm.hiddbm[i].weights'
             broadcast!(+, input, input, mvdbm.hiddbm[i].a')
          end
-         newmu = bernoulli(sigm(beta * input))
-         newdelta = maximum(abs(mu[1] - newmu))
-         if newdelta > delta
-            delta = newdelta
-         end
-         mu[i] = newmu
+         newmu = bernoulli(sigm(input))
+         delta = max(delta, maximum(abs(mu[i+1] - newmu)))
+         mu[i+1] = newmu
       end
    end
 
