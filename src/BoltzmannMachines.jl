@@ -950,7 +950,7 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
    # For respecting standard deviation in update rule
    # see [Srivastava+Salakhutdinov, 2014], p. 2962
    vmeanfield = broadcast(./, vmeanfield, dbmpart.sd')
-   vgibbs = broadcast(./, vmeanfield, dbmpart.sd')
+   vgibbs = broadcast(./, vgibbs, dbmpart.sd')
 
    nsamples = size(vmeanfield, 1)
    nparticles = size(vgibbs, 1)
@@ -972,7 +972,6 @@ end
 function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2},
       particles::Particles, learningrate::Float64)
 
-      println("PArtiles");println(size(particles[1]));println(size(particles[1]))
    gibbssample!(particles, mvdbm)
    mu = meanfield(mvdbm, x)
 
