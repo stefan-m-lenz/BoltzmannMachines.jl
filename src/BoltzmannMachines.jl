@@ -43,25 +43,38 @@ of the first hidden layer.
 type MultivisionDBM
 
    visrbms::Vector{AbstractRBM}
-   visrbmshiddenranges::Array{UnitRange{Int}}
+   visrbmsvisranges::Array{UnitRange{Int}}
+   visrbmshidranges::Array{UnitRange{Int}}
 
    hiddbm::DBMParam
 
    function MultivisionDBM(visrbms, hiddbm)
       # initialize ranges of hidden units for different RBMs
       nvisrbms = length(visrbms)
-      visrbmshiddenranges = Array{UnitRange{Int}}(nvisrbms)
-      lastrangeend = 0
+
+      # calculate visible ranges
+      visrbmsvisranges = Array{UnitRange{Int}}(nvisrbms)
+      offset = 0
+      for i = 1:nvisrbms
+         nvisibleofcurrentvisrbm = length(visrbms[i].a)
+         visrbmsvisranges[i] = offset + (1:nvisibleofcurrentvisrbm)
+         offset += nvisibleofcurrentvisrbm
+      end
+
+      # calculate hidden ranges
+      visrbmshidranges = Array{UnitRange{Int}}(nvisrbms)
+      offset = 0
       for i = 1:nvisrbms
          nhiddenofcurrentvisrbm = length(visrbms[i].b)
-         visrbmshiddenranges[i] = lastrangeend + (1:nhiddenofcurrentvisrbm)
-         lastrangeend += nhiddenofcurrentvisrbm
+         visrbmshidranges[i] = offset + (1:nhiddenofcurrentvisrbm)
+         offset += nhiddenofcurrentvisrbm
       end
-      new(visrbms, visrbmshiddenranges, hiddbm)
+
+      new(visrbms, visrbmsvisranges, visrbmshidranges, hiddbm)
    end
 end
 
-#typealias AbstractDBM Union{DBMParam, MultivisionDBM}
+typealias AbstractDBM Union{DBMParam, MultivisionDBM}
 
 function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, DBMParam())
@@ -131,8 +144,8 @@ function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
 end
 
 type MultivisionParticles
-   hidparticles::Particles
    visparticles::Particles
+   hidparticles::Particles
 end
 
 "
@@ -647,13 +660,57 @@ function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
    mu
 end
 
-# TODO
-# function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.001)
-#    nhiddenlayers = length(mvdbm.hiddbm) + 1
-#    mu = Particles(nhiddenlayers)
-#    for i=2:(nhiddenlayer -1)
-#    mu
-# end
+function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.001)
+
+   nhiddenlayers = length(mvdbm.hiddbm) + 1
+   nfirsthidden = length(mvdbm.hiddbm[1].a)
+   mu = Particles(nhiddenlayers)
+
+   # Initialization with single bottom-up pass
+   mu[1] = visiblestofirsthidden(mvdbm, x)
+   for i = 2:(nhiddenlayers-1)
+      mu[i] = hprob(mvdbm.hiddbm[i-1], mu[i-1], 2.0)
+   end
+   mu[nhiddenlayers] = hprob(mvdbm.hiddbm[nhiddenlayers-1], mu[nhiddenlayers-1])
+
+   # mean-field updates until convergence criterion is met
+   delta = 1.0
+   while delta > eps
+      delta = 0.0
+
+      # input of first hidden layer from second hidden layer
+      hinputtop = mu[2] * mvdbm.hiddbm[1].weights'
+      newdelta = 1.0
+      for i = eachindex(mvdbm.visrbms)
+         hiddenrange = mvdbm.visrbmshidranges[i]
+         visrange = mvdbm.visrbmsvisranges[i]
+         newmu = sigm(hinputtop[:,hiddenrange] +
+               hiddeninput(mvdbm.visrbms[i], x[:,visrange]))
+         newdelta = maximum(newdelta, abs(mu[1][visrange] - newmu))
+         mu[1] = newmu
+      end
+      if newdelta > delta
+         delta = newdelta
+      end
+
+      for i = 2:nhiddenlayers
+         input = mu[i-1] * mvdbm.hiddbm[i-1].weights
+         broadcast!(+, input, input, mvdbm.hiddbm[i-1].b')
+         if i < nhiddenlayers
+            input += mu[i+1] * mvdbm.hiddbm[i].weights'
+            broadcast!(+, input, input, mvdbm.hiddbm[i].a')
+         end
+         newmu = bernoulli(sigm(beta * input))
+         newdelta = maximum(abs(mu[1] - newmu))
+         if newdelta > delta
+            delta = newdelta
+         end
+         mu[i] = newmu
+      end
+   end
+
+   mu
+end
 
 function gibbssample!(mvparticles::MultivisionParticles,
       mvdbm::MultivisionDBM,
@@ -671,24 +728,24 @@ function gibbssample!(mvparticles::MultivisionParticles,
       broadcast!(+, hinputtop, hinputtop, mvdbm.hiddbm[1].a')
 
       for i = eachindex(mvdbm.visrbms)
-         hiddenrange = mvdbm.visrbmshiddenranges[i]
+         hiddenrange = mvdbm.visrbmshidranges[i]
 
          # sample first hidden from visible layers of visrbms
          # and second hidden layer
-         input = hinputtop[hiddenrange] +
+         input = hinputtop[:,hiddenrange] +
                hiddeninput(mvdbm.visrbms[i], mvparticles.visparticles[i])
-         mvparticles.hidparticles[1][hiddenrange] =
+         mvparticles.hidparticles[1][:,hiddenrange] =
                bernoulli(sigm(beta * input))
 
          # sample visible from old first hidden
          mvparticles.visparticles[i] =
-               samplehidden(mvdbm.visrbms[i], oldstate[hiddenrange], beta)
+               samplevisible(mvdbm.visrbms[i], oldstate[:,hiddenrange], beta)
       end
 
       # sample other hidden layers
       for i = 2:nhiddenlayers
          input = oldstate * mvdbm.hiddbm[i-1].weights
-         broadcast!(+, input, inputmvdbm.hiddbm[i-1].b')
+         broadcast!(+, input, input, mvdbm.hiddbm[i-1].b')
          if i < nhiddenlayers
             input += mvparticles.hidparticles[i+1] * mvdbm.hiddbm[i].weights'
             broadcast!(+, input, input, mvdbm.hiddbm[i].a')
@@ -832,7 +889,7 @@ and a pre-trained Deep Boltzmann machine `dbm` as arguments.
 * `monitoring`: A function that is executed after each training epoch.
    It takes a DBM and the epoch as arguments.
 """
-function fitbm(x::Array{Float64,2}, dbm::DBMParam;
+function fitbm(x::Array{Float64,2}, dbm::AbstractDBM;
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrates::Array{Float64,1} = 0.005*11.0 ./ (10.0 + (1:epochs)),
@@ -921,11 +978,32 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
    nothing
 end
 
-function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2}, hidparticles::Particles)
-   # TODO
-   # gibbssample!(mvdbm)
-   # meanfield(mvdbm) liefert mvparticles
-   # updatedbmpart fuer jede visible RBM, updatedbmpart fuer jede RBM in hiddbm
+function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2},
+      mvparticles::MultivisionParticles, learningrate::Float64)
+
+   gibbssample!(mvparticles, mvdbm)
+   mu = meanfield(mvdbm, x)
+
+   # update parameters of each visible RBM
+   for i = eachindex(mvdbm.visrbms)
+      hiddenrange = mvdbm.visrbmshidranges[i]
+      updatedbmpart!(mvdbm.visrbms[i], learningrate,
+            mvparticles.visparticles[1],
+            mvparticles.hidparticles[1][:,hiddenrange],
+            x[:,hiddenrange],
+            mu[1])
+   end
+
+   # update parameters of each RBM in hiddbm
+   for i = eachindex(mvdbm.hiddbm)
+      updatedbmpart!(mvdbm.hiddbm[i], learningrate,
+            mvparticles.hidparticles[i],
+            mvparticles.hidparticles[i+1],
+            mu[i],
+            mu[i+1])
+   end
+
+   mvdbm
 end
 
 function sampledbm(dbm::DBMParam, n::Int, burnin::Int=10, returnall=false)
