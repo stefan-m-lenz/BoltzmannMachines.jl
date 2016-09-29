@@ -13,7 +13,6 @@ type BernoulliRBM <: AbstractRBM
 end
 
 typealias DBMParam Array{BernoulliRBM,1}
-typealias AbstractBM Union{DBMParam, AbstractRBM} # TODO replace DBMParam with AbstractDBM
 typealias Particles Array{Array{Float64,2},1}
 typealias Particle Array{Array{Float64,1},1}
 
@@ -75,6 +74,7 @@ type MultivisionDBM
 end
 
 typealias AbstractDBM Union{DBMParam, MultivisionDBM}
+typealias AbstractBM Union{AbstractDBM, AbstractRBM}
 
 function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, DBMParam())
@@ -679,7 +679,7 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
          hiddenrange = mvdbm.visrbmshidranges[i]
          visiblerange = mvdbm.visrbmsvisranges[i]
 
-         newmu[:,hiddenrange] .= sigm(hinputtop[:,hiddenrange] +
+         newmu[:,hiddenrange] = sigm(hinputtop[:,hiddenrange] +
                hiddeninput(mvdbm.visrbms[i], mu[1][:,visiblerange]))
       end
       delta = max(delta, maximum(abs(mu[2] - newmu)))
@@ -1012,7 +1012,7 @@ function sampledbm(dbm::DBMParam, n::Int, burnin::Int=10, returnall=false)
    end
 end
 
-function sampleparticles(dbm::DBMParam, nparticles::Int, burnin::Int = 10)
+function sampleparticles(dbm::AbstractDBM, nparticles::Int, burnin::Int = 10)
    particles = initparticles(dbm, nparticles)
    gibbssample!(particles, dbm, burnin)
    particles
