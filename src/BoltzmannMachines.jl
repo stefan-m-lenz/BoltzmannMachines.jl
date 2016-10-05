@@ -1699,7 +1699,7 @@ Sets the vector `combination`, containing a sequence of the values 0.0 and 1.0,
 to the next combination of 0.0s and 1.0s.
 Returns false if the new combination consists only of zeros; true otherwise.
 """
-function next!(combination::Array{Float64,1})
+function next!(combination::Vector{Float64})
    i = 1
    while i <= length(combination)
       if combination[i] == 0.0
@@ -1714,25 +1714,31 @@ function next!(combination::Array{Float64,1})
    i <= length(combination)
 end
 
-function exactpartitionfunction(rbm::BernoulliRBM)
+"""
+    exactlogpartitionfunction(rbm)
+Calculates the log of the partition function exactly.
+The complexity of the algorithm is O(2^n), with n being the minumum of
+{number of visible nodes, number of hidden nodes}.
+"""
+function exactlogpartitionfunction(rbm::BernoulliRBM)
    nvisible = length(rbm.a)
    nhidden = length(rbm.b)
-   z = [0.0]
-   v = zeros(nvisible)
-   h = zeros(nhidden)
-   while true
-      fill!(h, 0.0)
+   z = 0.0
+   if nvisible <= nhidden
+      v = zeros(nvisible)
       while true
-         z += exp(v'*rbm.weights*h + rbm.a'*v + rbm.b'*h)
+         z += exp(-freeenergy(rbm, v))
+         next!(v) || break
+      end
+   else
+      h = zeros(nhidden)
+      revrbm = reversedrbm(rbm)
+      while true
+         z += exp(-freeenergy(revrbm, h))
          next!(h) || break
       end
-      next!(v) || break
    end
-   z[1]
-end
-
-function exactlogpartitionfunction(rbm::BernoulliRBM)
-   log(exactpartitionfunction(rbm))
+   log(z)
 end
 
 function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
@@ -1756,6 +1762,10 @@ are switched and a visible standard deviation of 1.
 function reversedrbm(bgrbm::BernoulliGaussianRBM)
    sd = ones(length(bgrbm.b))
    GaussianBernoulliRBM(bgrbm.weights', bgrbm.b, bgrbm.a, sd)
+end
+
+function reversedrbm(rbm::BernoulliRBM)
+   BernoulliRBM(rbm.weights', rbm.b, rbm.a)
 end
 
 function exactlogpartitionfunction(bgrbm::BernoulliGaussianRBM)
@@ -1810,11 +1820,15 @@ function exactpartitionfunction(dbm::DBMParam)
    z
 end
 
+function exactlogpartitionfunction(dbm::DBMParam)
+   log(exactpartitionfunction(dbm))
+end
+
 "
 Computes the mean likelihood for the given dataset `x` exactly.
 "
 function exactloglikelihood(dbm::DBMParam, x::Array{Float64,2},
-      logz = log(exactpartitionfunction(dbm)))
+      logz = exactlogpartitionfunction(dbm))
 
    nsamples = size(x,1)
    nlayers = length(dbm) + 1
@@ -2186,6 +2200,10 @@ function freeenergy(rbm::BernoulliRBM, x::Matrix{Float64})
    end
    freeenergy /= nsamples
    freeenergy
+end
+
+function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
+   - dot(rbm.a, v) - sum(log(1 + exp(hiddeninput(rbm, v))))
 end
 
 function freeenergy(gbrbm::GaussianBernoulliRBM, x::Matrix{Float64})

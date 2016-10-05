@@ -57,4 +57,51 @@ function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
    baserate - exactloglik
 end
 
+function randdbm(nunits)
+   nrbms = length(nunits) - 1
+   dbm = BMs.DBMParam(nrbms)
+   for i = 1:nrbms
+      dbm[i] = randrbm(nunits[i], nunits[i+1])
+   end
+   dbm
+end
+
+"
+Calculates the exact value for the partition function and an estimate with AIS
+and return the difference between the logs of the two values
+for a given RBM.
+"
+function aisvsexact(rbm::BMs.AbstractRBM, ntemperatures::Int = 100,
+      nparticles::Int = 100)
+
+   # Test log partition funtion estimation vs exact calculation
+   exact = BMs.exactlogpartitionfunction(rbm)
+   impweights = BMs.aisimportanceweights(rbm,
+         ntemperatures = ntemperatures, nparticles = nparticles)
+   r = mean(impweights)
+   estimated = BMs.logpartitionfunction(rbm, r)
+   println("Range of 2 * sd aroung AIS-estimated log partition function")
+   println(BMs.aisprecision(impweights, 2.0))
+   println("Difference between exact log partition function and AIS-estimated one")
+   println("in percent of log of exact value")
+   println((exact - estimated)/exact*100)
+end
+
+function aisvsexact(dbm::BMs.DBMParam, ntemperatures = 100, nparticles = 100)
+   nrbms = length(dbm)
+
+   impweights = BMs.aisimportanceweights(dbm, ntemperatures = ntemperatures,
+      nparticles = nparticles)
+
+   r = mean(impweights)
+   println("Range of 2 * sd aroung AIS-estimated log partition function")
+   println(BMs.aisprecision(impweights, 2.0))
+   exact = BMs.exactlogpartitionfunction(dbm)
+   estimated = BMs.logpartitionfunction(dbm, r)
+   println("Difference between exact log partition function and AIS-estimated one")
+   println("in percent of log of exact value")
+   println((exact - estimated)/exact*100)
+   # TODO loglikelihood base-rate vs loglikelihood dbm
+end
+
 end
