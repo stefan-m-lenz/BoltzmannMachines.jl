@@ -103,6 +103,9 @@ function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString)
    requiresgadfly()
    title = get(plottitledict, evaluationkey, evaluationkey)
    plotdata = extractevaluationdata(monitor, evaluationkey)
+   if size(plotdata, 1) == 0
+      error("No data for this evaluation in monitor")
+   end
    plot(plotdata, x ="epoch", y = "value", color = "datasetname",
          Geom.line, Guide.title(title))
 end

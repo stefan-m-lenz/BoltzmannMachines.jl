@@ -103,7 +103,7 @@ The values of the returned dictionary are the correlations of the samples in
 the datasets given as values in the `datadict`.
 "
 function correlations(datadict::DataDict)
-   DataDict(map(kv -> (kv[1], cor(kv[2])), datadict))
+   DataDict(map(kv -> (kv[1] => cor(kv[2])), datadict))
 end
 
 """
@@ -111,11 +111,11 @@ end
 Generates samples and records the distance of their correlation matrix to the
 correlation matrices for (original) datasets contained in the `cordict`.
 """
-function monitorcordiff!(monitor::Monitor, rbm::AbstractRBM, epoch::Int,
+function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       cordict::DataDict;
       nparticles::Int = 3000, burnin = 10)
 
-   samplecor = cor(BMs.sampleparticles(rbm, nparticles, burnin)[1])
+   samplecor = cor(BMs.sampleparticles(bm, nparticles, burnin)[1])
    for (datasetname, datacor) in cordict
       push!(monitor, MonitoringItem(BMs.monitorcordiff, epoch,
                norm(samplecor-datacor), datasetname))
