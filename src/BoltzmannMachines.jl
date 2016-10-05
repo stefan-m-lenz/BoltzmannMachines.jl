@@ -375,6 +375,16 @@ function initvisiblebias(x::Array{Float64,2})
    initbias
 end
 
+function combinedbiases(dbm::DBMParam)
+   biases = Particle(length(dbm) + 1)
+   biases[1] = dbm[1].a
+   for i = 2:length(dbm)
+      biases[i] = dbm[i].a + dbm[i-1].b
+   end
+   biases[end] = dbm[end].b
+   biases
+end
+
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),
       epochs::Int = 10,
@@ -1719,10 +1729,24 @@ function next!(combination::Vector{Float64})
 end
 
 """
+    next!(particle)
+Sets `particle` to the next combination of nodes' activations.
+Returns false if the loop went through all combinations; true otherwise.
+"""
+function next!(particle::Particle)
+   n = length(particle)
+   i = 1
+   while i <= n && !next!(particle[i])
+      i += 1
+   end
+   i <= n
+end
+
+"""
     exactlogpartitionfunction(rbm)
-Calculates the log of the partition function exactly.
-The complexity of the algorithm is O(2^n), with n being the minumum of
-{number of visible nodes, number of hidden nodes}.
+Calculates the log of the partition function of the BernoulliRBM `rbm` exactly.
+The complexity of the algorithm is
+O(2^min(number of visible nodes, number of hidden nodes)).
 """
 function exactlogpartitionfunction(rbm::BernoulliRBM)
    nvisible = length(rbm.a)
@@ -1745,6 +1769,11 @@ function exactlogpartitionfunction(rbm::BernoulliRBM)
    log(z)
 end
 
+"""
+    exactlogpartitionfunction(gbrbm)
+Calculates the log of the partition function of the GaussianBernoulliRBM `gbrbm`
+exactly. The complexity of the algorithm is O(2^number of hidden nodes).
+"""
 function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
    nvisible = length(gbrbm.a)
    nhidden = length(gbrbm.b)
@@ -1770,6 +1799,11 @@ end
 
 function reversedrbm(rbm::BernoulliRBM)
    BernoulliRBM(rbm.weights', rbm.b, rbm.a)
+end
+
+function reverseddbm(dbm::DBMParam)
+   revdbm = reverse(dbm)
+   map!(reversedrbm, revdbm)
 end
 
 function exactlogpartitionfunction(bgrbm::BernoulliGaussianRBM)
@@ -1801,7 +1835,7 @@ function initcombination(dbm::DBMParam)
    u
 end
 
-function exactpartitionfunction(dbm::DBMParam)
+function exactlogpartitionfunction(dbm::DBMParam)
    nlayers = length(dbm) + 1
 
    u = initcombination(dbm)
@@ -1821,11 +1855,54 @@ function exactpartitionfunction(dbm::DBMParam)
          break
       end
    end
-   z
+   log(z)
 end
 
-function exactlogpartitionfunction(dbm::DBMParam)
-   log(exactpartitionfunction(dbm))
+# NOT YET FUNCTIONAL
+function exactlogpartitionfunction2(dbm::DBMParam)
+   nunits = BMs.nunits(dbm)
+   nhiddenlayers = length(dbm)
+
+   # Apply algorithm on reversed DBM if it requires fewer iterations there
+   if nhiddenlayers % 2 == 1
+      noddlayersnodes = sum(nunits[1:3:end])
+      nevenlayersnodes = sum(nunits[2:2:end])
+      if noddlayersnodes > nevenlayersnodes
+         dbm = reverseddbm(dbm)
+         nunits = reverse(nunits)
+      end
+   end
+
+   # Initialize particles for odd hidden layers: h1, h3, ...
+   hodd = Particle(round(Int, nhiddenlayers / 2, RoundUp))
+   for i = eachindex(hodd)
+      hodd[i] = zeros(nunits[2i])
+   end
+
+   biases = combinedbiases(dbm)
+
+   # Calculate the unnormalized probabilities for all combinations of nodes
+   # in the odd hidden layers
+   z = 0.0
+   nintermediatelayerstobesummedout = div(nhiddenlayers - 1, 2)
+   # TODO: biases benutzen
+   while true
+      pun = exp(dot(biases[1], hodd[1])) *
+            prod(1 + exp(visibleinput(dbm[1], hodd[1])))
+      for i = 1:2:nintermediatelayerstobesummedout
+         pun *= prod(1 + exp(
+               hiddeninput(dbm[2i], hodd[i]) + visibleinput(dbm[2i+1], hodd[i+1])))
+      end
+      if nhiddenlayers % 2 == 0
+         pun *= prod(1 + exp(hiddeninput(dbm[end], hodd[end])))
+      end
+
+      z += pun
+
+      # next combination of odd hidden layers' nodes
+      next!(hodd) || break
+   end
+   log(z)
 end
 
 "
