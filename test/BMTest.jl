@@ -1,7 +1,16 @@
 module BMTest
 
+using Base.Test
 import BoltzmannMachines
 const BMs = BoltzmannMachines
+
+function createsamples(nsamples::Int, nvariables::Int, samerate=0.7)
+   x = round(rand(nsamples,nvariables))
+   samerange = 1:round(Int, samerate*nsamples)
+   x[samerange,3] = x[samerange,2] = x[samerange,1]
+   x = x[randperm(nsamples),:] # shuffle lines
+   x
+end
 
 function randrbm(nvisible, nhidden, factorw = 1.0, factora = 1.0, factorb = 1.0)
    w = factorw*randn(nvisible, nhidden)
@@ -104,7 +113,7 @@ function aisvsexact(dbm::BMs.DBMParam, ntemperatures = 100, nparticles = 100)
    # TODO loglikelihood base-rate vs loglikelihood dbm
 end
 
-function exactlogpartitionfunctioninefficient(dbm::BMs.DBMParam)
+function exactlogpartitionfunctionwithoutsummingout(dbm::BMs.DBMParam)
    nlayers = length(dbm) + 1
    u = BMs.initcombination(dbm)
    z = 0.0
@@ -113,6 +122,45 @@ function exactlogpartitionfunctioninefficient(dbm::BMs.DBMParam)
       BMs.next!(u) || break
    end
    log(z)
+end
+
+function testsummingoutforexactloglikelihood(nunits::Vector{Int})
+   x = BMTest.createsamples(1000, nunits[1]);
+   dbm = BMs.stackrbms(x, nhiddens = nunits[2:end],
+         epochs = 50, predbm = true, learningrate = 0.001);
+   dbm = BMs.fitbm(x, dbm,
+         learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
+         epochs = 30);
+   logz = BMs.exactlogpartitionfunction(dbm)
+   @test_approx_eq(BMs.exactloglikelihood(dbm, x, logz),
+         exactloglikelihoodwithoutsummingout(dbm, x, logz))
+end
+
+function exactloglikelihoodwithoutsummingout(dbm::BMs.DBMParam, x::Array{Float64,2},
+      logz = BMs.exactlogpartitionfunction(dbm))
+
+   nsamples = size(x,1)
+   nlayers = length(dbm) + 1
+
+   u = BMs.initcombination(dbm)
+   logp = 0.0
+   for j = 1:nsamples
+      u[1] = vec(x[j,:])
+
+      p = 0.0
+      while true
+         p += exp(-BMs.energy(dbm, u))
+
+         # next combination of hidden nodes' activations
+         BMs.next!(u[2:end]) || break
+      end
+
+      logp += log(p)
+   end
+
+   logp /= nsamples
+   logp -= logz
+   logp
 end
 
 end

@@ -1839,7 +1839,8 @@ end
     exactlogpartitionfunction(dbm)
 Calculates the log of the partition function of the DBM `dbm` exactly.
 If the number of hidden layers is even, the execution time grows exponentially
-with the total number of nodes in hidden layers with odd indexes.
+with the total number of nodes in hidden layers with odd indexes
+(i. e. h1, h3, ...).
 If the number of hidden layers is odd, the execution time grows exponentially
 with the minimum of
 (number of nodes in layers with even index,
@@ -1851,28 +1852,28 @@ function exactlogpartitionfunction(dbm::DBMParam)
 
    # Apply algorithm on reversed DBM if it requires fewer iterations there
    if nhiddenlayers % 2 == 1
-      noddlayersnodes = sum(nunits[1:3:end])
+      noddlayersnodes = sum(nunits[1:2:end])
       nevenlayersnodes = sum(nunits[2:2:end])
-      if noddlayersnodes > nevenlayersnodes
+      if noddlayersnodes < nevenlayersnodes
          dbm = reverseddbm(dbm)
          nunits = reverse(nunits)
       end
    end
 
-   # Initialize particles for odd hidden layers: h1, h3, ...
+   # Initialize particles for hidden layers with odd indexes
    hodd = Particle(round(Int, nhiddenlayers / 2, RoundUp))
    for i = eachindex(hodd)
       hodd[i] = zeros(nunits[2i])
    end
 
    # Calculate the unnormalized probabilities for all combinations of nodes
-   # in the odd hidden layers
+   # in the hidden layers with odd indexes
    z = 0.0
    biases = combinedbiases(dbm)
    nintermediatelayerstobesummedout = div(nhiddenlayers - 1, 2)
    while true
       pun = prod(1 + exp(visibleinput(dbm[1], hodd[1])))
-      for i = 1:2:nintermediatelayerstobesummedout
+      for i = 1:nintermediatelayerstobesummedout
          pun *= prod(1 + exp(
                hiddeninput(dbm[2i], hodd[i]) + visibleinput(dbm[2i+1], hodd[i+1])))
       end
@@ -1892,33 +1893,61 @@ function exactlogpartitionfunction(dbm::DBMParam)
 end
 
 "
-Computes the mean likelihood for the given dataset `x` exactly.
+Computes the unnormalized probability of the nodes in layers with odd indexes,
+i. e. p*(v, h2, h4, ...).
 "
+function unnormalizedproboddlayers(dbm::DBMParam, uodd::Particle,
+      combinedbiases = BMs.combinedbiases(dbm))
+
+   nlayers = length(dbm) + 1
+   nintermediatelayerstobesummedout = div(nlayers - 1, 2)
+   pun = 1.0
+   for i = 1:nintermediatelayerstobesummedout
+      pun *= prod(1 + exp(
+            hiddeninput(dbm[2i-1], uodd[i]) + visibleinput(dbm[2i], uodd[i+1])))
+   end
+   if nlayers % 2 == 0
+      pun *= prod(1 + exp(hiddeninput(dbm[end], uodd[end])))
+   end
+   for i = 1:length(uodd)
+      pun *= exp(dot(combinedbiases[2i-1], uodd[i]))
+   end
+
+   pun
+end
+
+"""
+    exactloglikelihood(dbm, x)
+    exactloglikelihood(dbm, x, logz)
+Computes the mean likelihood for the given dataset `x` and the DBM `dbm`
+exactly.
+If the value of the log of the partition function of the `dbm` is not supplied
+as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
+"""
 function exactloglikelihood(dbm::DBMParam, x::Array{Float64,2},
       logz = exactlogpartitionfunction(dbm))
 
-   nsamples = size(x,1)
-   nlayers = length(dbm) + 1
+   nsamples = size(x, 1)
+   nunits = BMs.nunits(dbm)
+   nlayers = length(nunits)
+   combinedbiases = BMs.combinedbiases(dbm)
 
-   u = initcombination(dbm)
+   # Initialize particles for hidden layers with odd indexes
+   uodd = Particle(round(Int, nlayers / 2, RoundUp))
+   for i = eachindex(uodd)
+      uodd[i] = zeros(nunits[2i-1])
+   end
+
    logp = 0.0
-   for j=1:nsamples
-      u[1] = vec(x[j,:])
+   for j = 1:nsamples
+      uodd[1] = vec(x[j,:])
 
       p = 0.0
       while true
-         p += exp(-energy(dbm, u))
+         p += unnormalizedproboddlayers(dbm, uodd, combinedbiases)
 
          # next combination of hidden nodes' activations
-         i = 2
-         while i <= nlayers && !next!(u[i])
-            i += 1
-         end
-
-         # stop if loop went through all combinations (and reached first one)
-         if i == nlayers + 1
-            break
-         end
+         next!(uodd[2:end]) || break
       end
 
       logp += log(p)
