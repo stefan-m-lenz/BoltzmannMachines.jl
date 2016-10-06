@@ -19,3 +19,13 @@ bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), rand(nvisible), ones(
 
 @test_approx_eq(BMs.logpartitionfunction(bgrbm, 1.0),
       BMs.exactlogpartitionfunction(bgrbm))
+
+# Test exact computation of log partition function of DBM:
+# Compare inefficient simple implementation with more efficient one that
+# sums out layers analytically.
+nhiddensvecs = Array[[5;4;6;3], [5;6;7], [4;4;2;4;3]]
+for i = 1:length(nhiddensvecs)
+   dbm = BMTest.randdbm(nhiddensvecs[i]);
+   @test_approx_eq(BMs.exactlogpartitionfunction(dbm),
+         BMTest.exactlogpartitionfunctioninefficient(dbm))
+end

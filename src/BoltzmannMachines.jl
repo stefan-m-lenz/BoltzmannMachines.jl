@@ -1836,30 +1836,6 @@ function initcombination(dbm::DBMParam)
 end
 
 function exactlogpartitionfunction(dbm::DBMParam)
-   nlayers = length(dbm) + 1
-
-   u = initcombination(dbm)
-
-   z = 0.0
-   while true
-      z += exp(-energy(dbm, u))
-
-      # next combination of activations
-      i = 1
-      while i <= nlayers && !next!(u[i])
-         i += 1
-      end
-
-      # stop if loop went through all combinations
-      if i == nlayers + 1
-         break
-      end
-   end
-   log(z)
-end
-
-# NOT YET FUNCTIONAL
-function exactlogpartitionfunction2(dbm::DBMParam)
    nunits = BMs.nunits(dbm)
    nhiddenlayers = length(dbm)
 
@@ -1879,22 +1855,22 @@ function exactlogpartitionfunction2(dbm::DBMParam)
       hodd[i] = zeros(nunits[2i])
    end
 
-   biases = combinedbiases(dbm)
-
    # Calculate the unnormalized probabilities for all combinations of nodes
    # in the odd hidden layers
    z = 0.0
+   biases = combinedbiases(dbm)
    nintermediatelayerstobesummedout = div(nhiddenlayers - 1, 2)
-   # TODO: biases benutzen
    while true
-      pun = exp(dot(biases[1], hodd[1])) *
-            prod(1 + exp(visibleinput(dbm[1], hodd[1])))
+      pun = prod(1 + exp(visibleinput(dbm[1], hodd[1])))
       for i = 1:2:nintermediatelayerstobesummedout
          pun *= prod(1 + exp(
                hiddeninput(dbm[2i], hodd[i]) + visibleinput(dbm[2i+1], hodd[i+1])))
       end
       if nhiddenlayers % 2 == 0
          pun *= prod(1 + exp(hiddeninput(dbm[end], hodd[end])))
+      end
+      for i = 1:length(hodd)
+         pun *= exp(dot(biases[2i], hodd[i]))
       end
 
       z += pun

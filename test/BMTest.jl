@@ -104,4 +104,15 @@ function aisvsexact(dbm::BMs.DBMParam, ntemperatures = 100, nparticles = 100)
    # TODO loglikelihood base-rate vs loglikelihood dbm
 end
 
+function exactlogpartitionfunctioninefficient(dbm::BMs.DBMParam)
+   nlayers = length(dbm) + 1
+   u = BMs.initcombination(dbm)
+   z = 0.0
+   while true
+      z += exp(-BMs.energy(dbm, u))
+      BMs.next!(u) || break
+   end
+   log(z)
+end
+
 end
