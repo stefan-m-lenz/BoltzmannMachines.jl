@@ -1745,8 +1745,8 @@ end
 """
     exactlogpartitionfunction(rbm)
 Calculates the log of the partition function of the BernoulliRBM `rbm` exactly.
-The complexity of the algorithm is
-O(2^min(number of visible nodes, number of hidden nodes)).
+The execution time grows exponentially with the minimum of
+(number of visible nodes, number of hidden nodes).
 """
 function exactlogpartitionfunction(rbm::BernoulliRBM)
    nvisible = length(rbm.a)
@@ -1772,7 +1772,7 @@ end
 """
     exactlogpartitionfunction(gbrbm)
 Calculates the log of the partition function of the GaussianBernoulliRBM `gbrbm`
-exactly. The complexity of the algorithm is O(2^number of hidden nodes).
+exactly. The execution time grows exponentially with the number of hidden nodes.
 """
 function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
    nvisible = length(gbrbm.a)
@@ -1835,6 +1835,16 @@ function initcombination(dbm::DBMParam)
    u
 end
 
+"""
+    exactlogpartitionfunction(dbm)
+Calculates the log of the partition function of the DBM `dbm` exactly.
+If the number of hidden layers is even, the execution time grows exponentially
+with the total number of nodes in hidden layers with odd indexes.
+If the number of hidden layers is odd, the execution time grows exponentially
+with the minimum of
+(number of nodes in layers with even index,
+number of nodes in layers with odd index).
+"""
 function exactlogpartitionfunction(dbm::DBMParam)
    nunits = BMs.nunits(dbm)
    nhiddenlayers = length(dbm)
