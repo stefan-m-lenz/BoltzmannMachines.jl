@@ -699,7 +699,7 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
          input = mu[i-1] * mvdbm.hiddbm[i-2].weights
          broadcast!(+, input, input, mvdbm.hiddbm[i-2].b')
          if i < nlayers
-            input += mu[i] * mvdbm.hiddbm[i-1].weights'
+            input += mu[i+1] * mvdbm.hiddbm[i-1].weights'
             broadcast!(+, input, input, mvdbm.hiddbm[i-1].a')
          end
          newmu = sigm(input)
@@ -1789,6 +1789,25 @@ function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
 end
 
 "
+    unnormalizedprobhidden(rbm, h)
+    unnormalizedprobhidden(gbrbm, h)
+Calculates the unnormalized probability of the `rbm`'s hidden nodes'
+activations given by `h`.
+"
+function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
+   exp(dot(rbm.b, h)) * (1 + exp(visibleinput(rbm, h)))
+end
+
+const sqrt2pi = sqrt(2pi)
+
+function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM, h::Vector{Float64})
+   nvisible = length(gbrbm.a)
+   wh = gbrbm.weights * h
+   exp(dot(gbrbm.b, h) + sum(0.5*wh.^2 + gbrbm.a ./ gbrbm.sd .* wh)) *
+         prod(gbrbm.sd) * sqrt2pi^nvisible
+end
+
+"
 Returns the GBRBM with weights such that hidden and visible of the given `bgrbm`
 are switched and a visible standard deviation of 1.
 "
@@ -1892,6 +1911,24 @@ function exactlogpartitionfunction(dbm::DBMParam)
    log(z)
 end
 
+function exactlogpartitionfunction(mvdbm::MultivisionDBM)
+   hodd = initcombinationoddlayersonly(mvdbm.hiddbm)
+   combinedbiases = BMs.combinedbiases(mvdbm.hiddbm)
+   z = 0.0
+   while true
+      pun = unnormalizedproboddlayers(mvdbm.hiddbm, hodd, combinedbiases)
+
+      for i = 1:length(mvdbm.visrbms)
+         pun *= unnormalizedprobhidden(mvdbm.visrbms[i],
+               hodd[1][mvdbm.visrbmshidranges[i]])
+      end
+
+      z += pun
+      next!(hodd) || break
+   end
+   log(z)
+end
+
 "
 Computes the unnormalized probability of the nodes in layers with odd indexes,
 i. e. p*(v, h2, h4, ...).
@@ -1916,6 +1953,20 @@ function unnormalizedproboddlayers(dbm::DBMParam, uodd::Particle,
    pun
 end
 
+"
+Creates and zero-initializes a particle for layers with odd indexes
+in the `dbm`.
+"
+function initcombinationoddlayersonly(dbm)
+   nunits = BMs.nunits(dbm)
+   nlayers = length(nunits)
+   uodd = Particle(round(Int, nlayers/2, RoundUp))
+   for i = eachindex(uodd)
+      uodd[i] = zeros(nunits[2i-1])
+   end
+   uodd
+end
+
 """
     exactloglikelihood(dbm, x)
     exactloglikelihood(dbm, x, logz)
@@ -1928,15 +1979,8 @@ function exactloglikelihood(dbm::DBMParam, x::Array{Float64,2},
       logz = exactlogpartitionfunction(dbm))
 
    nsamples = size(x, 1)
-   nunits = BMs.nunits(dbm)
-   nlayers = length(nunits)
    combinedbiases = BMs.combinedbiases(dbm)
-
-   # Initialize particles for hidden layers with odd indexes
-   uodd = Particle(round(Int, nlayers / 2, RoundUp))
-   for i = eachindex(uodd)
-      uodd[i] = zeros(nunits[2i-1])
-   end
+   uodd = initcombinationoddlayersonly(dbm)
 
    logp = 0.0
    for j = 1:nsamples
