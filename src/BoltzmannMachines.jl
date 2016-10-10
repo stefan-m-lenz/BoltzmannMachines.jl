@@ -1089,6 +1089,41 @@ function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::I
    particles
 end
 
+function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
+   joinrbms(T[rbm1, rbm2])
+end
+
+function joinweights{T<:AbstractRBM}(rbms::Vector{T})
+   jointnhidden = mapreduce(rbm -> length(rbm.b), +, 0, rbms)
+   jointnvisible = mapreduce(rbm -> length(rbm.a), +, 0, rbms)
+   jointweights = zeros(jointnvisible, jointnhidden)
+   offset1 = 0
+   offset2 = 0
+   for i = eachindex(rbms)
+      nvisible = length(rbms[i].a)
+      nhidden = length(rbms[i].b)
+      jointweights[offset1 + (1:nvisible), offset2 + (1:nhidden)] =
+            rbms[i].weights
+      offset1 += nvisible
+      offset2 += nhidden
+   end
+   jointweights
+end
+
+function joinrbms(rbms::Vector{BernoulliRBM})
+   jointvisiblebias = cat(1, map(rbm -> rbm.a, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.b, rbms)...)
+   BernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias)
+end
+
+function joinrbms(rbms::Vector{GaussianBernoulliRBM})
+   jointvisiblebias = cat(1, map(rbm -> rbm.a, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.b, rbms)...)
+   jointsd = cat(1, map(rbm -> rbm.sd, rbms)...)
+   GaussianBernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias,
+         jointsd)
+end
+
 "
 Returns a matrix, containing in the entry [i,j]
 the associations between the variables contained in the columns i and j
