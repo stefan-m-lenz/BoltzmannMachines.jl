@@ -1430,7 +1430,7 @@ standard deviation of values of the i'th component of the sample vectors.
 function gaussianloglikelihoodbaserate(x::Matrix{Float64})
    nsamples, nvariables = size(x)
    sigmasq = var(x,1)
-   mu = mean(x,1)
+   mu = vec(mean(x,1))
    loglikelihood = 0.0
    for j = 1:nsamples
       loglikelihood -= sum((x[j,:] - mu).^2 ./ sigmasq)
@@ -1795,7 +1795,7 @@ Calculates the unnormalized probability of the `rbm`'s hidden nodes'
 activations given by `h`.
 "
 function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.b, h)) * (1 + exp(visibleinput(rbm, h)))
+   exp(dot(rbm.b, h)) * prod(1 + exp(visibleinput(rbm, h)))
 end
 
 const sqrt2pi = sqrt(2pi)
@@ -1839,6 +1839,15 @@ function energy(dbm::DBMParam, u::Particle)
       energy -= u[i]'*dbm[i].weights*u[i+1] + dbm[i].a'*u[i] + dbm[i].b'*u[i+1]
    end
    energy[1]
+end
+
+function energy(rbm::BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
+   - dot(v, rbm.weights*h) - dot(rbm.a, v) - dot(rbm.b, h)
+end
+
+function energy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
+   sum(((v - gbrbm.a) ./ gbrbm.sd).^2) / 2 - dot(gbrbm.b, h) -
+         dot(gbrbm.weights*h, v ./ gbrbm.sd)
 end
 
 "
@@ -1975,7 +1984,7 @@ exactly.
 If the value of the log of the partition function of the `dbm` is not supplied
 as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
 """
-function exactloglikelihood(dbm::DBMParam, x::Array{Float64,2},
+function exactloglikelihood(dbm::DBMParam, x::Matrix{Float64},
       logz = exactlogpartitionfunction(dbm))
 
    nsamples = size(x, 1)
@@ -2000,6 +2009,44 @@ function exactloglikelihood(dbm::DBMParam, x::Array{Float64,2},
    logp /= nsamples
    logp -= logz
    logp
+end
+
+function exactloglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64},
+      logz = exactlogpartitionfunction(mvdbm))
+
+   nsamples = size(x, 1)
+   combinedbiases = BMs.combinedbiases(mvdbm.hiddbm)
+
+   # combinations of hidden layers with odd index (i. e. h1, h3, ...)
+   hodd = initcombinationoddlayersonly(mvdbm.hiddbm)
+
+   logpx = 0.0
+   for j = 1:nsamples
+      v = vec(x[j,:])
+      px = 0.0
+      while true
+         pun = unnormalizedproboddlayers(mvdbm.hiddbm, hodd, combinedbiases)
+
+         firstlayerenergy = 0.0
+         for i = eachindex(mvdbm.visrbms)
+            firstlayerenergy += energy(mvdbm.visrbms[i],
+                  v[mvdbm.visrbmsvisranges[i]],
+                  hodd[1][mvdbm.visrbmshidranges[i]])
+         end
+         pun *= exp(-firstlayerenergy)
+
+         px += pun
+
+         # next combination of hidden nodes' activations
+         next!(hodd) || break
+      end
+
+      logpx += log(px)
+   end
+
+   logpx /= nsamples
+   logpx -= logz
+   logpx
 end
 
 "
@@ -2041,6 +2088,9 @@ end
 
 function nunits(dbm::DBMParam)
    nrbms = length(dbm)
+   if nrbms == 0
+      error("Nodes and layers not defined in empty DBM")
+   end
    nlayers = length(dbm) + 1
    nu = Array{Int,1}(nlayers)
    for i = 1:nrbms
