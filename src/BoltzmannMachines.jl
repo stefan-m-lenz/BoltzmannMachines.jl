@@ -397,7 +397,7 @@ function fitrbm(x::Matrix{Float64};
       rbmtype::DataType = BernoulliRBM,
       monitoring::Function = ((rbm, epoch) -> nothing),
 
-      # these arguments only relevant for GaussianBernoulliRBMs
+      # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = sdlearningrate * ones(epochs),
       sdinitfactor::Float64 = 0.0)
@@ -517,9 +517,10 @@ function sdupdateterm(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, h::Array
    (v - gbrbm.a).^2 ./ (gbrbm.sd .^3) - (v ./ (gbrbm.sd .^ 2)) .* (gbrbm.weights * h)
 end
 
-"
+"""
+    reconstructionerror(rbm, x)
 Computes the mean reconstruction error of the RBM on the dataset `x`.
-"
+"""
 function reconstructionerror(rbm::AbstractRBM,
       x::Array{Float64,2},
       upfactor::Float64 = 1.0,
@@ -781,14 +782,14 @@ function gibbssample!(particles::Particles, dbm::DBMParam,
    particles
 end
 
-"
+"""
     initparticles(dbm, nparticles)
 Creates particles for Gibbs sampling in a DBM and initializes them with random
 Bernoulli distributed (p=0.5) values.
 Returns an array containing in the i'th entry a matrix of size
 (`nparticles`, number of nodes in layer i) such that
 the particles are contained in the rows of these matrices.
-"
+"""
 function initparticles(dbm::DBMParam, nparticles::Int)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
@@ -925,12 +926,13 @@ function fitdbm(x, nhiddens::Array{Int,1}, epochs=10, nparticles=100; learningra
 end
 
 """
+    fitbm(x, dbm; ...)
 Performs fitting of a Deep Boltzmann Machine. Expects a training data set `x`
 and a pre-trained Deep Boltzmann machine `dbm` as arguments.
 
 # Optional keyword arguments:
 * `epoch`: number of training epochs
-* `nparticles`: number of particles used for sampling
+* `nparticles`: number of particles used for sampling, default 100
 * The learning rate for each epoch is given as vector `learningrates`.
 * `monitoring`: A function that is executed after each training epoch.
    It takes a DBM and the epoch as arguments.
@@ -1210,10 +1212,11 @@ function tstatistics(particles::Particles)
    t
 end
 
-"
-Returns a dictionary containing the rows of `x` as keys and their relative
-frequencies as values.
-"
+"""
+    samplefrequencies(x)
+Returns a dictionary containing the rows of the data set `x` as keys and their
+relative frequencies as values.
+"""
 function samplefrequencies{T}(x::Array{T,2})
    dict = Dict{Array{T}, Float64}()
    nsamples = size(x, 1)
@@ -2086,6 +2089,11 @@ function loglikelihood(dbm::DBMParam, x::Array{Float64,2};
    logp
 end
 
+"""
+    nunits(bm)
+Returns an integer vector that contans in the i'th entry the number of nodes
+in the i'th layer of the `bm`.
+"""
 function nunits(dbm::DBMParam)
    nrbms = length(dbm)
    if nrbms == 0
@@ -2104,12 +2112,12 @@ function nunits(rbm::AbstractRBM)
    [length(rbm.a); length(rbm.b)]
 end
 
-"
+"""
     aisprecision(r, aissd, sdrange)
 Returns the differences of the estimated logratio `r` to the lower
 and upper bound of the range defined by the multiple `sdrange`
 of the standard deviation of the ratio's estimator `aissd`.
-"
+"""
 function aisprecision(r::Float64, aissd::Float64, sdrange::Float64 = 1.0)
 
    if r - sdrange*aissd <= 0 # prevent domainerror
@@ -2123,14 +2131,14 @@ function aisprecision(r::Float64, aissd::Float64, sdrange::Float64 = 1.0)
    diffbottom, difftop
 end
 
-"
+"""
     aisprecision(impweights, sdrange)
-"
+"""
 function aisprecision(impweights::Array{Float64,1}, sdrange::Float64 = 1.0)
    aisprecision(mean(impweights), aisstandarddeviation(impweights), sdrange)
 end
 
-"
+"""
     logproblowerbound(dbm, x; ...)
 Estimates the mean of the variational lower bound for the log probability
 of the DBM on a given dataset `x` like described in Equation 38
@@ -2145,7 +2153,7 @@ for the DBM.
 or is calculated by the mean-field method.
 * The `logpartitionfunction` can be specified directly
 or is calculated using the `impweights`.
-"
+"""
 function logproblowerbound(dbm::DBMParam,
       x::Array{Float64};
       impweights::Array{Float64,1} = aisimportanceweights(dbm),
@@ -2430,10 +2438,10 @@ function freeenergy(bgrbm::BernoulliGaussianRBM, x::Matrix{Float64})
    freeenergy
 end
 
-"
+"""
     nmodelparameters(bm)
 Returns the number of parameters in the Boltzmann Machine.
-"
+"""
 function nmodelparameters(bm::AbstractBM)
    nunits = BMs.nunits(bm)
    prod(nunits) + sum(nunits)
@@ -2441,20 +2449,20 @@ end
 
 # TODO add nmodelparameters for GaussianBernoulli
 
-"
+"""
     akaikeinformationcriterion(bm, loglikelihood)
 Calculates the Akaike information criterion for a Boltzmann Machine, given its
 `loglikelihood`.
-"
+"""
 function akaikeinformationcriterion(bm::AbstractBM, loglikelihood::Float64)
    2*BMs.nmodelparameters(bm) - 2*loglikelihood
 end
 
-"
+"""
     bayesianinformationcriterion(bm, nvariables, loglikelihood)
 Calculates the Akaike information criterion for a Boltzmann machine, given its
 `loglikelihood` and the number of samples `nsamples`.
-"
+"""
 function bayesianinformationcriterion(bm::AbstractBM, nsamples::Int, loglikelihood::Float64)
    -2*loglikelihood + BMs.nmodelparameters(bm)*log(nsamples)
 end
