@@ -60,13 +60,13 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
    end
 end
 
-function monitorexactloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
+function monitorexactloglikelihood!(monitor::Monitor, bm::AbstractBM,
       epoch::Int, datadict::DataDict)
 
-   logz = BMs.exactlogpartitionfunction(rbm)
+   logz = BMs.exactlogpartitionfunction(bm)
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(BMs.monitorexactloglikelihood, epoch,
-               loglikelihood(rbm, x, logz), datasetname))
+               exactloglikelihood(bm, x, logz), datasetname))
    end
 end
 

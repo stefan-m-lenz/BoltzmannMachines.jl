@@ -1958,6 +1958,13 @@ function exactlogpartitionfunction(dbm::DBMParam)
    log(z)
 end
 
+"""
+    exactlogpartitionfunction(mvdbm)
+Calculates the log of the partition function of the MultivisionDBM `mvdbm`
+exactly.
+The execution time grows exponentially with the total number of nodes in hidden
+layers with odd indexes (i. e. h1, h3, ...).
+"""
 function exactlogpartitionfunction(mvdbm::MultivisionDBM)
    hodd = initcombinationoddlayersonly(mvdbm.hiddbm)
    combinedbiases = BMs.combinedbiases(mvdbm.hiddbm)
@@ -2015,9 +2022,22 @@ function initcombinationoddlayersonly(dbm)
 end
 
 """
+    exactloglikelihood(rbm, x)
+Computes the mean log-likelihood for the given dataset `x` and the RBM `rbm`
+exactly.
+The log of the partition function is computed exactly by
+`exactlogpartitionfunction(rbm)`.
+Besides that, the function simply calls `loglikelihood(rbm, x)`.
+"""
+function exactloglikelihood(rbm::AbstractRBM, x::Matrix{Float64},
+      logz = BMs.exactlogpartitionfunction(rbm))
+   loglikelihood(rbm, x, logz)
+end
+
+"""
     exactloglikelihood(dbm, x)
     exactloglikelihood(dbm, x, logz)
-Computes the mean likelihood for the given dataset `x` and the DBM `dbm`
+Computes the mean log-likelihood for the given dataset `x` and the DBM `dbm`
 exactly.
 If the value of the log of the partition function of the `dbm` is not supplied
 as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
@@ -2087,12 +2107,12 @@ function exactloglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64},
    logpx
 end
 
-"
+"""
     loglikelihood(dbm, x; ...)
 Estimates the mean log-likelihood of the DBM on the data set `x`
 with Annealed Importance Sampling.
 This requires a separate run of AIS for each sample.
-"
+"""
 function loglikelihood(dbm::DBMParam, x::Array{Float64,2};
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
