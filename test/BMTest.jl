@@ -15,7 +15,7 @@ end
 function randrbm(nvisible, nhidden, factorw = 1.0, factora = 1.0, factorb = 1.0)
    w = factorw*randn(nvisible, nhidden)
    a = factora*rand(nvisible)
-   b = factorb*ones(nhidden)
+   b = factorb*(0.5 - rand(nhidden))
    BMs.BernoulliRBM(w, a, b)
 end
 
