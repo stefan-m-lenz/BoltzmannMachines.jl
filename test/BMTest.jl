@@ -163,4 +163,34 @@ function exactloglikelihoodwithoutsummingout(dbm::BMs.DBMParam, x::Array{Float64
    logp
 end
 
+"
+Tests whether the exact loglikelihood of a MultivisionDBM with two visible
+input layers of Bernoulli units is equal to the loglikelihood of the DBM
+where the two visible RBMs are joined to one RBM.
+"
+function testexactloglikelihood_bernoullimvdbm(nunits::Vector{Int})
+
+   nvisible1 = floor(Int, nunits[1]/2)
+   nvisible2 = ceil(Int, nunits[1]/2)
+   nhidden1 = floor(Int, nunits[2]/2)
+   nhidden2 = ceil(Int, nunits[2]/2)
+
+   rbm1 = randrbm(nvisible1, nhidden1)
+   rbm2 = randrbm(nvisible2, nhidden2)
+
+   hiddbm = randdbm(nunits[2:end])
+   mvdbm = BMs.MultivisionDBM([rbm1;rbm2])
+   mvdbm.hiddbm = hiddbm
+
+   jointrbm = BMs.joinrbms(rbm1, rbm2)
+   dbm = BMs.BernoulliRBM[jointrbm, hiddbm...]
+
+   nsamples = 25
+   x = hcat(createsamples(nsamples, nvisible1),
+      createsamples(nsamples, nvisible2))
+
+   @test_approx_eq(BMs.exactloglikelihood(dbm, x),
+         BMs.exactloglikelihood(mvdbm, x))
+end
+
 end

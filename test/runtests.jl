@@ -33,3 +33,7 @@ end
 for nunits in Array[[10;5;4], [20;5;4;2], [4;2;2;3;2]]
    BMTest.testsummingoutforexactloglikelihood(nunits)
 end
+
+for nunits in Array[[10;5;4;3], [18;2;3], [11;3;7;4;5]]
+   BMTest.testexactloglikelihood_bernoullimvdbm([11;3;11;10])
+end
