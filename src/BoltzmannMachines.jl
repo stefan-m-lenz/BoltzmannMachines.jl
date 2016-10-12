@@ -34,6 +34,21 @@ type BernoulliGaussianRBM <: AbstractRBM
 end
 
 """
+Contains the parameters of an RBM with 0/1/2-valued, Binomial (n=2) distributed
+visible nodes, and binary, Bernoulli distributed hidden nodes.
+This model is equivalent to a BernoulliRBM in which every two visible nodes are
+connected with the same weights to one hidden node.
+The states (0,0) / (1,0) / (0,1) / (1,1) of the visible nodes connected with
+with the same weights translate as states 0 / 1 / 1 / 2 in the
+Binomial2BernoulliRBM.
+"""
+type Binomial2BernoulliRBM <: AbstractRBM
+   weights::Matrix{Float64}
+   a::Vector{Float64}
+   b::Vector{Float64}
+end
+
+"""
 A MultivisionDBM consists of several visible layers (may have different
 input types) and binary hidden layers.
 Nodes of different visible layers are connected to non-overlapping parts
@@ -188,6 +203,10 @@ function hprob(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2}, factor::Float6
    sigm(factor*hiddeninput(gbrbm, vv))
 end
 
+function hprob(b2brbm::Binomial2BernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
+   sigm(factor*(hiddeninput(b2brbm, v)))
+end
+
 function samplevisible(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    bernoulli!(vprob(rbm, h, factor))
 end
@@ -214,6 +233,11 @@ function samplevisible(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor
    bernoulli(vprob(bgrbm, hh, factor))
 end
 
+function samplevisible{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   v = sigm(factor * visibleinput(b2brbm, h))
+   bernoulli(v) + bernoulli(v)
+end
+
 function samplehidden(rbm::BernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
    bernoulli!(hprob(rbm, v, factor))
 end
@@ -228,6 +252,14 @@ end
 
 function samplehidden(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    bernoulli(hprob(gbrbm, hh, factor))
+end
+
+function samplehidden(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   bernoulli!(hprob(b2brbm, h, factor))
+end
+
+function samplehidden(b2brbm::Binomial2BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   bernoulli(hprob(b2brbm, hh, factor))
 end
 
 function samplehidden(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
@@ -252,20 +284,24 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
 
    nsamples, nvisible = size(x)
    weights = randn(nvisible, nhidden)/sqrt(nvisible)
-   b = zeros(nhidden)
+   hidbias = zeros(nhidden)
 
    if rbmtype == BernoulliRBM
-      a = initvisiblebias(x)
-      return BernoulliRBM(weights, a, b)
+      visbias = initvisiblebias(x)
+      return BernoulliRBM(weights, visbias, hidbias)
 
    elseif rbmtype == GaussianBernoulliRBM
-      a = vec(mean(x, 1))
+      visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      return GaussianBernoulliRBM(weights, a, b, sd)
+      return GaussianBernoulliRBM(weights, visbias, hidbias, sd)
 
    elseif rbmtype == BernoulliGaussianRBM
-      a = initvisiblebias(x)
-      return BernoulliGaussianRBM(weights, a, b)
+      visbias = initvisiblebias(x)
+      return BernoulliGaussianRBM(weights, visbias, hidbias)
+
+   elseif rbmtype == Binomial2BernoulliRBM
+      visbias = initvisiblebias(x/2)
+      return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
@@ -313,11 +349,21 @@ function vprob(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
 end
 
 function vprob(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-    sigm(factor*visibleinput(rbm,hh))
+   sigm(factor*visibleinput(rbm,hh))
 end
 
 function vprob(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-    sigm(factor*visibleinput(bgrbm,hh))
+   sigm(factor*visibleinput(bgrbm,hh))
+end
+
+"""
+    vprob(b2brbm, h)
+Each visible node in the Binomial2BernoulliRBM is sampled from a Binomial(2,p)
+distribution in the Gibbs steps. This functions returns the vector of values for
+2*p. (The value is doubled to get a value in the same range as the sampled one.)
+"""
+function vprob{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   2*sigm(factor * visibleinput(b2brbm, h))
 end
 
 "
@@ -332,6 +378,17 @@ end
 function hiddeninput(rbm::BernoulliRBM, vv::Array{Float64,2})
    input = vv*rbm.weights
    broadcast!(+, input, input, rbm.b')
+end
+
+function hiddeninput(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
+   # Hidden input is implicitly doubled
+   # because the visible units range from 0 to 2.
+   b2brbm.weights' * v + b2brbm.b
+end
+
+function hiddeninput(b2brbm::Binomial2BernoulliRBM, vv::Array{Float64,2})
+   input = vv * b2brbm.weights
+   broadcast!(+, input, input, b2brbm.b')
 end
 
 function hprob(rbm::BernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
@@ -358,6 +415,15 @@ end
 function visibleinput(rbm::BernoulliGaussianRBM, hh::Array{Float64,2})
    input = hh*rbm.weights'
    broadcast!(+, input, input, rbm.a')
+end
+
+function visibleinput(b2brbm::Binomial2BernoulliRBM, h::Vector{Float64})
+   b2brbm.weights * h + b2brbm.a
+end
+
+function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
+   input = hh * b2brbm.weights'
+   broadcast!(+, input, input, b2brbm.a')
 end
 
 "
@@ -484,6 +550,22 @@ function updateparameters!(rbm::AbstractRBM,
       learningrate::Float64,
       sdlearningrate::Float64)
 
+   deltaw = v*h' - vmodel*hmodel'
+   rbm.weights += deltaw * learningrate
+   rbm.a += (v - vmodel) * learningrate
+   rbm.b += (h - hmodel) * learningrate
+   nothing
+end
+
+function updateparameters!(rbm::Binomial2BernoulliRBM,
+      v::Vector{Float64}, vmodel::Vector{Float64},
+      h::Vector{Float64}, hmodel::Vector{Float64},
+      learningrate::Float64,
+      sdlearningrate::Float64)
+
+   # for efficiency: divide visible nodes' activations by 2 instead of weights
+   v = v / 2
+   vmodel = vmodel / 2
    deltaw = v*h' - vmodel*hmodel'
    rbm.weights += deltaw * learningrate
    rbm.a += (v - vmodel) * learningrate
@@ -960,21 +1042,22 @@ function updatedbmpart!(dbmpart::BernoulliRBM,
       vmeanfield::Matrix{Float64},
       hmeanfield::Matrix{Float64})
 
-   nsamples = size(vmeanfield, 1)
-   nparticles = size(vgibbs, 1)
+   updatedbmpartcore!(dbmpart, learningrate,
+         vgibbs, hgibbs, vmeanfield, hmeanfield)
+end
 
-   leftw = vmeanfield' * hmeanfield / nsamples
-   lefta = mean(vmeanfield, 1)[:]
-   leftb = mean(hmeanfield, 1)[:]
+function updatedbmpart!(dbmpart::Binomial2BernoulliRBM,
+      learningrate::Float64,
+      vgibbs::Matrix{Float64},
+      hgibbs::Matrix{Float64},
+      vmeanfield::Matrix{Float64},
+      hmeanfield::Matrix{Float64})
 
-   rightw = vgibbs' * hgibbs / nparticles
-   righta = mean(vgibbs, 1)[:]
-   rightb = mean(hgibbs, 1)[:]
+   vmeanfield /= 2
+   vgibbs /= 2
 
-   dbmpart.weights += learningrate*(leftw - rightw)
-   dbmpart.a += learningrate*(lefta - righta)
-   dbmpart.b += learningrate*(leftb - rightb)
-   nothing
+   updatedbmpartcore!(dbmpart, learningrate,
+         vgibbs, hgibbs, vmeanfield, hmeanfield)
 end
 
 function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
@@ -988,6 +1071,17 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
    # see [Srivastava+Salakhutdinov, 2014], p. 2962
    vmeanfield = broadcast(./, vmeanfield, dbmpart.sd')
    vgibbs = broadcast(./, vgibbs, dbmpart.sd')
+
+   updatedbmpartcore!(dbmpart, learningrate,
+         vgibbs, hgibbs, vmeanfield, hmeanfield)
+end
+
+function updatedbmpartcore!(dbmpart::AbstractRBM,
+      learningrate::Float64,
+      vgibbs::Matrix{Float64},
+      hgibbs::Matrix{Float64},
+      vmeanfield::Matrix{Float64},
+      hmeanfield::Matrix{Float64})
 
    nsamples = size(vmeanfield, 1)
    nparticles = size(vgibbs, 1)
