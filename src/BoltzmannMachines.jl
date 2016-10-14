@@ -95,6 +95,11 @@ function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, DBMParam())
 end
 
+function MultivisionDBM(visrbm::AbstractRBM)
+   MultivisionDBM([visrbm], DBMParam())
+end
+
+
 """
     addlayer!(mvdbm, x)
 Adds a pretrained layer to the MultivisionDBM, given the dataset `x` as input
@@ -550,22 +555,6 @@ function updateparameters!(rbm::AbstractRBM,
       learningrate::Float64,
       sdlearningrate::Float64)
 
-   deltaw = v*h' - vmodel*hmodel'
-   rbm.weights += deltaw * learningrate
-   rbm.a += (v - vmodel) * learningrate
-   rbm.b += (h - hmodel) * learningrate
-   nothing
-end
-
-function updateparameters!(rbm::Binomial2BernoulliRBM,
-      v::Vector{Float64}, vmodel::Vector{Float64},
-      h::Vector{Float64}, hmodel::Vector{Float64},
-      learningrate::Float64,
-      sdlearningrate::Float64)
-
-   # for efficiency: divide visible nodes' activations by 2 instead of weights
-   v = v / 2
-   vmodel = vmodel / 2
    deltaw = v*h' - vmodel*hmodel'
    rbm.weights += deltaw * learningrate
    rbm.a += (v - vmodel) * learningrate
