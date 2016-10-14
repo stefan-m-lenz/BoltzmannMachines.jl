@@ -269,6 +269,10 @@ end
 
 function empiricalloglikelihood(x::Matrix{Float64}, xgen::Matrix{Float64})
 
+   if size(x, 2) != size(xgen, 2)
+      error("Number of variables does not match.")
+   end
+
    genfreq = samplefrequencies(xgen)
    loglikelihood = 0.0
    norigsamples = size(x,1)
@@ -299,6 +303,12 @@ end
 
 function energy(rbm::BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
    - dot(v, rbm.weights*h) - dot(rbm.a, v) - dot(rbm.b, h)
+end
+
+function energy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
+   # Add term to correct for 0/1/2-valued v.
+   - sum(v .== 1.0) * log(2) - dot(v, b2brbm.weights*h) -
+         dot(b2brbm.a, v) - dot(b2brbm.b, h)
 end
 
 function energy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
@@ -422,6 +432,16 @@ function exactlogpartitionfunction(rbm::BernoulliRBM)
    log(z)
 end
 
+function exactlogpartitionfunction(rbm::Binomial2BernoulliRBM)
+   nhidden = length(rbm.b)
+   h = zeros(nhidden)
+   z = 0.0
+   while true
+      z += unnormalizedprobhidden(rbm, h)
+      next!(h) || break
+   end
+   log(z)
+end
 
 """
     exactlogpartitionfunction(gbrbm)
@@ -534,7 +554,8 @@ end
 
 """
     freeenergy(rbm, x)
-Computes the average free energy of the samples in the dataset `x` for the RBMs.
+Computes the average free energy of the samples in the dataset `x` for the
+AbstractRBM `rbm`.
 """
 function freeenergy(rbm::BernoulliRBM, x::Matrix{Float64})
    nsamples = size(x,1)
@@ -549,6 +570,22 @@ end
 
 function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
    - dot(rbm.a, v) - sum(log(1 + exp(hiddeninput(rbm, v))))
+end
+
+function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
+   nsamples = size(x,1)
+   freeenergy = 0.0
+   for j = 1:nsamples
+      v = vec(x[j,:])
+      # To get probabilities for 0/1/2-valued v, multiply probabilities for v's
+      # with 2^(number of 1s in v), because each v can be represented by
+      # this number of combinations in the 00/01/10/11 space, all having equal
+      # probability.
+      freeenergy -= sum(v .== 1.0) * log(2) +
+            dot(b2brbm.a, v) + sum(log(1 + exp(hiddeninput(b2brbm, v))))
+   end
+   freeenergy /= nsamples
+   freeenergy
 end
 
 function freeenergy(gbrbm::GaussianBernoulliRBM, x::Matrix{Float64})
@@ -999,6 +1036,10 @@ activations given by `h`.
 """
 function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
    exp(dot(rbm.b, h)) * prod(1 + exp(visibleinput(rbm, h)))
+end
+
+function unnormalizedprobhidden(rbm::Binomial2BernoulliRBM, h::Vector{Float64})
+   exp(dot(rbm.b, h)) * prod(1 + exp(visibleinput(rbm, h)))^2
 end
 
 const sqrt2pi = sqrt(2pi)
