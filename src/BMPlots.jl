@@ -4,6 +4,9 @@ in module BoltzmannMachines.
 "
 module BMPlots
 
+using Gadfly
+using DataFrames
+
 import ..BoltzmannMachines
 const BMs = BoltzmannMachines
 

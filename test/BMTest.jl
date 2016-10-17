@@ -68,7 +68,7 @@ end
 
 function randdbm(nunits)
    nrbms = length(nunits) - 1
-   dbm = BMs.DBMParam(nrbms)
+   dbm = BMs.BasicDBM(nrbms)
    for i = 1:nrbms
       dbm[i] = randrbm(nunits[i], nunits[i+1])
    end
@@ -96,7 +96,7 @@ function aisvsexact(rbm::BMs.AbstractRBM, ntemperatures::Int = 100,
    println((exact - estimated)/exact*100)
 end
 
-function aisvsexact(dbm::BMs.DBMParam, ntemperatures = 100, nparticles = 100)
+function aisvsexact(dbm::BMs.BasicDBM, ntemperatures = 100, nparticles = 100)
    nrbms = length(dbm)
 
    impweights = BMs.aisimportanceweights(dbm, ntemperatures = ntemperatures,
@@ -113,7 +113,7 @@ function aisvsexact(dbm::BMs.DBMParam, ntemperatures = 100, nparticles = 100)
    # TODO loglikelihood base-rate vs loglikelihood dbm
 end
 
-function exactlogpartitionfunctionwithoutsummingout(dbm::BMs.DBMParam)
+function exactlogpartitionfunctionwithoutsummingout(dbm::BMs.BasicDBM)
    nlayers = length(dbm) + 1
    u = BMs.initcombination(dbm)
    z = 0.0
@@ -136,7 +136,7 @@ function testsummingoutforexactloglikelihood(nunits::Vector{Int})
          exactloglikelihoodwithoutsummingout(dbm, x, logz))
 end
 
-function exactloglikelihoodwithoutsummingout(dbm::BMs.DBMParam, x::Array{Float64,2},
+function exactloglikelihoodwithoutsummingout(dbm::BMs.BasicDBM, x::Array{Float64,2},
       logz = BMs.exactlogpartitionfunction(dbm))
 
    nsamples = size(x,1)

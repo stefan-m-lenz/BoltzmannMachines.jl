@@ -13,7 +13,7 @@ export
          fitrbm, trainrbm!, samplevisible, samplehidden,
          hiddenpotential, visiblepotential, samplerbm,
       AbstractDBM,
-         DBMParam,
+         BasicDBM,
          MultivisionDBM,
          fitrbm, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm
 
@@ -385,7 +385,7 @@ function fitpartdbm(x::Array{Float64,2},
 end
 
 
-function sampledbm(dbm::DBMParam, n::Int, burnin::Int=10, returnall=false)
+function sampledbm(dbm::BasicDBM, n::Int, burnin::Int=10, returnall=false)
 
    particles = initparticles(dbm, n)
 
@@ -707,7 +707,7 @@ function haraldsloglikelihoods(dbms, x::Array{Float64,2};
    loglikelihoods
 end
 
-function findcliques(rbm::Union{BernoulliRBM, DBMParam},
+function findcliques(rbm::Union{BernoulliRBM, BasicDBM},
       nparticles::Int = 10000, burnin::Int = 10)
 
    findcliques(vishidtabs(sampleparticles(rbm, nparticles, burnin)))

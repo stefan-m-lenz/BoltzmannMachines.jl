@@ -19,7 +19,7 @@ const monitorlogproblowerbound = "logproblowerbound"
 const monitoraisstandarddeviation = "aisstandarddeviation"
 const monitoraisr = "aisr"
 
-function monitorlogproblowerbound!(monitor::Monitor, dbm::DBMParam,
+function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       epoch::Int, datadict::DataDict)
 
    impweights = BMs.aisimportanceweights(dbm) # TODO parameter evtl. anpassen

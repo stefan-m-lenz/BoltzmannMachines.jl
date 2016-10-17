@@ -1,5 +1,5 @@
 
-typealias DBMParam Array{BernoulliRBM,1}
+typealias BasicDBM Array{BernoulliRBM,1}
 typealias Particles Array{Array{Float64,2},1}
 typealias Particle Array{Array{Float64,1},1}
 
@@ -16,7 +16,7 @@ type MultivisionDBM
    visrbmsvisranges::Array{UnitRange{Int}}
    visrbmshidranges::Array{UnitRange{Int}}
 
-   hiddbm::DBMParam
+   hiddbm::BasicDBM
 
    function MultivisionDBM(visrbms, hiddbm)
       # initialize ranges of hidden units for different RBMs
@@ -44,14 +44,14 @@ type MultivisionDBM
    end
 end
 
-typealias AbstractDBM Union{DBMParam, MultivisionDBM}
+typealias AbstractDBM Union{BasicDBM, MultivisionDBM}
 
 function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
-   MultivisionDBM(visrbms, DBMParam())
+   MultivisionDBM(visrbms, BasicDBM())
 end
 
 function MultivisionDBM(visrbm::AbstractRBM)
-   MultivisionDBM([visrbm], DBMParam())
+   MultivisionDBM([visrbm], BasicDBM())
 end
 
 
@@ -94,7 +94,7 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
    mvdbm
 end
 
-function combinedbiases(dbm::DBMParam)
+function combinedbiases(dbm::BasicDBM)
    biases = Particle(length(dbm) + 1)
    biases[1] = dbm[1].a
    for i = 2:length(dbm)
@@ -198,7 +198,7 @@ function gibbssample!(particles::Particles,
    particles
 end
 
-function gibbssample!(particles::Particles, dbm::DBMParam,
+function gibbssample!(particles::Particles, dbm::BasicDBM,
       steps::Int = 5, beta::Float64 = 1.0)
 
    for step in 1:steps
@@ -230,7 +230,7 @@ Returns an array containing in the i'th entry a matrix of size
 (`nparticles`, number of nodes in layer i) such that
 the particles are contained in the rows of these matrices.
 """
-function initparticles(dbm::DBMParam, nparticles::Int)
+function initparticles(dbm::BasicDBM, nparticles::Int)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
    particles[1] = rand([0.0 1.0], nparticles, length(dbm[1].a))
@@ -266,7 +266,7 @@ returns a matrix of particles for the DBM.
 The number of particles is equal to the number of samples in `x`.
 `eps` is the convergence criterion for the fix-point iteration, default 0.001.
 """
-function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
+function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
    nlayers = length(dbm) + 1
    mu = Particles(nlayers)
@@ -411,7 +411,7 @@ end
     traindbm!(dbm, x, particles, learningrate)
 Trains the given `dbm` for one epoch.
 """
-function traindbm!(dbm::DBMParam, x::Array{Float64,2}, particles::Particles,
+function traindbm!(dbm::BasicDBM, x::Array{Float64,2}, particles::Particles,
       learningrate::Float64)
 
    gibbssample!(particles, dbm)

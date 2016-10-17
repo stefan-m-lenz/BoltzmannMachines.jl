@@ -161,7 +161,7 @@ for estimating the ratio of the partition functions of the given `dbm` to the
 base-rate DBM with all weights being zero.
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
 """
-function aisimportanceweights(dbm::DBMParam;
+function aisimportanceweights(dbm::BasicDBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -293,7 +293,7 @@ end
 Computes the energy of the combination of activations, given by the particle
 `u`, in the DBM.
 "
-function energy(dbm::DBMParam, u::Particle)
+function energy(dbm::BasicDBM, u::Particle)
    energy = [0.0]
    for i = 1:length(dbm)
       energy -= u[i]'*dbm[i].weights*u[i+1] + dbm[i].a'*u[i] + dbm[i].b'*u[i+1]
@@ -339,7 +339,7 @@ exactly.
 If the value of the log of the partition function of the `dbm` is not supplied
 as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
 """
-function exactloglikelihood(dbm::DBMParam, x::Matrix{Float64},
+function exactloglikelihood(dbm::BasicDBM, x::Matrix{Float64},
       logz = exactlogpartitionfunction(dbm))
 
    nsamples = size(x, 1)
@@ -479,7 +479,7 @@ with the minimum of
 (number of nodes in layers with even index,
 number of nodes in layers with odd index).
 """
-function exactlogpartitionfunction(dbm::DBMParam)
+function exactlogpartitionfunction(dbm::BasicDBM)
    nunits = BMs.nunits(dbm)
    nhiddenlayers = length(dbm)
 
@@ -626,7 +626,7 @@ end
 "
 Returns particle for DBM, initialized with zeros.
 "
-function initcombination(dbm::DBMParam)
+function initcombination(dbm::BasicDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
    u = Particle(nlayers)
@@ -671,7 +671,7 @@ Estimates the mean log-likelihood of the DBM on the data set `x`
 with Annealed Importance Sampling.
 This requires a separate run of AIS for each sample.
 """
-function loglikelihood(dbm::DBMParam, x::Array{Float64,2};
+function loglikelihood(dbm::BasicDBM, x::Array{Float64,2};
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -812,7 +812,7 @@ Calculates the log of the partition function of the DBM from the estimator `r`.
 `r` is an estimator of the ratio of the DBM's partition function to the
 partition function of the DBM with zero weights and zero biases.
 """
-function logpartitionfunction(dbm::DBMParam,
+function logpartitionfunction(dbm::BasicDBM,
       r::Float64 = mean(aisimportanceweights(dbm)))
 
    logz = log(r) + log(2)*sum(nunits(dbm))
@@ -835,7 +835,7 @@ or is calculated by the mean-field method.
 * The `logpartitionfunction` can be specified directly
 or is calculated using the `impweights`.
 """
-function logproblowerbound(dbm::DBMParam,
+function logproblowerbound(dbm::BasicDBM,
       x::Array{Float64};
       impweights::Array{Float64,1} = aisimportanceweights(dbm),
       mu::Particles = meanfield(dbm, x),
@@ -914,7 +914,7 @@ function nunits(rbm::AbstractRBM)
    [length(rbm.a); length(rbm.b)]
 end
 
-function nunits(dbm::DBMParam)
+function nunits(dbm::BasicDBM)
    nrbms = length(dbm)
    if nrbms == 0
       error("Nodes and layers not defined in empty DBM")
@@ -976,7 +976,7 @@ function reversedrbm(rbm::BernoulliRBM)
    BernoulliRBM(rbm.weights', rbm.b, rbm.a)
 end
 
-function reverseddbm(dbm::DBMParam)
+function reverseddbm(dbm::BasicDBM)
    revdbm = reverse(dbm)
    map!(reversedrbm, revdbm)
 end
@@ -1007,7 +1007,7 @@ end
 Computes the unnormalized probability of the nodes in layers with odd indexes,
 i. e. p*(v, h2, h4, ...).
 "
-function unnormalizedproboddlayers(dbm::DBMParam, uodd::Particle,
+function unnormalizedproboddlayers(dbm::BasicDBM, uodd::Particle,
       combinedbiases = BMs.combinedbiases(dbm))
 
    nlayers = length(dbm) + 1
