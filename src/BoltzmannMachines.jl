@@ -2,7 +2,20 @@ module BoltzmannMachines
 
 const BMs = BoltzmannMachines
 
-export BernoulliRBM, fitrbm, samplerbm, hprob, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm, comparedbms
+export
+   AbstractBM,
+      AbstractRBM,
+         BernoulliRBM,
+         BernoulliGaussianRBM,
+         Binomial2BernoulliRBM,
+         GaussianBernoulliRBM,
+         fitrbm, trainrbm!, samplevisible, samplehidden, sampleparticles,
+         hprob, vprob, samplerbm,
+      AbstractDBM,
+         DBMParam,
+         MultivisionDBM,
+         fitrbm, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm
+
 
 abstract AbstractRBM
 
@@ -431,10 +444,11 @@ function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    broadcast!(+, input, input, b2brbm.a')
 end
 
-"
+"""
+    initvisiblebias(x)
 Returns sensible initial values for the visible bias for training an RBM
 on the data set `x`.
-"
+"""
 function initvisiblebias(x::Array{Float64,2})
    nvisible = size(x,2)
    initbias = zeros(nvisible)
@@ -457,6 +471,33 @@ function combinedbiases(dbm::DBMParam)
    biases
 end
 
+
+"""
+    fitrbm(x; ...)
+Fits an RBM model to the data set `x`, using Stochastic Gradient Descent (SGD)
+with Contrastive Divergence (CD), and returns it.
+
+# Optional keyword arguments (ordered by importance):
+* `rbmtype`: the type of the desired RBM. This must be a subtype of AbstractRBM
+   and defaults to `BernoulliRBM`.
+* `nhidden`: number of hidden units for returned RBM
+* `epoch`: number of training epochs
+* `learningrate`/`learningrates`: The learning rate for the weights and biases
+   can be specified as single value, used throughout all epochs, or as a vector
+   of `learningrates` that contains a value for each epoch.
+* `pcd`: indicating whether Persistent Contrastive Divergence (PCD) is to
+   be used (true, default) or simple CD that initializes the Gibbs Chain with
+   the training sample (false)
+* `cdsteps`: number of Gibbs sampling steps in CD/PCD, defaults to 1
+* `monitoring`: a function that is executed after each training epoch.
+   It takes an RBM and the epoch as arguments.
+* `upfactor`, `downfactor`: If this function is used for pretraining a part of
+   a DBM, it is necessary to multiply the weights of the RBM with factors.
+* `sdlearningrate`/`sdlearningrates`: learning rate(s) for the
+   standard deviation if training a `GaussianBernoulliRBM`. Ignored for other
+   types of RBMs. It usually must be much smaller than the learning rates for
+   the weights. By default, it is 0.0 and the standard deviation is not learned.
+"""
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),
       epochs::Int = 10,
@@ -505,6 +546,17 @@ function fitrbm(x::Matrix{Float64};
    rbm
 end
 
+
+"""
+    trainrbm!(rbm, x)
+Trains the given `rbm` for one epoch. (See also function `fitrbm`.)
+
+# Optional keyword arguments:
+* `learningrate`, `cdsteps`, `sdlearningrate`, `upfactor`, `downfactor`:
+   See documentation of function `fitrbm`.
+* `chainstate`: a vector for holding the state of the RBM's hidden nodes. If
+   it is specified, PCD is used.
+"""
 function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       chainstate::Array{Float64,1} = Array{Float64,1}(),
       upfactor::Float64 = 1.0,
