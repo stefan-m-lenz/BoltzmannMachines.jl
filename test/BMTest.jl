@@ -128,7 +128,7 @@ function testsummingoutforexactloglikelihood(nunits::Vector{Int})
    x = BMTest.createsamples(1000, nunits[1]);
    dbm = BMs.stackrbms(x, nhiddens = nunits[2:end],
          epochs = 50, predbm = true, learningrate = 0.001);
-   dbm = BMs.fitbm(x, dbm,
+   dbm = BMs.traindbm!(dbm, x,
          learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
          epochs = 30);
    logz = BMs.exactlogpartitionfunction(dbm)
@@ -213,7 +213,7 @@ function testexactloglikelihood_b2brbm()
 
    mvdbm = BMs.MultivisionDBM([b2brbm, rbm]);
    BMs.addlayer!(mvdbm, x, nhidden = 5);
-   mvdbm = BMs.fitbm(x, mvdbm; epochs = 20);
+   mvdbm = BMs.traindbm!(mvdbm, x; epochs = 20);
    exactloglik = BMs.exactloglikelihood(mvdbm, x)
    emploglik = BMs.empiricalloglikelihood(mvdbm, x, 1000000)
    @test abs((exactloglik - emploglik)/exactloglik) < 0.01

@@ -15,7 +15,7 @@ export
       AbstractDBM,
          BasicDBM,
          MultivisionDBM,
-         fitrbm, stackrbms, meanfield, gibbssample!, fitdbm, sampledbm
+         fitdbm, gibbssample!, meanfield, sampledbm, stackrbms, traindbm!
 
 include("rbmtraining.jl")
 include("dbmtraining.jl")
@@ -358,7 +358,7 @@ function fitpartdbmcore(x::Array{Float64,2},
       return params
    end
 
-   fitbm(x, params, epochs = jointepochs, nparticles = nparticles,learningrate=jointlearningrate)
+   traindbm!(params, x, epochs = jointepochs, nparticles = nparticles,learningrate=jointlearningrate)
 end
 
 function fitpartdbm(x::Array{Float64,2},

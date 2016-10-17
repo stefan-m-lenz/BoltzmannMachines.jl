@@ -106,47 +106,11 @@ end
 
 
 "
-Convenience Wrapper to pretrain an RBM-Stack and to jointly adjust the weights using fitbm
+Convenience Wrapper to pretrain an RBM-Stack and to jointly adjust the weights using traindbm!
 "
 function fitdbm(x, nhiddens::Array{Int,1}, epochs=10, nparticles=100; learningrate::Float64 = 0.005)
    pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens, epochs = epochs, predbm = true, learningrate=learningrate)
-   fitbm(x, pretraineddbm, epochs = epochs, nparticles = nparticles)
-end
-
-
-"""
-    fitbm(x, dbm; ...)
-Performs fitting of a Deep Boltzmann Machine. Expects a training data set `x`
-and a pre-trained Deep Boltzmann machine `dbm` as arguments.
-
-# Optional keyword arguments:
-* `epoch`: number of training epochs
-* `nparticles`: number of particles used for sampling, default 100
-* The learning rate for each epoch is given as vector `learningrates`.
-* `monitoring`: A function that is executed after each training epoch.
-   It takes a DBM and the epoch as arguments.
-"""
-function fitbm(x::Array{Float64,2}, dbm::AbstractDBM;
-      epochs::Int = 10,
-      nparticles::Int = 100,
-      learningrate::Float64 = 0.005,
-      learningrates::Array{Float64,1} = learningrate*11.0 ./ (10.0 + (1:epochs)),
-      monitoring::Function = ((dbm, epoch) -> nothing))
-
-   if length(learningrates) < epochs
-      error("Not enough learning rates for training epochs")
-   end
-
-   particles = initparticles(dbm, nparticles)
-
-   for epoch=1:epochs
-      traindbm!(dbm, x, particles, learningrates[epoch])
-
-      # monitoring the learning process at the end of epoch
-      monitoring(dbm, epoch)
-   end
-
-   dbm
+   traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles)
 end
 
 
@@ -406,6 +370,47 @@ function stackrbms(x::Array{Float64,2};
    dbmn
 end
 
+
+"""
+    traindbm!(dbm, x; ...)
+Trains the `dbm` (an `AbstractDBM`) using the learning procedure for a
+general Boltzmann Machine with the training data set `x`.
+A learning step consists of mean-field inference (positive phase),
+stochastic approximation by Gibbs Sampling (negative phase) and the parameter
+updates.
+
+# Optional keyword arguments (ordered by importance):
+* `epoch`: number of training epochs
+* `learningrate`/`learningrates`: a vector of learning rates for each epoch to
+   update the weights and biases. The learning rates should decrease with the
+   epochs, e. g. like `a / (b + epoch)`. If only one value is given as
+   `learningrate`, `a` and `b` will be 11.0 and 10.0, respectively.
+* `nparticles`: number of particles used for sampling, default 100
+* `monitoring`: A function that is executed after each training epoch.
+   It has to take the trained DBM and the current epoch as arguments.
+"""
+function traindbm!(dbm::AbstractDBM, x::Array{Float64,2};
+      epochs::Int = 10,
+      nparticles::Int = 100,
+      learningrate::Float64 = 0.005,
+      learningrates::Array{Float64,1} = learningrate*11.0 ./ (10.0 + (1:epochs)),
+      monitoring::Function = ((dbm, epoch) -> nothing))
+
+   if length(learningrates) < epochs
+      error("Not enough learning rates for training epochs")
+   end
+
+   particles = initparticles(dbm, nparticles)
+
+   for epoch=1:epochs
+      traindbm!(dbm, x, particles, learningrates[epoch])
+
+      # monitoring the learning process at the end of epoch
+      monitoring(dbm, epoch)
+   end
+
+   dbm
+end
 
 """
     traindbm!(dbm, x, particles, learningrate)
