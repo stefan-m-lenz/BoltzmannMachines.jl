@@ -1,6 +1,6 @@
 using Base.Test
 
-using BoltzmannMachines
+import BoltzmannMachines
 const BMs = BoltzmannMachines
 
 include("BMTest.jl")

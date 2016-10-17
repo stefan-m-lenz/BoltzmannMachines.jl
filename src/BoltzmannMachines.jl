@@ -4,13 +4,14 @@ const BMs = BoltzmannMachines
 
 export
    AbstractBM,
+      sampleparticles,
       AbstractRBM,
          BernoulliRBM,
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
-         fitrbm, trainrbm!, samplevisible, samplehidden, sampleparticles,
-         hprob, vprob, samplerbm,
+         fitrbm, trainrbm!, samplevisible, samplehidden,
+         hiddenpotential, visiblepotential, samplerbm,
       AbstractDBM,
          DBMParam,
          MultivisionDBM,
@@ -25,27 +26,27 @@ typealias AbstractBM Union{AbstractDBM, AbstractRBM}
 Computes the activation probability of the visible units in an RBM, given the
 values `h` of the hidden units.
 "
-function vprob(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+function visiblepotential(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    factor*(gbrbm.a + gbrbm.sd .* (gbrbm.weights * h))
 end
 
 # factor is ignored, GaussianBernoulliRBMs should only be used in bottom layer of DBM
-function vprob(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+function visiblepotential(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    mu = hh*gbrbm.weights'
    broadcast!(.*, mu, mu, gbrbm.sd')
    broadcast!(+, mu, mu, gbrbm.a')
    mu
 end
 
-function vprob(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+function visiblepotential(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    sigm(factor*(bgrbm.weights*h + bgrbm.a))
 end
 
-function hprob(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+function hiddenpotential(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
    factor*(bgrbm.b + bgrbm.weights' * v)
 end
 
-function hprob(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
+function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    # factor ignored
    broadcast(+, vv*bgrbm.weights, bgrbm.b')
 end
@@ -61,42 +62,42 @@ function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
    mu
 end
 
-function hprob(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+function hiddenpotential(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
    sigm(factor*(hiddeninput(gbrbm, v)))
 end
 
-function hprob(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
+function hiddenpotential(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    sigm(factor*hiddeninput(gbrbm, vv))
 end
 
-function hprob(b2brbm::Binomial2BernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
+function hiddenpotential(b2brbm::Binomial2BernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
    sigm(factor*(hiddeninput(b2brbm, v)))
 end
 
 function samplevisible(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(vprob(rbm, h, factor))
+   bernoulli!(visiblepotential(rbm, h, factor))
 end
 
 function samplevisible(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(vprob(rbm, hh, factor))
+   bernoulli(visiblepotential(rbm, hh, factor))
 end
 
 function samplevisible(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   vprob(gbrbm, h, factor) + gbrbm.sd .* randn(length(gbrbm.a))
+   visiblepotential(gbrbm, h, factor) + gbrbm.sd .* randn(length(gbrbm.a))
 end
 
 function samplevisible(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   hh = vprob(gbrbm, hh, factor)
+   hh = visiblepotential(gbrbm, hh, factor)
    hh += broadcast(.*, randn(size(hh)), gbrbm.sd')
    hh
 end
 
 function samplevisible(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(vprob(bgrbm, h, factor))
+   bernoulli!(visiblepotential(bgrbm, h, factor))
 end
 
 function samplevisible(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(vprob(bgrbm, hh, factor))
+   bernoulli(visiblepotential(bgrbm, hh, factor))
 end
 
 function samplevisible{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
@@ -105,35 +106,35 @@ function samplevisible{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, fa
 end
 
 function samplehidden(rbm::BernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(hprob(rbm, v, factor))
+   bernoulli!(hiddenpotential(rbm, v, factor))
 end
 
 function samplehidden(rbm::BernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(hprob(rbm, vv, factor))
+   bernoulli(hiddenpotential(rbm, vv, factor))
 end
 
 function samplehidden(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(hprob(gbrbm, h, factor))
+   bernoulli!(hiddenpotential(gbrbm, h, factor))
 end
 
 function samplehidden(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(hprob(gbrbm, hh, factor))
+   bernoulli(hiddenpotential(gbrbm, hh, factor))
 end
 
 function samplehidden(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(hprob(b2brbm, h, factor))
+   bernoulli!(hiddenpotential(b2brbm, h, factor))
 end
 
 function samplehidden(b2brbm::Binomial2BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(hprob(b2brbm, hh, factor))
+   bernoulli(hiddenpotential(b2brbm, hh, factor))
 end
 
 function samplehidden(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   hprob(bgrbm, h, factor) + randn(length(bgrbm.b))
+   hiddenpotential(bgrbm, h, factor) + randn(length(bgrbm.b))
 end
 
 function samplehidden(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   hh = hprob(bgrbm, hh, factor)
+   hh = hiddenpotential(bgrbm, hh, factor)
    hh + randn(size(hh))
 end
 
@@ -166,7 +167,7 @@ end
 Computes the activation probability of the hidden units in an RBM, given the
 values `v` of the visible units.
 "
-function hprob(rbm::BernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+function hiddenpotential(rbm::BernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
    sigm(factor*(rbm.weights'*v + rbm.b))
 end
 
@@ -174,25 +175,25 @@ end
 Computes the activation probability of the visible units in an RBM, given the
 values `h` of the hidden units.
 "
-function vprob(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+function visiblepotential(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    sigm(factor*(rbm.weights*h + rbm.a))
 end
 
-function vprob(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+function visiblepotential(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    sigm(factor*visibleinput(rbm,hh))
 end
 
-function vprob(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+function visiblepotential(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    sigm(factor*visibleinput(bgrbm,hh))
 end
 
 """
-    vprob(b2brbm, h)
+    visiblepotential(b2brbm, h)
 Each visible node in the Binomial2BernoulliRBM is sampled from a Binomial(2,p)
 distribution in the Gibbs steps. This functions returns the vector of values for
 2*p. (The value is doubled to get a value in the same range as the sampled one.)
 """
-function vprob{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+function visiblepotential{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
    2*sigm(factor * visibleinput(b2brbm, h))
 end
 
@@ -221,7 +222,7 @@ function hiddeninput(b2brbm::Binomial2BernoulliRBM, vv::Array{Float64,2})
    broadcast!(+, input, input, b2brbm.b')
 end
 
-function hprob(rbm::BernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
+function hiddenpotential(rbm::BernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    sigm(factor*hiddeninput(rbm,vv))
 end
 
@@ -272,8 +273,8 @@ function samplerbm(rbm::BernoulliRBM, n::Int, burnin::Int = 10)
 
    h = round(rand(nhidden))
    for i=1:(n+burnin)
-      v = bernoulli!(vprob(rbm, h))
-      h = bernoulli!(hprob(rbm, v))
+      v = bernoulli!(visiblepotential(rbm, h))
+      h = bernoulli!(hiddenpotential(rbm, v))
 
       if i > burnin
          x[i-burnin,:] = v
@@ -417,7 +418,7 @@ end
 function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
    particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
    # do not sample in last step to avoid that the noise dominates the data
-   particles[1] = vprob(gbrbm, particles[2])
+   particles[1] = visiblepotential(gbrbm, particles[2])
    particles
 end
 

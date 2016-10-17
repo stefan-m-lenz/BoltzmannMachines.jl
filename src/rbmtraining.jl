@@ -216,8 +216,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       end
 
       # Do not sample in last step to avoid unnecessary sampling noise
-      vmodel = vprob(rbm, hmodel, downfactor)
-      hmodel = hprob(rbm, vmodel, upfactor)
+      vmodel = visiblepotential(rbm, hmodel, downfactor)
+      hmodel = hiddenpotential(rbm, vmodel, upfactor)
 
       if pcd
          # Preserve state of chain in a way that changes are visible to the caller.

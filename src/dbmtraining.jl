@@ -74,7 +74,7 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
    # propagate input x up to last hidden layer
    hh = visiblestofirsthidden(mvdbm, x)
    for i = 1:length(mvdbm.hiddbm)
-      hh = hprob(mvdbm.hiddbm[i], hh, 2.0) # intermediate layer, factor is 2.0
+      hh = hiddenpotential(mvdbm.hiddbm[i], hh, 2.0) # intermediate layer, factor is 2.0
    end
 
    upfactor = downfactor = 2.0
@@ -275,9 +275,9 @@ function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
    # but the topmost layer (see [Salakhutdinov+Hinton, 2012], p. 1985)
    mu[1] = x
    for i=2:(nlayers-1)
-      mu[i] = hprob(dbm[i-1], mu[i-1], 2.0)
+      mu[i] = hiddenpotential(dbm[i-1], mu[i-1], 2.0)
    end
-   mu[nlayers] = hprob(dbm[nlayers-1], mu[nlayers-1])
+   mu[nlayers] = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
 
    # mean-field updates until convergence criterion is met
    delta = 1.0
@@ -296,7 +296,7 @@ function meanfield(dbm::DBMParam, x::Array{Float64,2}, eps::Float64 = 0.001)
       end
 
       # last layer
-      newmu = hprob(dbm[nlayers-1], mu[nlayers-1])
+      newmu = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
       newdelta = maximum(abs(mu[nlayers] - newmu))
       if newdelta > delta
          delta = newdelta
@@ -318,9 +318,9 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
    mu[1] = x
    mu[2] = visiblestofirsthidden(mvdbm, x)
    for i = 3:(nlayers-1) # intermediate hidden layers after second
-      mu[i] = hprob(mvdbm.hiddbm[i-2], mu[i-1], 2.0)
+      mu[i] = hiddenpotential(mvdbm.hiddbm[i-2], mu[i-1], 2.0)
    end
-   mu[nlayers] = hprob(mvdbm.hiddbm[nlayers-2], mu[nlayers-1])
+   mu[nlayers] = hiddenpotential(mvdbm.hiddbm[nlayers-2], mu[nlayers-1])
 
    # mean-field updates until convergence criterion is met
    delta = Inf
@@ -385,7 +385,7 @@ function stackrbms(x::Array{Float64,2};
 
    hiddenval = x
    for i=2:nrbms
-      hiddenval = BMs.hprob(dbmn[i-1], hiddenval, upfactor)
+      hiddenval = BMs.hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
          hidden = bernoulli(hiddenval)
       end

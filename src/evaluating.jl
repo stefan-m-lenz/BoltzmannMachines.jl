@@ -39,7 +39,7 @@ function aisimportanceweights(rbm::BernoulliRBM;
 
          # Gibbs transition
          for burn=1:burnin
-            h = bernoulli!(hprob(rbm, v, beta[k]))
+            h = bernoulli!(hiddenpotential(rbm, v, beta[k]))
             vinput = beta[k] * visibleinput(rbm, h) + (1 - beta[k]) * visbias
             v = bernoulli!(sigm(vinput))
          end
@@ -79,8 +79,8 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
 
          # Sample next value for v using Gibbs Sampling in the RBM
          for burn=1:burnin
-            h1 = bernoulli!(hprob(rbm1, v, 1 - beta[k]));
-            h2 = bernoulli!(hprob(rbm2, v,     beta[k]));
+            h1 = bernoulli!(hiddenpotential(rbm1, v, 1 - beta[k]));
+            h2 = bernoulli!(hiddenpotential(rbm2, v,     beta[k]));
 
             v = bernoulli!(sigm(
                 (1-beta[k]) * visibleinput(rbm1, h1) +
@@ -954,8 +954,8 @@ function reconstructionerror(rbm::AbstractRBM,
 
    for sample = 1:nsamples
       v = vec(x[sample,:])
-      hmodel = hprob(rbm, v, upfactor)
-      vmodel = vprob(rbm, hmodel, downfactor)
+      hmodel = hiddenpotential(rbm, v, upfactor)
+      vmodel = visiblepotential(rbm, hmodel, downfactor)
       reconstructionerror += sum(abs(v - vmodel))
    end
 

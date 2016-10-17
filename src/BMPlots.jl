@@ -153,12 +153,15 @@ Makes pair plot for each variable of the data set `x` versus each other variable
 function plotpairs(x::Matrix{Float64};
       filename::AbstractString = "pairs",
       labels = Vector{AbstractString}(),
-      cellsize = 60mm,
+      cellsize = 0,
       subgroups = Vector{AbstractString}(),
       densityestimation::Function = emptyfunc,
       datafordensityestimation::Matrix{Float64} = x)
 
    requiresgadfly()
+   if cellsize == 0
+      cellsize = 60mm
+   end
 
    nvariables = size(x,2)
    nlabels = length(labels)
@@ -221,7 +224,7 @@ function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       hiddennodes::Tuple{Int,Int} = (1,2),
       labels = Vector{AbstractString}())
 
-   hh = BMs.hprob(rbm, x)
+   hh = BMs.hiddenpotential(rbm, x)
    hh = hh[:,collect(hiddennodes)]
 
    if !isempty(labels)
