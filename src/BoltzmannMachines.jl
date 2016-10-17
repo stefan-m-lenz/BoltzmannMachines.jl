@@ -27,38 +27,38 @@ Computes the activation probability of the visible units in an RBM, given the
 values `h` of the hidden units.
 "
 function visiblepotential(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   factor*(gbrbm.a + gbrbm.sd .* (gbrbm.weights * h))
+   factor*(gbrbm.visbias + gbrbm.sd .* (gbrbm.weights * h))
 end
 
 # factor is ignored, GaussianBernoulliRBMs should only be used in bottom layer of DBM
 function visiblepotential(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    mu = hh*gbrbm.weights'
    broadcast!(.*, mu, mu, gbrbm.sd')
-   broadcast!(+, mu, mu, gbrbm.a')
+   broadcast!(+, mu, mu, gbrbm.visbias')
    mu
 end
 
 function visiblepotential(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   sigm(factor*(bgrbm.weights*h + bgrbm.a))
+   sigm(factor*(bgrbm.weights*h + bgrbm.visbias))
 end
 
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
-   factor*(bgrbm.b + bgrbm.weights' * v)
+   factor*(bgrbm.hidbias + bgrbm.weights' * v)
 end
 
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    # factor ignored
-   broadcast(+, vv*bgrbm.weights, bgrbm.b')
+   broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
 end
 
 function hiddeninput(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1})
-   gbrbm.weights'* (v ./ gbrbm.sd) + gbrbm.b
+   gbrbm.weights'* (v ./ gbrbm.sd) + gbrbm.hidbias
 end
 
 function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
    mu = broadcast(./, vv, gbrbm.sd')
    mu = mu*gbrbm.weights
-   broadcast!(+, mu, mu, gbrbm.b')
+   broadcast!(+, mu, mu, gbrbm.hidbias')
    mu
 end
 
@@ -83,7 +83,7 @@ function samplevisible(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 
 end
 
 function samplevisible(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   visiblepotential(gbrbm, h, factor) + gbrbm.sd .* randn(length(gbrbm.a))
+   visiblepotential(gbrbm, h, factor) + gbrbm.sd .* randn(length(gbrbm.visbias))
 end
 
 function samplevisible(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
@@ -130,7 +130,7 @@ function samplehidden(b2brbm::Binomial2BernoulliRBM, hh::Array{Float64,2}, facto
 end
 
 function samplehidden(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   hiddenpotential(bgrbm, h, factor) + randn(length(bgrbm.b))
+   hiddenpotential(bgrbm, h, factor) + randn(length(bgrbm.hidbias))
 end
 
 function samplehidden(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
@@ -168,7 +168,7 @@ Computes the activation probability of the hidden units in an RBM, given the
 values `v` of the visible units.
 "
 function hiddenpotential(rbm::BernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
-   sigm(factor*(rbm.weights'*v + rbm.b))
+   sigm(factor*(rbm.weights'*v + rbm.hidbias))
 end
 
 "
@@ -176,7 +176,7 @@ Computes the activation probability of the visible units in an RBM, given the
 values `h` of the hidden units.
 "
 function visiblepotential(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   sigm(factor*(rbm.weights*h + rbm.a))
+   sigm(factor*(rbm.weights*h + rbm.visbias))
 end
 
 function visiblepotential(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
@@ -203,23 +203,23 @@ Computes the total input of the hidden units in an RBM, given the activations
 of the visible units `v`.
 "
 function hiddeninput(rbm::BernoulliRBM, v::Array{Float64,1})
-   rbm.weights'*v + rbm.b
+   rbm.weights'*v + rbm.hidbias
 end
 
 function hiddeninput(rbm::BernoulliRBM, vv::Array{Float64,2})
    input = vv*rbm.weights
-   broadcast!(+, input, input, rbm.b')
+   broadcast!(+, input, input, rbm.hidbias')
 end
 
 function hiddeninput(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
    # Hidden input is implicitly doubled
    # because the visible units range from 0 to 2.
-   b2brbm.weights' * v + b2brbm.b
+   b2brbm.weights' * v + b2brbm.hidbias
 end
 
 function hiddeninput(b2brbm::Binomial2BernoulliRBM, vv::Array{Float64,2})
    input = vv * b2brbm.weights
-   broadcast!(+, input, input, b2brbm.b')
+   broadcast!(+, input, input, b2brbm.hidbias')
 end
 
 function hiddenpotential(rbm::BernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
@@ -231,30 +231,30 @@ Computes the total input of the visible units in an RBM, given the activations
 of the hidden units.
 "
 function visibleinput(rbm::BernoulliRBM, h::Array{Float64,1})
-   rbm.weights*h + rbm.a
+   rbm.weights*h + rbm.visbias
 end
 
 function visibleinput(rbm::BernoulliRBM, hh::Array{Float64,2})
    input = hh*rbm.weights'
-   broadcast!(+, input, input, rbm.a')
+   broadcast!(+, input, input, rbm.visbias')
 end
 
 function visibleinput(rbm::BernoulliGaussianRBM, h::Array{Float64,1})
-   rbm.weights*h + rbm.a
+   rbm.weights*h + rbm.visbias
 end
 
 function visibleinput(rbm::BernoulliGaussianRBM, hh::Array{Float64,2})
    input = hh*rbm.weights'
-   broadcast!(+, input, input, rbm.a')
+   broadcast!(+, input, input, rbm.visbias')
 end
 
 function visibleinput(b2brbm::Binomial2BernoulliRBM, h::Vector{Float64})
-   b2brbm.weights * h + b2brbm.a
+   b2brbm.weights * h + b2brbm.visbias
 end
 
 function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    input = hh * b2brbm.weights'
-   broadcast!(+, input, input, b2brbm.a')
+   broadcast!(+, input, input, b2brbm.visbias')
 end
 
 
@@ -266,8 +266,8 @@ Generates `n` samples from a given `rbm` by running a single Gibbs chain with
 "
 function samplerbm(rbm::BernoulliRBM, n::Int, burnin::Int = 10)
 
-   nvisible = length(rbm.a)
-   nhidden = length(rbm.b)
+   nvisible = length(rbm.visbias)
+   nhidden = length(rbm.hidbias)
 
    x = zeros(n, nvisible)
 
@@ -337,8 +337,8 @@ function fitpartdbmcore(x::Array{Float64,2},
          startposout += nhiddensmat[j,i]
 
          weights[inindex,outindex] = partparams[j][i].weights
-         a[inindex] = partparams[j][i].a
-         b[outindex] = partparams[j][i].b
+         a[inindex] = partparams[j][i].visbias
+         b[outindex] = partparams[j][i].hidbias
 
          params[i] = BernoulliRBM(weights,a,b)
       end
@@ -406,7 +406,7 @@ end
 
 function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
    particles = Particles(2)
-   particles[2] = rand([0.0 1.0], nparticles, length(rbm.b))
+   particles[2] = rand([0.0 1.0], nparticles, length(rbm.hidbias))
 
    for i=1:burnin
       particles[1] = samplevisible(rbm, particles[2])
@@ -427,14 +427,14 @@ function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
 end
 
 function joinweights{T<:AbstractRBM}(rbms::Vector{T})
-   jointnhidden = mapreduce(rbm -> length(rbm.b), +, 0, rbms)
-   jointnvisible = mapreduce(rbm -> length(rbm.a), +, 0, rbms)
+   jointnhidden = mapreduce(rbm -> length(rbm.hidbias), +, 0, rbms)
+   jointnvisible = mapreduce(rbm -> length(rbm.visbias), +, 0, rbms)
    jointweights = zeros(jointnvisible, jointnhidden)
    offset1 = 0
    offset2 = 0
    for i = eachindex(rbms)
-      nvisible = length(rbms[i].a)
-      nhidden = length(rbms[i].b)
+      nvisible = length(rbms[i].visbias)
+      nhidden = length(rbms[i].hidbias)
       jointweights[offset1 + (1:nvisible), offset2 + (1:nhidden)] =
             rbms[i].weights
       offset1 += nvisible
@@ -444,14 +444,14 @@ function joinweights{T<:AbstractRBM}(rbms::Vector{T})
 end
 
 function joinrbms(rbms::Vector{BernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.a, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.b, rbms)...)
+   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
    BernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias)
 end
 
 function joinrbms(rbms::Vector{GaussianBernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.a, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.b, rbms)...)
+   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
    jointsd = cat(1, map(rbm -> rbm.sd, rbms)...)
    GaussianBernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias,
          jointsd)

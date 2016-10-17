@@ -84,9 +84,9 @@ function monitorweightsnorm!(monitor::Monitor, rbm::AbstractRBM, epoch::Int)
          MonitoringItem(BMs.monitorweightsnorm, epoch,
                norm(rbm.weights), "Weights"),
          MonitoringItem(BMs.monitorweightsnorm, epoch,
-               norm(rbm.a), "Visible bias"),
+               norm(rbm.visbias), "Visible bias"),
          MonitoringItem(BMs.monitorweightsnorm, epoch,
-               norm(rbm.b), "Hidden bias"))
+               norm(rbm.hidbias), "Hidden bias"))
 end
 
 function monitorsd!(monitor::Monitor, gbrbm::GaussianBernoulliRBM, epoch::Int)

@@ -2,8 +2,8 @@ abstract AbstractRBM
 
 type BernoulliRBM <: AbstractRBM
    weights::Array{Float64,2}
-   a::Array{Float64,1}
-   b::Array{Float64,1}
+   visbias::Array{Float64,1}
+   hidbias::Array{Float64,1}
 end
 
 
@@ -13,16 +13,16 @@ binary, Bernoulli distributed hidden nodes.
 """
 type GaussianBernoulliRBM <: AbstractRBM
    weights::Array{Float64,2}
-   a::Array{Float64,1}
-   b::Array{Float64,1}
+   visbias::Array{Float64,1}
+   hidbias::Array{Float64,1}
    sd::Array{Float64,1}
 end
 
 
 type BernoulliGaussianRBM <: AbstractRBM
    weights::Array{Float64,2}
-   a::Array{Float64,1}
-   b::Array{Float64,1}
+   visbias::Array{Float64,1}
+   hidbias::Array{Float64,1}
 end
 
 
@@ -37,8 +37,8 @@ Binomial2BernoulliRBM.
 """
 type Binomial2BernoulliRBM <: AbstractRBM
    weights::Matrix{Float64}
-   a::Vector{Float64}
-   b::Vector{Float64}
+   visbias::Vector{Float64}
+   hidbias::Vector{Float64}
 end
 
 
@@ -173,7 +173,7 @@ end
 
 
 function sdupdateterm(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, h::Array{Float64,1})
-   (v - gbrbm.a).^2 ./ (gbrbm.sd .^3) - (v ./ (gbrbm.sd .^ 2)) .* (gbrbm.weights * h)
+   (v - gbrbm.visbias).^2 ./ (gbrbm.sd .^3) - (v ./ (gbrbm.sd .^ 2)) .* (gbrbm.weights * h)
 end
 
 
@@ -239,8 +239,8 @@ function updateparameters!(rbm::AbstractRBM,
 
    deltaw = v*h' - vmodel*hmodel'
    rbm.weights += deltaw * learningrate
-   rbm.a += (v - vmodel) * learningrate
-   rbm.b += (h - hmodel) * learningrate
+   rbm.visbias += (v - vmodel) * learningrate
+   rbm.hidbias += (h - hmodel) * learningrate
    nothing
 end
 
@@ -263,7 +263,7 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
 
    deltaw = v*h' - vmodel*hmodel'
    gbrbm.weights += deltaw * learningrate
-   gbrbm.a += (v - vmodel) * learningrate
-   gbrbm.b += (h - hmodel) * learningrate
+   gbrbm.visbias += (v - vmodel) * learningrate
+   gbrbm.hidbias += (h - hmodel) * learningrate
    nothing
 end

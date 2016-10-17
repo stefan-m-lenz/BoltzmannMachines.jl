@@ -17,7 +17,7 @@ visible bias of the given `rbm`.
 * `burnin`: Number of steps to sample for the Gibbs transition between models
 """
 function aisimportanceweights(rbm::BernoulliRBM;
-      visbias::Array{Float64,1} = rbm.a,
+      visbias::Array{Float64,1} = rbm.visbias,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -25,7 +25,7 @@ function aisimportanceweights(rbm::BernoulliRBM;
 
    impweights = ones(nparticles)
 
-   visbiasdiff = rbm.a - visbias
+   visbiasdiff = rbm.visbias - visbias
 
    for j=1:nparticles
       v = bernoulli!(sigm(visbias))
@@ -62,15 +62,15 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
       nparticles::Int = 100,
       burnin::Int = 10)
 
-   nvisible = length(rbm1.a)
+   nvisible = length(rbm1.visbias)
 
-   if length(rbm2.a) != nvisible
+   if length(rbm2.visbias) != nvisible
       error("The two RBMs must have the same numer of visible units.")
    end
 
    impweights = ones(nparticles)
 
-   visbiasdiff = rbm2.a - rbm1.a
+   visbiasdiff = rbm2.visbias - rbm1.visbias
 
    for j=1:nparticles # TODO parallelize
       v = rand(nvisible)
@@ -120,13 +120,13 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
    mixrbm = deepcopy(gbrbm)
 
    for j=1:nparticles
-      h = bernoulli!(sigm(gbrbm.b))
+      h = bernoulli!(sigm(gbrbm.hidbias))
 
       for k=2:(ntemperatures + 1)
 
          wh = gbrbm.weights*h
          logimpweights[j] += (beta[k] - beta[k-1]) *
-               sum(0.5 * wh.^2 + gbrbm.a ./gbrbm.sd .* wh)
+               sum(0.5 * wh.^2 + gbrbm.visbias ./gbrbm.sd .* wh)
 
          # Gibbs transition
          mixrbm.weights = gbrbm.weights * sqrt(beta[k])
@@ -177,12 +177,12 @@ function aisimportanceweights(dbm::BasicDBM;
 
       for j=1:nparticles # TODO parallelize
 
-         oddbiasenergy = dot(dbm[1].a, vec(particles[1][j,:]))
+         oddbiasenergy = dot(dbm[1].visbias, vec(particles[1][j,:]))
          for i = 3:2:nrbms
-            oddbiasenergy += dot(dbm[i].a + dbm[i-1].b, vec(particles[i][j,:]))
+            oddbiasenergy += dot(dbm[i].visbias + dbm[i-1].hidbias, vec(particles[i][j,:]))
          end
          if nlayers % 2 != 0
-            oddbiasenergy += dot(dbm[nrbms].b, vec(particles[nlayers][j,:]))
+            oddbiasenergy += dot(dbm[nrbms].hidbias, vec(particles[nlayers][j,:]))
          end
          impweights[j] *= exp((beta[k] - beta[k-1]) * oddbiasenergy)
 
@@ -296,23 +296,23 @@ Computes the energy of the combination of activations, given by the particle
 function energy(dbm::BasicDBM, u::Particle)
    energy = [0.0]
    for i = 1:length(dbm)
-      energy -= u[i]'*dbm[i].weights*u[i+1] + dbm[i].a'*u[i] + dbm[i].b'*u[i+1]
+      energy -= u[i]'*dbm[i].weights*u[i+1] + dbm[i].visbias'*u[i] + dbm[i].hidbias'*u[i+1]
    end
    energy[1]
 end
 
 function energy(rbm::BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
-   - dot(v, rbm.weights*h) - dot(rbm.a, v) - dot(rbm.b, h)
+   - dot(v, rbm.weights*h) - dot(rbm.visbias, v) - dot(rbm.hidbias, h)
 end
 
 function energy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
    # Add term to correct for 0/1/2-valued v.
    - sum(v .== 1.0) * log(2) - dot(v, b2brbm.weights*h) -
-         dot(b2brbm.a, v) - dot(b2brbm.b, h)
+         dot(b2brbm.visbias, v) - dot(b2brbm.hidbias, h)
 end
 
 function energy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
-   sum(((v - gbrbm.a) ./ gbrbm.sd).^2) / 2 - dot(gbrbm.b, h) -
+   sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2 - dot(gbrbm.hidbias, h) -
          dot(gbrbm.weights*h, v ./ gbrbm.sd)
 end
 
@@ -412,8 +412,8 @@ The execution time grows exponentially with the minimum of
 (number of visible nodes, number of hidden nodes).
 """
 function exactlogpartitionfunction(rbm::BernoulliRBM)
-   nvisible = length(rbm.a)
-   nhidden = length(rbm.b)
+   nvisible = length(rbm.visbias)
+   nhidden = length(rbm.hidbias)
    z = 0.0
    if nvisible <= nhidden
       v = zeros(nvisible)
@@ -433,7 +433,7 @@ function exactlogpartitionfunction(rbm::BernoulliRBM)
 end
 
 function exactlogpartitionfunction(rbm::Binomial2BernoulliRBM)
-   nhidden = length(rbm.b)
+   nhidden = length(rbm.hidbias)
    h = zeros(nhidden)
    z = 0.0
    while true
@@ -449,14 +449,14 @@ Calculates the log of the partition function of the GaussianBernoulliRBM `gbrbm`
 exactly. The execution time grows exponentially with the number of hidden nodes.
 """
 function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
-   nvisible = length(gbrbm.a)
-   nhidden = length(gbrbm.b)
+   nvisible = length(gbrbm.visbias)
+   nhidden = length(gbrbm.hidbias)
 
    h = zeros(nhidden)
    z = 0.0
    while true
       wh = gbrbm.weights * h
-      z += exp(dot(gbrbm.b, h) + sum(0.5*wh.^2 + gbrbm.a ./ gbrbm.sd .* wh))
+      z += exp(dot(gbrbm.hidbias, h) + sum(0.5*wh.^2 + gbrbm.visbias ./ gbrbm.sd .* wh))
       next!(h) || break
    end
    log(z) + nvisible/2 * log(2*pi) + sum(log(gbrbm.sd))
@@ -562,14 +562,14 @@ function freeenergy(rbm::BernoulliRBM, x::Matrix{Float64})
    freeenergy = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
-      freeenergy -= dot(rbm.a, v) + sum(log(1 + exp(hiddeninput(rbm, v))))
+      freeenergy -= dot(rbm.visbias, v) + sum(log(1 + exp(hiddeninput(rbm, v))))
    end
    freeenergy /= nsamples
    freeenergy
 end
 
 function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
-   - dot(rbm.a, v) - sum(log(1 + exp(hiddeninput(rbm, v))))
+   - dot(rbm.visbias, v) - sum(log(1 + exp(hiddeninput(rbm, v))))
 end
 
 function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
@@ -582,7 +582,7 @@ function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
       # this number of combinations in the 00/01/10/11 space, all having equal
       # probability.
       freeenergy -= sum(v .== 1.0) * log(2) +
-            dot(b2brbm.a, v) + sum(log(1 + exp(hiddeninput(b2brbm, v))))
+            dot(b2brbm.visbias, v) + sum(log(1 + exp(hiddeninput(b2brbm, v))))
    end
    freeenergy /= nsamples
    freeenergy
@@ -592,16 +592,16 @@ function freeenergy(gbrbm::GaussianBernoulliRBM, x::Matrix{Float64})
    # For derivation of formula for free energy of Gaussian-Bernoulli-RBMs,
    # see [Krizhevsky, 2009], page 15.
    nsamples = size(x,1)
-   nhidden = length(gbrbm.b)
+   nhidden = length(gbrbm.hidbias)
 
    freeenergy = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
       for k = 1:nhidden
          freeenergy -=
-               log(1 + exp(gbrbm.b[k] + dot(gbrbm.weights[:,k], v ./ gbrbm.sd)))
+               log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], v ./ gbrbm.sd)))
       end
-      freeenergy += 0.5 * sum(((v - gbrbm.a) ./ gbrbm.sd).^2)
+      freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
    end
    freeenergy /= nsamples
    freeenergy
@@ -609,13 +609,13 @@ end
 
 function freeenergy(bgrbm::BernoulliGaussianRBM, x::Matrix{Float64})
    nsamples = size(x,1)
-   nhidden = length(bgrbm.b)
+   nhidden = length(bgrbm.hidbias)
 
    freeenergy = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
       wtv = bgrbm.weights'*v
-      freeenergy -= dot(bgrbm.b, wtv) + 0.5 * sum(wtv.^2) + dot(bgrbm.a, v)
+      freeenergy -= dot(bgrbm.hidbias, wtv) + 0.5 * sum(wtv.^2) + dot(bgrbm.visbias, v)
    end
    freeenergy /= nsamples
    freeenergy -= nhidden / 2 * log(2pi)
@@ -689,8 +689,8 @@ function loglikelihood(dbm::BasicDBM, x::Array{Float64,2};
    logp = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
-      logp += dot(dbm[1].a, v)
-      hdbm[1].a = hiddeninput(dbm[1], v) + dbm[2].a
+      logp += dot(dbm[1].visbias, v)
+      hdbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
       r = mean(aisimportanceweights(hdbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
       logp += log(r)
@@ -720,7 +720,7 @@ function loglikelihooddiff(rbm1::BernoulliRBM, rbm2::BernoulliRBM,
 
    lldiff = 0.0
 
-   visbiasdiff = rbm1.a - rbm2.a
+   visbiasdiff = rbm1.visbias - rbm2.visbias
 
    # calculate difference of sum of unnormalized log probabilities
    for j=1:nsamples
@@ -756,14 +756,14 @@ log(Z) = log(r) + log(Z_0)
 function logpartitionfunction(rbm::BernoulliRBM,
       r::Float64 = mean(aisimportanceweights(rbm)))
 
-   logpartitionfunction(rbm, rbm.a, r)
+   logpartitionfunction(rbm, rbm.visbias, r)
 end
 
 function logpartitionfunction(rbm::BernoulliRBM,
       visbias::Vector{Float64},
       r::Float64 = mean(aisimportanceweights(rbm; visbias = visbias)))
 
-   nhidden = length(rbm.b)
+   nhidden = length(rbm.hidbias)
    # Uses equation 43 in [Salakhutdinov, 2008]
    logz = log(r) + log(2)*nhidden + sum(log(1 + exp(visbias)))
 end
@@ -781,8 +781,8 @@ standard deviation and same visible and hidden bias as the given `gbrbm`.
 function logpartitionfunction(gbrbm::GaussianBernoulliRBM,
       r::Float64 = mean(aisimportanceweights(gbrbm)))
 
-   nvisible = length(gbrbm.a)
-   logz0 = nvisible / 2 * log(2*pi) + sum(log(gbrbm.sd)) + sum(log(1 + exp(gbrbm.b)))
+   nvisible = length(gbrbm.visbias)
+   logz0 = nvisible / 2 * log(2*pi) + sum(log(gbrbm.sd)) + sum(log(1 + exp(gbrbm.hidbias)))
    logz = log(r) + logz0
 end
 
@@ -799,8 +799,8 @@ and same visible and hidden bias as the given `bgrbm`.
 function logpartitionfunction(bgrbm::BernoulliGaussianRBM,
       r::Float64 = mean(aisimportanceweights(bgrbm)))
 
-   nhidden = length(bgrbm.b)
-   logz0 = nhidden / 2 * log(2pi) + sum(log(1 + exp(bgrbm.a)))
+   nhidden = length(bgrbm.hidbias)
+   logz0 = nhidden / 2 * log(2pi) + sum(log(1 + exp(bgrbm.visbias)))
    logz = log(r) + logz0
 end
 
@@ -853,7 +853,7 @@ function logproblowerbound(dbm::BasicDBM,
 
          # add energy
          lowerbound +=
-               dot(v, dbm[i].a) + dot(h, dbm[i].b) + dot(v, dbm[i].weights * h)
+               dot(v, dbm[i].visbias) + dot(h, dbm[i].hidbias) + dot(v, dbm[i].weights * h)
 
          # add entropy of approximate posterior Q
          h = h[(h .> 0.0) & (h .< 1.0)]
@@ -911,7 +911,7 @@ Returns an integer vector that contans in the i'th entry the number of nodes
 in the i'th layer of the `bm`.
 """
 function nunits(rbm::AbstractRBM)
-   [length(rbm.a); length(rbm.b)]
+   [length(rbm.visbias); length(rbm.hidbias)]
 end
 
 function nunits(dbm::BasicDBM)
@@ -922,9 +922,9 @@ function nunits(dbm::BasicDBM)
    nlayers = length(dbm) + 1
    nu = Array{Int,1}(nlayers)
    for i = 1:nrbms
-      nu[i] = length(dbm[i].a)
+      nu[i] = length(dbm[i].visbias)
    end
-   nu[nlayers] = length(dbm[nlayers-1].b)
+   nu[nlayers] = length(dbm[nlayers-1].hidbias)
    nu
 end
 
@@ -968,12 +968,12 @@ Returns the GBRBM with weights such that hidden and visible of the given `bgrbm`
 are switched and a visible standard deviation of 1.
 "
 function reversedrbm(bgrbm::BernoulliGaussianRBM)
-   sd = ones(length(bgrbm.b))
-   GaussianBernoulliRBM(bgrbm.weights', bgrbm.b, bgrbm.a, sd)
+   sd = ones(length(bgrbm.hidbias))
+   GaussianBernoulliRBM(bgrbm.weights', bgrbm.hidbias, bgrbm.visbias, sd)
 end
 
 function reversedrbm(rbm::BernoulliRBM)
-   BernoulliRBM(rbm.weights', rbm.b, rbm.a)
+   BernoulliRBM(rbm.weights', rbm.hidbias, rbm.visbias)
 end
 
 function reverseddbm(dbm::BasicDBM)
@@ -1035,19 +1035,19 @@ Calculates the unnormalized probability of the `rbm`'s hidden nodes'
 activations given by `h`.
 """
 function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.b, h)) * prod(1 + exp(visibleinput(rbm, h)))
+   exp(dot(rbm.hidbias, h)) * prod(1 + exp(visibleinput(rbm, h)))
 end
 
 function unnormalizedprobhidden(rbm::Binomial2BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.b, h)) * prod(1 + exp(visibleinput(rbm, h)))^2
+   exp(dot(rbm.hidbias, h)) * prod(1 + exp(visibleinput(rbm, h)))^2
 end
 
 const sqrt2pi = sqrt(2pi)
 
 function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM, h::Vector{Float64})
-   nvisible = length(gbrbm.a)
+   nvisible = length(gbrbm.visbias)
    wh = gbrbm.weights * h
-   exp(dot(gbrbm.b, h) + sum(0.5*wh.^2 + gbrbm.a ./ gbrbm.sd .* wh)) *
+   exp(dot(gbrbm.hidbias, h) + sum(0.5*wh.^2 + gbrbm.visbias ./ gbrbm.sd .* wh)) *
          prod(gbrbm.sd) * sqrt2pi^nvisible
 end
 
