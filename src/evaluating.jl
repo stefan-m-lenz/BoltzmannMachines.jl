@@ -103,6 +103,25 @@ end
 
 
 """
+    aisimportanceweights(bgrbm; ...)
+Computes the importance weights in the Annealed Importance Sampling algorithm
+for estimating the ratio of the partition functions of the given
+BernoulliGaussianRBM `bgrbm` to the BernoulliGaussianRBM with the same visible
+bias and hidden bias but zero weights.
+"""
+function aisimportanceweights(bgrbm::BernoulliGaussianRBM;
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 10)
+
+   # reversed RBM has the same partition function
+   aisimportanceweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
+         beta = beta, nparticles = nparticles, burnin = burnin)
+end
+
+
+"""
     aisimportanceweights(b2brbm; ...)
 Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given
@@ -164,17 +183,6 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
    end
 
    exp(logimpweights)
-end
-
-# TODO document or remove
-function aisimportanceweights(bgrbm::BernoulliGaussianRBM;
-      ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 10)
-
-   aisimportanceweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
-         beta = beta, nparticles = nparticles, burnin = burnin)
 end
 
 
