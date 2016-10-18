@@ -4,18 +4,30 @@ const BMs = BoltzmannMachines
 
 export
    AbstractBM,
+      aisimportanceweights, aisprecision, aisstandarddeviation,
+      empiricalloglikelihood, energy, exactloglikelihood,
+      exactlogpartitionfunction, loglikelihood,
+      logpartitionfunction, logproblowerbound, reconstructionerror,
       sampleparticles,
       AbstractRBM,
          BernoulliRBM,
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
-         fitrbm, trainrbm!, samplevisible, samplehidden,
+         fitrbm, freeenergy, trainrbm!, samplehidden, samplevisible,
          hiddenpotential, visiblepotential, samplerbm,
       AbstractDBM,
          BasicDBM,
          MultivisionDBM,
-         fitdbm, gibbssample!, meanfield, sampledbm, stackrbms, traindbm!
+         fitdbm, gibbssample!, meanfield, sampledbm, stackrbms, traindbm!,
+   Monitor, MonitoringItem, DataDict,
+      monitorexactloglikelihood, monitorexactloglikelihood!,
+      monitorfreeenergy, monitorfreeenergy!,
+      monitorlogproblowerbound, monitorlogproblowerbound!,
+      monitorloglikelihood, monitorloglikelihood!,
+      monitorreconstructionerror, monitorreconstructionerror!,
+      monitorweightsnorm, monitorweightsnorm!
+
 
 include("rbmtraining.jl")
 include("dbmtraining.jl")
