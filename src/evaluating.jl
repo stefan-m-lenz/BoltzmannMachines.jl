@@ -3,7 +3,7 @@
 Computes the importance weights for estimating the ratio of the partition
 functions of the given `rbm` to the RBM with zeros weights, zero hidden bias
 and visible bias `visbias` using the Annealed Importance Sampling algorithm,
-like described in section 4.1.3 of [Salakhutdinov, 2008].
+(AIS) like described in section 4.1.3 of [Salakhutdinov, 2008].
 `visbias` can be given as optional keyword argument and is by default the
 visible bias of the given `rbm`.
 
@@ -103,8 +103,32 @@ end
 
 
 """
+    aisimportanceweights(b2brbm; ...)
+Computes the importance weights in the Annealed Importance Sampling algorithm
+for estimating the ratio of the partition functions of the given
+Binomial2BernoulliRBM `b2brbm` to the Binomial2BernoulliRBM with same visible
+bias and zero weights.
+"""
+function aisimportanceweights(b2brbm::Binomial2BernoulliRBM;
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 10)
+
+   # compute importance weights for BernoulliRBM with duplicated weights and
+   # visible bias
+   rbm = BernoulliRBM(vcat(b2brbm.weights, b2brbm.weights),
+         vcat(b2brbm.visbias, b2brbm.visbias), b2brbm.hidbias)
+
+   aisimportanceweights(rbm;
+         ntemperatures = ntemperatures, beta = beta,
+         nparticles = nparticles, burnin = burnin)
+end
+
+
+"""
     aisimportanceweights(gbrbm; ...)
-Computes the importance weights using the Annealed Importance Sampling algorithm
+Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given
 GaussianBernoulliRBM `gbrbm` to the GaussianBernoulliRBM with same hidden and
 visible biases and same standard deviation but with zero weights.
@@ -156,7 +180,7 @@ end
 
 """
     aisimportanceweights(dbm; ...)
-Computes the importance weights using the Annealed Importance Sampling algorithm
+Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given `dbm` to the
 base-rate DBM with all weights being zero.
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
@@ -743,8 +767,8 @@ end
     logpartitionfunction(rbm, r)
     logpartitionfunction(rbm, visbias, r)
 Calculates the log of the partition function of the RBM from the estimator `r`.
-`r` is an estimator of the ratio of the RBM's partition function to the
-partition function of the RBM with zero weights and visible bias `visbias`, Z_0.
+`r` is an estimator of the ratio of the RBM's partition function Z to the
+partition function Z_0 of the RBM with zero weights and visible bias `visbias`.
 If the estimator `r` is not given as argument, Annealed Importance Sampling
 is performed to get a value for it.
 By default, `visbias` is the visible bias of the `rbm`.
@@ -766,6 +790,23 @@ function logpartitionfunction(rbm::BernoulliRBM,
    nhidden = length(rbm.hidbias)
    # Uses equation 43 in [Salakhutdinov, 2008]
    logz = log(r) + log(2)*nhidden + sum(log(1 + exp(visbias)))
+end
+
+
+"""
+    logpartitionfunction(b2brbm)
+    logpartitionfunction(b2brbm, r)
+Calculates the log of the partition function of the Binomial2BernoulliRBM
+`b2brbm` from the estimator `r`.
+`r` is an estimator of the ratio of the `b2brbm`'s partition function to the
+partition function of the B2BRBM with zero weights, zero hidden bias, and
+same visible bias as the given `b2brbm`.
+"""
+function logpartitionfunction(b2brbm::Binomial2BernoulliRBM,
+      r::Float64 = mean(aisimportanceweights(b2brbm)))
+
+   nhidden = length(b2brbm.hidbias)
+   logz = log(r) + log(2)*nhidden + 2*sum(log(1 + exp(b2brbm.visbias)))
 end
 
 

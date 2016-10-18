@@ -37,3 +37,5 @@ end
 for nunits in Array[[10;5;4;3], [18;6;3], [11;6;7;4]]
    BMTest.testexactloglikelihood_bernoullimvdbm(nunits)
 end
+
+testloglikelihood_b2brbm()
