@@ -105,12 +105,40 @@ function combinedbiases(dbm::BasicDBM)
 end
 
 
-"
-Convenience Wrapper to pretrain an RBM-Stack and to jointly adjust the weights using traindbm!
-"
-function fitdbm(x, nhiddens::Array{Int,1}, epochs=10, nparticles=100; learningrate::Float64 = 0.005)
-   pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens, epochs = epochs, predbm = true, learningrate=learningrate)
-   traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles)
+"""
+    fitdbm(x; ...)
+Fits a BasicDBM model to the data set `x`. The procedure consists of two parts:
+First a stack of RBMs is pretrained in a greedy layerwise manner
+(see `stackrbms(x)`). Then the weights are jointly trained using the
+general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
+
+# Optional keyword arguments (ordered by importance):
+* `nhiddens`: vector that defines the number of nodes in the hidden layers of
+   the DBM. The default value specifies two hidden layers with the same size
+   as the visible layer.
+* `epochs`: number of training epochs for joint training
+* `epochspretraining`: number of training epochs for pretraining,
+   defaults to `epochs`
+* `learningrate`: learning rate for joint training, see `traindbm!`
+* `learningratepretraining`: learning rate for pretraining,
+   defaults to `learningrate`
+* `nparticles`: number of particles used for sampling during joint training of
+   DBM, default 100
+"""
+function fitdbm(x::Matrix{Float64};
+      nhiddens::Vector{Int} = size(x,2)*ones(2),
+      epochs::Int = 10,
+      nparticles::Int = 100,
+      learningrate::Float64 = 0.005,
+      learningratepretraining::Float64 = learningrate,
+      epochspretraining::Int = epochs)
+
+   pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens,
+         epochs = epochspretraining, predbm = true,
+         learningrate = learningratepretraining)
+
+   traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
+      learningrate = learningrate)
 end
 
 
@@ -327,7 +355,7 @@ Performs greedy layerwise training for Deep Belief Networks or greedy layerwise
 pretraining for Deep Boltzmann Machines.
 """
 function stackrbms(x::Array{Float64,2};
-      nhiddens::Array{Int,1} = round(Int64, size(x,2) * ones(3)), # TODO besserer default-Wert für Anzahl hidden units
+      nhiddens::Array{Int,1} = size(x,2)*ones(2),
       epochs::Int = 10,
       predbm::Bool = false,
       samplehidden::Bool = true,
@@ -384,7 +412,7 @@ updates.
 * `learningrate`/`learningrates`: a vector of learning rates for each epoch to
    update the weights and biases. The learning rates should decrease with the
    epochs, e. g. like `a / (b + epoch)`. If only one value is given as
-   `learningrate`, `a` and `b` will be 11.0 and 10.0, respectively.
+   `learningrate`, `a` and `b` are 11.0 and 10.0, respectively.
 * `nparticles`: number of particles used for sampling, default 100
 * `monitoring`: A function that is executed after each training epoch.
    It has to take the trained DBM and the current epoch as arguments.

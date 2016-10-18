@@ -320,7 +320,10 @@ function fitpartdbmcore(x::Array{Float64,2},
    partparams = Array{Array{BMs.BernoulliRBM,1},1}(nparts)
 
    for i=1:nparts
-      partparams[i] = fitdbm(x[:,visibleindex[i]],vec(nhiddensmat[i,:]),epochs,nparticles,learningrate=learningrate)
+      partparams[i] = fitdbm(x[:,visibleindex[i]];
+            nhiddens = vec(nhiddensmat[i,:]),
+            epochs = epochs, nparticles = nparticles,
+            learningrate = learningrate)
    end
 
    params = Array{BMs.BernoulliRBM,1}(length(nhiddens))
@@ -384,7 +387,8 @@ function fitpartdbm(x::Array{Float64,2},
       topn::Int=0)
 
    if (nparts < 2)
-      return fitdbm(x,nhiddens,epochs,nparticles)
+      return fitdbm(x, nhiddens = nhiddens, epochs = epochs,
+            nparticles = nparticles)
    end
 
    partitions = Int(ceil(log(2,nparts)))
