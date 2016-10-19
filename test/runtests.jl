@@ -13,7 +13,7 @@ include("BMTest.jl")
 x = rand([0.0 0.0 0.0 1.0 1.0], 1000, 10);
 @test_approx_eq_eps(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
 @test_approx_eq_eps(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
-x = rand(1000, 10) + randn(1000, 10)
+x = rand(1000, 10) + randn(1000, 10);
 @test_approx_eq_eps(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
 
 
@@ -41,4 +41,4 @@ for nunits in Array[[10;5;4;3], [18;6;3], [11;6;7;4]]
    BMTest.testexactloglikelihood_bernoullimvdbm(nunits)
 end
 
-testloglikelihood_b2brbm()
+BMTest.testloglikelihood_b2brbm()

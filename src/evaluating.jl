@@ -1164,11 +1164,11 @@ standard deviation of values of the i'th component of the sample vectors.
 """
 function gaussianloglikelihoodbaserate(x::Matrix{Float64})
    nsamples, nvariables = size(x)
-   sigmasq = var(x,1)
+   sigmasq = vec(var(x,1))
    mu = vec(mean(x,1))
    loglikelihood = 0.0
    for j = 1:nsamples
-      loglikelihood -= sum((x[j,:] - mu).^2 ./ sigmasq)
+      loglikelihood -= sum((vec(x[j,:]) - mu).^2 ./ sigmasq)
    end
    loglikelihood /= nsamples
    loglikelihood -= log(2*pi) * nvariables + sum(log(sigmasq))
