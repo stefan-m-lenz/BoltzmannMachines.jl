@@ -1,6 +1,19 @@
 abstract AbstractRBM
 
-type BernoulliRBM <: AbstractRBM
+"""
+Abstract super type for RBMs with binary and Bernoulli distributed hidden nodes.
+"""
+abstract AbstractXBernoulliRBM <: AbstractRBM
+
+"""
+    BernoulliRBM(weights, visbias, hidbias)
+Encapsulates the parameters of an RBM with Bernoulli distributed nodes.
+* `weights`: matrix of weights with size
+  (number of visible nodes, number of hidden nodes)
+* `visbias`: bias vector for visible nodes
+* `hidbias`: bias vector for hidden nodes
+"""
+type BernoulliRBM <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -8,17 +21,23 @@ end
 
 
 """
-Parameters of a RBM with real valued, Gaussian distributed visible nodes and
-binary, Bernoulli distributed hidden nodes.
+    GaussianBernoulliRBM(weights, visbias, hidbias, sd)
+Encapsulates the parameters of an RBM with Gaussian distributed visible nodes
+and Bernoulli distributed hidden nodes.
 """
-type GaussianBernoulliRBM <: AbstractRBM
+type GaussianBernoulliRBM <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
    sd::Array{Float64,1}
 end
 
-
+"""
+    BernoulliGaussianRBM(weights, visbias, hidbias)
+Encapsulates the parameters of an RBM with Bernoulli distributed visible nodes
+and Gaussian distributed hidden nodes.
+The standard deviation of the Gaussian distribution is 1.
+"""
 type BernoulliGaussianRBM <: AbstractRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
@@ -27,15 +46,16 @@ end
 
 
 """
-Contains the parameters of an RBM with 0/1/2-valued, Binomial (n=2) distributed
-visible nodes, and binary, Bernoulli distributed hidden nodes.
+    Binomial2BernoulliRBM(weights, visbias, hidbias)
+Encapsulates the parameters of an RBM with 0/1/2-valued, Binomial (n=2)
+distributed visible nodes, and Bernoulli distributed hidden nodes.
 This model is equivalent to a BernoulliRBM in which every two visible nodes are
-connected with the same weights to one hidden node.
+connected with the same weights to each hidden node.
 The states (0,0) / (1,0) / (0,1) / (1,1) of the visible nodes connected with
 with the same weights translate as states 0 / 1 / 1 / 2 in the
 Binomial2BernoulliRBM.
 """
-type Binomial2BernoulliRBM <: AbstractRBM
+type Binomial2BernoulliRBM <: AbstractXBernoulliRBM
    weights::Matrix{Float64}
    visbias::Vector{Float64}
    hidbias::Vector{Float64}
@@ -66,7 +86,8 @@ with Contrastive Divergence (CD), and returns it.
 * `sdlearningrate`/`sdlearningrates`: learning rate(s) for the
    standard deviation if training a `GaussianBernoulliRBM`. Ignored for other
    types of RBMs. It usually must be much smaller than the learning rates for
-   the weights. By default, it is 0.0 and the standard deviation is not learned.
+   the weights. By default, it is 0.0 which means that the standard deviation
+   is not learned.
 """
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),
@@ -172,6 +193,18 @@ function initvisiblebias(x::Array{Float64,2})
 end
 
 
+"
+Samples the activation of the hidden nodes from the potential.
+"
+function samplehiddenpotential!(h::Vector{Float64}, rbm::AbstractXBernoulliRBM)
+   bernoulli!(h)
+end
+
+function samplehiddenpotential!(h::Vector{Float64}, rbm::BernoulliGaussianRBM)
+   h .+= randn(length(h))
+end
+
+
 function sdupdateterm(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, h::Array{Float64,1})
    (v - gbrbm.visbias).^2 ./ (gbrbm.sd .^3) - (v ./ (gbrbm.sd .^ 2)) .* (gbrbm.weights * h)
 end
@@ -222,7 +255,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       if pcd
          # Preserve state of chain in a way that changes are visible to the caller.
          copy!(chainstate, hmodel)
-         bernoulli!(chainstate) # TODO change to support other types of hidden nodes
+         samplehiddenpotential!(chainstate, rbm)
       end
 
       updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate)
