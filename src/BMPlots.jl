@@ -22,6 +22,12 @@ function requiresgadfly()
    end
 end
 
+function checkdata(plotdata)
+   if size(plotdata, 1) == 0
+      error("No data for this evaluation in monitor")
+   end
+end
+
 function getvalue(monitor::BMs.Monitor, evaluation::AbstractString, epoch::Int)
    itemidx = findfirst((item -> item.evaluation == evaluation && item.epoch == epoch), monitor)
    monitor[itemidx].value
@@ -73,6 +79,7 @@ function plotlogproblowerbound(monitor::BMs.Monitor; sdrange::Float64 = 0.0)
    requiresgadfly()
    title = "Average lower bound of log probability"
    plotdata = extractaisdata(monitor, BMs.monitorlogproblowerbound, sdrange)
+   checkdata(plotdata)
    if sdrange != 0
       plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax", color = "datasetname",
          Geom.line, Geom.ribbon,
@@ -84,10 +91,7 @@ function plotlogproblowerbound(monitor::BMs.Monitor; sdrange::Float64 = 0.0)
 end
 
 function plotexactloglikelihood(monitor::BMs.Monitor)
-   requiresgadfly()
-   plotdata = extractevaluationdata(monitor, BMs.monitorexactloglikelihood)
-   plot(plotdata, x ="epoch", y = "value", color = "datasetname",
-         Geom.line, Guide.title("Exact loglikelihood of RBM"))
+   plotevaluation(monitor, BMs.monitorexactloglikelihood)
 end
 
 plottitledict = Dict(
@@ -103,9 +107,7 @@ function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString)
    requiresgadfly()
    title = get(plottitledict, evaluationkey, evaluationkey)
    plotdata = extractevaluationdata(monitor, evaluationkey)
-   if size(plotdata, 1) == 0
-      error("No data for this evaluation in monitor")
-   end
+   checkdata(plotdata)
    plot(plotdata, x ="epoch", y = "value", color = "datasetname",
          Geom.line, Guide.title(title))
 end
@@ -117,6 +119,7 @@ training an RBMs.
 function plotloglikelihood(monitor::BMs.Monitor; sdrange::Float64 = 2.0)
    requiresgadfly()
    plotdata = extractaisdata(monitor, BMs.monitorloglikelihood, sdrange)
+   checkdata(plotdata)
    title = "Average log-likelihood"
    if sdrange != 0
       plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax", color = "datasetname",
@@ -129,10 +132,7 @@ function plotloglikelihood(monitor::BMs.Monitor; sdrange::Float64 = 2.0)
 end
 
 function plotreconstructionerror(monitor::BMs.Monitor)
-   requiresgadfly()
-   plotdata = extractevaluationdata(monitor, BMs.monitorreconstructionerror)
-   plot(plotdata, x = "epoch", y = "value", color = "datasetname", Geom.line,
-         Guide.title("Mean reconstruction error"))
+   plotevaluation(monitor, BMs.monitorreconstructionerror)
 end
 
 function emptyfunc
