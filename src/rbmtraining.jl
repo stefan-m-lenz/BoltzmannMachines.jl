@@ -139,6 +139,70 @@ end
 
 
 """
+    hiddeninput(rbm, v)
+Computes the total input of the hidden units in the AbstractRBM `rbm`,
+given the activations of the visible units `v`.
+`v` may be a vector or a matrix that contains the samples in its rows.
+"""
+function hiddeninput(rbm::BernoulliRBM, v::Array{Float64,1})
+   rbm.weights'*v + rbm.hidbias
+end
+
+function hiddeninput(rbm::BernoulliRBM, vv::Array{Float64,2})
+   input = vv*rbm.weights
+   broadcast!(+, input, input, rbm.hidbias')
+end
+
+function hiddeninput(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
+   # Hidden input is implicitly doubled
+   # because the visible units range from 0 to 2.
+   b2brbm.weights' * v + b2brbm.hidbias
+end
+
+function hiddeninput(b2brbm::Binomial2BernoulliRBM, vv::Array{Float64,2})
+   input = vv * b2brbm.weights
+   broadcast!(+, input, input, b2brbm.hidbias')
+end
+
+function hiddeninput(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1})
+   gbrbm.weights'* (v ./ gbrbm.sd) + gbrbm.hidbias
+end
+
+function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
+   mu = broadcast(./, vv, gbrbm.sd')
+   mu = mu*gbrbm.weights
+   broadcast!(+, mu, mu, gbrbm.hidbias')
+   mu
+end
+
+
+"""
+    hiddenpotential(rbm, v)
+    hiddenpotential(rbm, v, factor)
+Returns the potential for activations of the hidden nodes in the AbstractRBM
+`rbm`, given the activations `v` of the visible nodes.
+`v` may be a vector or a matrix that contains the samples in its rows.
+The potential is a deterministic value to which sampling can be applied to get
+the activations.
+
+The total input can be scaled with the `factor`. This is needed when training
+the `rbm` as part of a DBM.
+"""
+function hiddenpotential(rbm::AbstractXBernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
+   sigm(factor*(hiddeninput(rbm, v)))
+end
+
+function hiddenpotential(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+   factor*(bgrbm.hidbias + bgrbm.weights' * v)
+end
+
+function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
+   # factor ignored
+   broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
+end
+
+
+"""
     initrbm(x, nhidden)
     initrbm(x, nhidden, rbmtype)
 Creates a RBM with `nhidden` hidden units and initalizes its weights for
@@ -192,6 +256,30 @@ function initvisiblebias(x::Array{Float64,2})
    initbias
 end
 
+"""
+    samplehidden(rbm, v)
+    samplehidden(rbm, v, factor)
+Returns activations of the hidden nodes in the AbstractRBM `rbm`, sampled
+from the state `v` of the visible nodes.
+`v` may be a vector or a matrix that contains the samples in its rows.
+For the `factor`, see `hiddenpotential(rbm, v, factor)`.
+"""
+function samplehidden(rbm::AbstractXBernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+   bernoulli!(hiddenpotential(rbm, v, factor))
+end
+
+function samplehidden(rbm::AbstractXBernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
+   bernoulli(hiddenpotential(rbm, vv, factor))
+end
+
+function samplehidden(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   hiddenpotential(bgrbm, h, factor) + randn(length(bgrbm.hidbias))
+end
+
+function samplehidden(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   hh = hiddenpotential(bgrbm, hh, factor)
+   hh + randn(size(hh))
+end
 
 "
 Samples the activation of the hidden nodes from the potential.
@@ -202,6 +290,45 @@ end
 
 function samplehiddenpotential!(h::Vector{Float64}, rbm::BernoulliGaussianRBM)
    h .+= randn(length(h))
+end
+
+"""
+    samplevisible(rbm, h)
+    samplevisible(rbm, h, factor)
+Returns activations of the visible nodes in the AbstractRBM `rbm`, sampled
+from the state `h` of the hidden nodes.
+`h` may be a vector or a matrix that contains the samples in its rows.
+For the `factor`, see `visiblepotential(rbm, h, factor)`.
+"""
+function samplevisible(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   bernoulli!(visiblepotential(rbm, h, factor))
+end
+
+function samplevisible(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   bernoulli(visiblepotential(rbm, hh, factor))
+end
+
+function samplevisible(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   bernoulli!(visiblepotential(bgrbm, h, factor))
+end
+
+function samplevisible(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   bernoulli(visiblepotential(bgrbm, hh, factor))
+end
+
+function samplevisible{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   v = sigm(factor * visibleinput(b2brbm, h))
+   bernoulli(v) + bernoulli(v)
+end
+
+function samplevisible(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   visiblepotential(gbrbm, h, factor) + gbrbm.sd .* randn(length(gbrbm.visbias))
+end
+
+function samplevisible(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   hh = visiblepotential(gbrbm, hh, factor)
+   hh += broadcast(.*, randn(size(hh)), gbrbm.sd')
+   hh
 end
 
 
@@ -263,6 +390,84 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
 
    rbm
 end
+
+"""
+    visibleinput(rbm, h)
+Returns activations of the visible nodes in the AbstractXBernoulliRBM `rbm`,
+sampled from the state `h` of the hidden nodes.
+`h` may be a vector or a matrix that contains the samples in its rows.
+"""
+function visibleinput(rbm::BernoulliRBM, h::Array{Float64,1})
+   rbm.weights*h + rbm.visbias
+end
+
+function visibleinput(rbm::BernoulliRBM, hh::Array{Float64,2})
+   input = hh*rbm.weights'
+   broadcast!(+, input, input, rbm.visbias')
+end
+
+function visibleinput(rbm::BernoulliGaussianRBM, h::Array{Float64,1})
+   rbm.weights*h + rbm.visbias
+end
+
+function visibleinput(rbm::BernoulliGaussianRBM, hh::Array{Float64,2})
+   input = hh*rbm.weights'
+   broadcast!(+, input, input, rbm.visbias')
+end
+
+function visibleinput(b2brbm::Binomial2BernoulliRBM, h::Vector{Float64})
+   b2brbm.weights * h + b2brbm.visbias
+end
+
+function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
+   input = hh * b2brbm.weights'
+   broadcast!(+, input, input, b2brbm.visbias')
+end
+
+
+"""
+    visiblepotential(rbm, h)
+    visiblepotential(rbm, h, factor)
+Returns the potential for activations of the visible nodes in the AbstractRBM
+`rbm`, given the activations `h` of the hidden nodes.
+`h` may be a vector or a matrix that contains the samples in its rows.
+The potential is a deterministic value to which sampling can be applied to get
+the activations.
+
+The total input can be scaled with the `factor`. This is needed when training
+the `rbm` as part of a DBM.
+"""
+function visiblepotential{N}(rbm::BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   sigm(factor*visibleinput(rbm, h))
+end
+
+function visiblepotential{N}(bgrbm::BernoulliGaussianRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   sigm(factor*visibleinput(bgrbm, h))
+end
+
+"""
+    visiblepotential(b2brbm, h)
+Each visible node in the Binomial2BernoulliRBM `b2brbm` is sampled from a
+Binomial(2,p) distribution in the Gibbs steps. This functions returns the vector
+of values for 2*p.
+(The value is doubled to get a value in the same range as the sampled one.)
+"""
+function visiblepotential{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+   2*sigm(factor * visibleinput(b2brbm, h))
+end
+
+function visiblepotential(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
+   factor*(gbrbm.visbias + gbrbm.sd .* (gbrbm.weights * h))
+end
+
+function visiblepotential(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
+   # factor is ignored, GaussianBernoulliRBMs should only be used in bottom layer of DBM
+   mu = hh*gbrbm.weights'
+   broadcast!(.*, mu, mu, gbrbm.sd')
+   broadcast!(+, mu, mu, gbrbm.visbias')
+   mu
+end
+
 
 function updateparameters!(rbm::AbstractRBM,
       v::Vector{Float64}, vmodel::Vector{Float64},
