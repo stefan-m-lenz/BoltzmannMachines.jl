@@ -12,7 +12,7 @@ of the first hidden layer.
 """
 type MultivisionDBM
 
-   visrbms::Vector{AbstractRBM}
+   visrbms::Vector{AbstractXBernoulliRBM}
    visrbmsvisranges::Array{UnitRange{Int}}
    visrbmshidranges::Array{UnitRange{Int}}
 
@@ -46,22 +46,30 @@ end
 
 typealias AbstractDBM Union{BasicDBM, MultivisionDBM}
 
-function MultivisionDBM{T<:AbstractRBM}(visrbms::Vector{T})
+function MultivisionDBM{T<:AbstractXBernoulliRBM}(visrbms::Vector{T})
    MultivisionDBM(visrbms, BasicDBM())
 end
 
-function MultivisionDBM(visrbm::AbstractRBM)
+function MultivisionDBM(visrbm::AbstractXBernoulliRBM)
    MultivisionDBM([visrbm], BasicDBM())
 end
 
+"""
+    addlayer!(dbm, x)
+Adds a pretrained layer to the BasicDBM `dbm`, given the dataset `x` as input
+for the visible layer of the `dbm`.
 
+# Optional keyword arguments (apply to BasicDBM and MultivisionDBM):
+* `isfirst`, `islast`: indicating that the new RBM should be trained as
+   first (assumed if `dbm` is empty) or last layer of the DBM, respectively.
+   If those flags are not set, the added layer is trained as intermediate layer.
+   This information is needed to determine the factor for the weights during
+   pretraining.
+* `epochs`, `nhidden`, `learningrate`/`learningrates`, `pcd`, `cdsteps`,
+  `monitoring`: used for fitting the weights of the last layer, see `fitrbm(x)`
 """
-    addlayer!(mvdbm, x)
-Adds a pretrained layer to the MultivisionDBM, given the dataset `x` as input
-for the visible layer.
-The variables/columns of `x` are divided among the visible RBMs.
-"""
-function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
+function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
+      isfirst::Bool = isempty(dbm),
       islast::Bool = false,
       nhidden::Int = size(x,2),
       epochs::Int = 10,
@@ -72,12 +80,15 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
       monitoring::Function = ((rbm, epoch) -> nothing))
 
    # propagate input x up to last hidden layer
-   hh = visiblestofirsthidden(mvdbm, x)
-   for i = 1:length(mvdbm.hiddbm)
-      hh = hiddenpotential(mvdbm.hiddbm[i], hh, 2.0) # intermediate layer, factor is 2.0
+   hh = x
+   for i = 1:length(dbm)
+      hh = hiddenpotential(dbm[i], hh, 2.0) # intermediate layer, factor is 2.0
    end
 
    upfactor = downfactor = 2.0
+   if isfirst
+      downfactor = 1.0
+   end
    if islast
       upfactor = 1.0
    end
@@ -90,9 +101,34 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
          upfactor = upfactor, downfactor = downfactor,
          monitoring = monitoring)
 
-   push!(mvdbm.hiddbm, rbm)
+   push!(dbm, rbm)
+   dbm
+end
+
+"""
+    addlayer!(mvdbm, x)
+Adds a pretrained layer to the MultivisionDBM, given the dataset `x` as input
+for the visible layers of the bottom RBMs.
+The variables/columns of `x` are divided among the visible RBMs.
+"""
+function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
+      islast::Bool = false,
+      nhidden::Int = size(x,2),
+      epochs::Int = 10,
+      learningrate::Float64 = 0.005,
+      learningrates::Vector{Float64} = learningrate * ones(epochs),
+      pcd::Bool = true,
+      cdsteps::Int = 1,
+      monitoring::Function = ((rbm, epoch) -> nothing))
+
+   addlayer!(mvdbm.hiddbm, visiblestofirsthidden(mvdbm, x);
+         isfirst = false,
+         islast = islast, nhidden = nhidden, epochs = epochs,
+         learningrate = learningrate, learningrates = learningrates, pcd = pcd,
+         cdsteps = cdsteps, monitoring = monitoring)
    mvdbm
 end
+
 
 function combinedbiases(dbm::BasicDBM)
    biases = Particle(length(dbm) + 1)
