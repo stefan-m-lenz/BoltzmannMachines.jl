@@ -358,7 +358,7 @@ function stackrbms(x::Array{Float64,2};
       nhiddens::Array{Int,1} = size(x,2)*ones(2),
       epochs::Int = 10,
       predbm::Bool = false,
-      samplehidden::Bool = true,
+      samplehidden::Bool = false,
       learningrate::Float64 = 0.005,
       layerwisemonitoring::Function = (rbmindex, rbm, epoch) -> nothing)
 
