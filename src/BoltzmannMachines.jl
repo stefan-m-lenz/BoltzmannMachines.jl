@@ -14,8 +14,10 @@ export
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
-         fitrbm, freeenergy, trainrbm!, samplehidden, samplevisible,
-         hiddenpotential, visiblepotential, samplerbm,
+         fitrbm, freeenergy, inirbm, joinrbms,
+         trainrbm!, samplehidden, samplevisible,
+         hiddenpotential, hiddeninput, visiblepotential, visibleinput,
+         samplerbm, # TODO
       AbstractDBM,
          BasicDBM,
          MultivisionDBM,
