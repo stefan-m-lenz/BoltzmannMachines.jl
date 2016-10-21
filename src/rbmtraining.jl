@@ -184,9 +184,11 @@ Returns the potential for activations of the hidden nodes in the AbstractRBM
 `v` may be a vector or a matrix that contains the samples in its rows.
 The potential is a deterministic value to which sampling can be applied to get
 the activations.
+In RBMs with Bernoulli distributed hidden units, the potential of the hidden
+nodes is the vector of probabilities for them to be turned on.
 
-The total input can be scaled with the `factor`. This is needed when training
-the `rbm` as part of a DBM.
+The total input can be scaled with the `factor`. This is needed when pretraining
+the `rbm` as part of a DBM or in Annealed Importance Sampling as temperature.
 """
 function hiddenpotential(rbm::AbstractXBernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
    sigm(factor*(hiddeninput(rbm, v)))
@@ -196,8 +198,12 @@ function hiddenpotential(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, facto
    factor*(bgrbm.hidbias + bgrbm.weights' * v)
 end
 
+"
+For BernoulliGaussianRBMs, the potential of the hidden nodes is the vector of
+means of the Gaussian distributions for each node.
+The factor is ignored in this case.
+"
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
-   # factor ignored
    broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
 end
 
@@ -434,8 +440,11 @@ Returns the potential for activations of the visible nodes in the AbstractRBM
 The potential is a deterministic value to which sampling can be applied to get
 the activations.
 
-The total input can be scaled with the `factor`. This is needed when training
-the `rbm` as part of a DBM.
+The total input can be scaled with the `factor`. This is needed when pretraining
+the `rbm` as part of a DBM or in Annealed Importance Sampling as temperature.
+
+In RBMs with Bernoulli distributed visible units, the potential of the visible
+nodes is the vector of probabilities for them to be turned on.
 """
 function visiblepotential{N}(rbm::BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
    sigm(factor*visibleinput(rbm, h))
@@ -446,16 +455,19 @@ function visiblepotential{N}(bgrbm::BernoulliGaussianRBM, h::Array{Float64,N}, f
 end
 
 """
-    visiblepotential(b2brbm, h)
-Each visible node in the Binomial2BernoulliRBM `b2brbm` is sampled from a
-Binomial(2,p) distribution in the Gibbs steps. This functions returns the vector
-of values for 2*p.
+For a Binomial2BernoulliRBM, the visible units are sampled from a
+Binomial(2,p) distribution in the Gibbs steps. In this case, the potential is
+the vector of values for 2p.
 (The value is doubled to get a value in the same range as the sampled one.)
 """
 function visiblepotential{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
    2*sigm(factor * visibleinput(b2brbm, h))
 end
 
+"""
+For GaussianBernoulliRBMs, the potential of the visible nodes is the vector of
+means of the Gaussian distributions for each node.
+"""
 function visiblepotential(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
    factor*(gbrbm.visbias + gbrbm.sd .* (gbrbm.weights * h))
 end
