@@ -245,6 +245,16 @@ function aisimportanceweights(dbm::BasicDBM;
    impweights
 end
 
+function aisimportanceweights(mvdbm::MultivisionDBM;
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 10)
+
+      # TODO implement
+   error("Not implemented")
+end
+
 
 """
     aisprecision(r, aissd, sdrange)
@@ -494,7 +504,11 @@ function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
    log(z) + nvisible/2 * log(2*pi) + sum(log(gbrbm.sd))
 end
 
-# TODO document or remove
+"""
+    exactlogpartitionfunction(bgrbm)
+Calculates the log of the partition function of the BernoulliGaussianRBM `bgrbm`
+exactly. The execution time grows exponentially with the number of visible nodes.
+"""
 function exactlogpartitionfunction(bgrbm::BernoulliGaussianRBM)
    exactlogpartitionfunction(reversedrbm(bgrbm))
 end
@@ -980,14 +994,27 @@ end
 
 """
     nmodelparameters(bm)
-Returns the number of parameters in the Boltzmann Machine.
+Returns the number of parameters in the Boltzmann Machine model `bm`.
 """
 function nmodelparameters(bm::AbstractBM)
    nunits = BMs.nunits(bm)
-   prod(nunits) + sum(nunits)
+   nweights = 0
+   for i = 1:(length(nunits) - 1)
+      nweights += nunits[i] * nunits[i+1]
+   end
+   nbiases = sum(nunits) # number of bias variables = number of nodes
+   nweights + nbiases
 end
 
-# TODO add nmodelparameters for GaussianBernoulli
+function nmodelparameters(gbrbm::GaussianBernoulliRBM)
+   invoke(nmodelparameters, (AbstractRBM,), gbrbm) + length(gbrbm.sd)
+end
+
+function nmodelparameters(mvdbm::MultivisionDBM)
+   nmodelparameters(mvdbm.hiddbm) - length(mvdbm.hiddbm[1].visbias) +
+         mapreduce(nmodelparameters, +, 0, mvdbm.visrbms)
+end
+
 
 """
     reconstructionerror(rbm, x)
