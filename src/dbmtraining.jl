@@ -415,7 +415,7 @@ function stackrbms(x::Array{Float64,2};
    for i=2:nrbms
       hiddenval = BMs.hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
-         hidden = bernoulli(hiddenval)
+         hiddenval = bernoulli(hiddenval)
       end
       if predbm
          upfactor = downfactor = 2.0
@@ -433,6 +433,196 @@ function stackrbms(x::Array{Float64,2};
 
    dbmn
 end
+
+
+# TODO document parameters
+"""
+Performs greedy layerwise training for Deep Belief Networks or greedy layerwise
+pretraining for Deep Boltzmann Machines, using a partition for lower layers.
+"""
+function stackpartrbms(x::Array{Float64,2};
+      nhiddens::Array{Int,1} = size(x,2)*ones(2),
+      visibleindex::Array{Array{Int,1}} = [collect(1:div(size(x,2),2)),collect((div(size(x,2),2)+1):size(x,2))],
+      partlayers::Int = 1,
+      epochs::Int = 10,
+      predbm::Bool = false,
+      samplehidden::Bool = false,
+      learningrate::Float64 = 0.005,
+      jointinitscale::Float64 = 0.0)
+
+   if partlayers < 1
+      return stackrbms(nhiddens,epochs,predbm,samplehidden,learningrate,layerwisemonitoring)
+   end
+
+   p = size(x,2)
+
+   nhiddenspart = nhiddens[1:partlayers]
+   nrbmsjoint = length(nhiddens) - partlayers
+
+   nhiddensmat = parthiddens(nhiddenspart,visibleindex,p)
+
+   partparams, hiddenvals = stackparts(x,nhiddensmat,nrbmsjoint,visibleindex,
+                                      epochs,predbm,samplehidden,learningrate)
+
+   bottomparams, hiddenval = joinparams(partparams,p,nhiddenspart,nhiddensmat,visibleindex,
+                                        jointinitscale,hiddenvals)
+
+   if nrbmsjoint  == 0
+      return bottomparams
+   end
+
+   stackjoint(hiddenval,nhiddens,bottomparams,
+              epochs,predbm,samplehidden,learningrate)
+end
+
+function stackjoint(hiddenval,nhiddens,bottomparams,epochs,predbm,samplehidden,learningrate)
+   nrbms = length(nhiddens)
+   nrbmspart = length(bottomparams)
+
+   dbmn = Array{BMs.BernoulliRBM,1}(nrbms)
+
+   dbmn[1:nrbmspart] = bottomparams
+
+   for i=(nrbmspart+1):nrbms
+      if predbm
+         upfactor = downfactor = 2.0
+         if i == nrbms
+            upfactor = 1.0
+         end
+      else
+         upfactor = downfactor = 1.0
+      end
+      dbmn[i] = BMs.fitrbm(hiddenval, nhidden = nhiddens[i], epochs = epochs,
+            upfactor = upfactor, downfactor = downfactor, pcd = true,
+            learningrate = learningrate)
+
+      if i < nrbms
+         hiddenval = BMs.hiddenpotential(dbmn[i], hiddenval, upfactor)
+         if samplehidden
+            hiddenval = BMs.bernoulli(hiddenval)
+         end
+      end
+   end
+
+   dbmn
+end
+
+function joinparams(partparams,p,nhiddens,nhiddensmat,visibleindex,jointinitscale,hiddenvals)
+   nparts = length(visibleindex)
+
+   params = Array{BMs.BernoulliRBM,1}(length(nhiddens))
+
+   hiddenval = zeros(size(hiddenvals[1],1),sum(nhiddensmat[:,end]))
+
+   for i=1:length(nhiddens)
+      curin = (i == 1 ? p : nhiddens[i-1])
+      curout = nhiddens[i]
+      if jointinitscale == 0.0
+         weights = zeros(curin,curout)
+      else
+         weights = randn(curin,curout) / curin * jointinitscale
+      end
+      visbias = zeros(curin)
+      hidbias = zeros(curout)
+
+      startposin = 1
+      startposout = 1
+      for j=1:nparts
+         if i == 1
+            inindex = visibleindex[j]
+         else
+            inindex = collect(startposin:(startposin+nhiddensmat[j,i-1]-1))
+            startposin += nhiddensmat[j,i-1]
+         end
+         outindex = collect(startposout:(startposout+nhiddensmat[j,i]-1))
+         startposout += nhiddensmat[j,i]
+
+         weights[inindex,outindex] = partparams[j][i].weights
+         visbias[inindex] = partparams[j][i].visbias
+         hidbias[outindex] = partparams[j][i].hidbias
+
+         params[i] = BoltzmannMachines.BernoulliRBM(weights,visbias,hidbias)
+
+         if i == length(nhiddens)
+            hiddenval[:,outindex] = hiddenvals[j]
+         end
+      end
+   end
+
+   params, hiddenval
+end
+
+function parthiddens(nhiddens,visibleindex,p)
+   nparts = length(visibleindex)
+
+   nhiddensmat = zeros(Int,nparts,length(nhiddens))
+   for i=1:(nparts-1)
+      nhiddensmat[i,:] = round(nhiddens ./ (p/length(visibleindex[i])))
+   end
+   nhiddensmat[nparts,:] = nhiddens .- vec(sum(nhiddensmat,1))
+
+   nhiddensmat
+end
+
+function stackparts(x,nhiddensmat,nrbmsjoint,visibleindex,epochs,predbm,samplehidden,learningrate)
+   nparts, nrbmspart = size(nhiddensmat)
+   n, p = size(x)
+
+   partparams = Array{Array{BMs.BernoulliRBM,1},1}(nparts)
+
+   hiddenvals = Array{Array{Float64,2},1}(nparts)
+
+   for apart=1:nparts
+      partparams[apart] = Array{BMs.BernoulliRBM,1}(nrbmspart)
+
+      upfactor = downfactor = 1.0
+      if predbm
+         upfactor = 2.0
+      end
+
+      partparams[apart][1] = BMs.fitrbm(x[:,visibleindex[apart]], nhidden = nhiddensmat[apart,1], epochs = epochs,
+            upfactor = upfactor, downfactor = downfactor, pcd = true,
+            learningrate = learningrate)
+
+      hiddenval = x[:,visibleindex[apart]]
+
+      if nrbmspart > 1
+         for i=2:nrbmspart
+            hiddenval = BMs.hiddenpotential(partparams[apart][i-1], hiddenval, upfactor)
+            if samplehidden
+               hidden = bernoulli(hiddenval)
+            end
+            if predbm
+               upfactor = downfactor = 2.0
+               if i == nrbmspart && nrbmsjoint == 0
+                  upfactor = 1.0
+               end
+            else
+               upfactor = downfactor = 1.0
+            end
+            partparams[apart][i] = BMs.fitrbm(hiddenval, nhidden = nhiddensmat[apart,i], epochs = epochs,
+                  upfactor = upfactor, downfactor = downfactor, pcd = true,
+                  learningrate = learningrate)
+         end
+      end
+
+      if predbm && nrbmsjoint > 1
+         upfactor = 2.0
+      else
+         upfactor = 1.0
+      end
+
+      hiddenval = BMs.hiddenpotential(partparams[apart][end], hiddenval, upfactor)
+      if samplehidden
+         hiddenval = BMs.bernoulli(hiddenval)
+      end
+
+      hiddenvals[apart] = hiddenval
+   end
+
+   partparams, hiddenvals
+end
+
 
 
 """
@@ -606,4 +796,3 @@ function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
 
    hcat(probs...)
 end
-
