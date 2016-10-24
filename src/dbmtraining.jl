@@ -229,20 +229,33 @@ end
 function gibbssample!(particles::Particles, dbm::BasicDBM,
       steps::Int = 5, beta::Float64 = 1.0)
 
+   oldstates = deepcopy(particles)
+   bottominput = deepcopy(particles)
+
+   # pgrid = collect(linspace(0.00001,0.99999,99999))
+   # etagrid = log.(pgrid./(1.0-pgrid))
+
    for step in 1:steps
-      oldstate = copy(particles[1])
       for i = 1:length(particles)
-         input = zeros(particles[i])
+         if step > 1
+            oldstates[i] .= particles[i]
+         end
          if i < length(particles)
-            input += particles[i+1] * dbm[i].weights'
-            broadcast!(+, input, input, dbm[i].visbias')
+            A_mul_B!(particles[i],particles[i+1],dbm[i].weights')
+            broadcast!(+, particles[i], particles[i], dbm[i].visbias')
+         else
+            particles[i][:] = 0
          end
          if i > 1
-            input += oldstate * dbm[i-1].weights
-            broadcast!(+, input, input, dbm[i-1].hidbias')
+            A_mul_B!(bottominput[i],oldstates[i-1],dbm[i-1].weights)
+            particles[i] += bottominput[i]
+            broadcast!(+, particles[i], particles[i], dbm[i-1].hidbias')
          end
-         oldstate = copy(particles[i])
-         particles[i] = bernoulli(sigm(beta * input))
+
+         for iter in eachindex(particles[i])
+            @inbounds particles[i][iter] = 1.0*(rand() < 1.0/(1.0+exp(-particles[i][iter]*beta)))
+            # @inbounds particles[i][iter] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < particles[i][iter]*beta)
+         end
       end
    end
 
