@@ -190,7 +190,8 @@ end
     aisimportanceweights(dbm; ...)
 Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given `dbm` to the
-base-rate DBM with all weights being zero.
+base-rate DBM with all weights being zero and all biases equal to the biases of
+the `dbm`.
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
 """
 function aisimportanceweights(dbm::BasicDBM;
@@ -199,51 +200,47 @@ function aisimportanceweights(dbm::BasicDBM;
       nparticles::Int = 100,
       burnin::Int = 10)
 
-   nrbms = length(dbm)
-   nlayers = nrbms + 1
-
    impweights = ones(nparticles)
-   particles = initparticles(dbm, nparticles)
+   particles = BMs.initparticles(dbm, nparticles)
+   nlayers = length(particles)
 
-   for k=2:length(beta)
+   # for performance reasons: preallocate input and combine biases
+   input = deepcopy(particles)
+   input2 = deepcopy(particles)
+   biases = BMs.combinedbiases(dbm)
 
-      for j=1:nparticles # TODO parallelize
-
-         oddbiasenergy = dot(dbm[1].visbias, vec(particles[1][j,:]))
-         for i = 3:2:nrbms
-            oddbiasenergy += dot(dbm[i].visbias + dbm[i-1].hidbias, vec(particles[i][j,:]))
+   for k = 2:length(beta)
+      BMs.weightsinput!(input, input2, dbm, particles)
+      for i = 1:nlayers
+         input2[i] .= input[i]
+         input[i] .*= beta[k]
+         input2[i] .*= beta[k-1]
+         broadcast!(+, input[i], input[i], biases[i]')
+         broadcast!(+, input2[i], input2[i], biases[i]')
+         particles[i] .= input[i]
+         for j = 1:nparticles
+            impweights[j] *=
+                  prod((1 + exp(input[i][j,:])) ./ (1 + exp(input2[i][j,:])))
          end
-         if nlayers % 2 != 0
-            oddbiasenergy += dot(dbm[nrbms].hidbias, vec(particles[nlayers][j,:]))
-         end
-         impweights[j] *= exp((beta[k] - beta[k-1]) * oddbiasenergy)
-
-         # Analytically sum out all uneven hidden layers.
-         for i = 1:2:nrbms
-            if i == nrbms
-               # If the number of layers is even,
-               # the last layer has also to be summed out.
-               # It gets its input only from the layer below.
-               hinput = BMs.hiddeninput(dbm[i], vec(particles[i][j,:]))
-            else
-               # All other hidden layers get their input from the
-               # layer below and the one above.
-               hinput = BMs.hiddeninput(dbm[i], vec(particles[i][j,:])) +
-                  BMs.visibleinput(dbm[i+1], vec(particles[i+2][j,:]))
-            end
-            impweights[j] *= prod(
-                     (1 + exp(beta[k]   * hinput)) ./
-                     (1 + exp(beta[k-1] * hinput)))
-         end
-
       end
 
-      gibbssample!(particles, dbm, burnin, beta[k])
+      BMs.sigm_bernoulli!(particles) # completes first Gibbs transition step
 
+      # other gibbs transition steps
+      for step in 2:burnin
+         BMs.weightsinput!(input, input2, dbm, particles)
+         for i = 1:nlayers
+            input[i] .*= beta[k]
+            broadcast!(+, input[i], input[i], biases[i]')
+            particles[i] .= input[i]
+         end
+         BMs.sigm_bernoulli!(particles)
+      end
    end
 
    impweights
 end
+
 
 function aisimportanceweights(mvdbm::MultivisionDBM;
       ntemperatures::Int = 100,
@@ -873,12 +870,21 @@ end
     logpartitionfunction(dbm, r)
 Calculates the log of the partition function of the DBM from the estimator `r`.
 `r` is an estimator of the ratio of the DBM's partition function to the
-partition function of the DBM with zero weights and zero biases.
+partition function of the DBM with zero weights but same biases as the `dbm`.
 """
 function logpartitionfunction(dbm::BasicDBM,
       r::Float64 = mean(aisimportanceweights(dbm)))
 
-   logz = log(r) + log(2)*sum(nunits(dbm))
+   logz = log(r) + logpartitionfunctionzeroweights(dbm)
+end
+
+function logpartitionfunctionzeroweights(dbm::BasicDBM)
+   logz0 = 0.0
+   biases = combinedbiases(dbm)
+   for i in eachindex(biases)
+      logz0 += sum(log(1 + exp(biases[i])))
+   end
+   logz0
 end
 
 

@@ -175,6 +175,14 @@ function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
    mu
 end
 
+function hiddeninput!(h::Vector{Float64}, rbm::BernoulliRBM, v::Vector{Float64},
+      temperature::Float64 = 1.0)
+
+   A_mul_B!(h, rbm.weights', v)
+   h .*= temperature
+   broadcast!(+, h, rbm.hidbias)
+end
+
 
 """
     hiddenpotential(rbm, v)
@@ -428,6 +436,14 @@ end
 function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    input = hh * b2brbm.weights'
    broadcast!(+, input, input, b2brbm.visbias')
+end
+
+function visibleinput!(v::Vector{Float64}, rbm::BernoulliRBM, h::Vector{Float64},
+      temperature::Float64 = 1.0)
+
+   A_mul_B!(v, rbm.weights, h)
+   v .*= temperature
+   broadcast!(+, v, rbm.visbias)
 end
 
 

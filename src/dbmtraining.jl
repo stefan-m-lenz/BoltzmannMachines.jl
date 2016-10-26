@@ -1,6 +1,14 @@
 
 typealias BasicDBM Array{BernoulliRBM,1}
+
+"
+`Particles` are an array of matrices.
+The i'th matrix contains in each row the vector of states of the nodes
+of the i'th layer of an RBM or a DBM. The set of rows with the same index define
+an activation state in a Boltzmann Machine.
+"
 typealias Particles Array{Array{Float64,2},1}
+
 typealias Particle Array{Array{Float64,1},1}
 
 
@@ -227,39 +235,47 @@ function gibbssample!(particles::Particles,
 end
 
 function gibbssample!(particles::Particles, dbm::BasicDBM,
-      steps::Int = 5, beta::Float64 = 1.0)
+      biases::Particle = BMs.combinedbiases(dbm),
+      nsteps::Int = 5)
 
-   oldstates = deepcopy(particles)
-   bottominput = deepcopy(particles)
+   input = deepcopy(particles)
+   topinput = deepcopy(particles)
 
-   # pgrid = collect(linspace(0.00001,0.99999,99999))
-   # etagrid = log.(pgrid./(1.0-pgrid))
-
-   for step in 1:steps
-      for i = 1:length(particles)
-         if step > 1
-            oldstates[i] .= particles[i]
-         end
-         if i < length(particles)
-            A_mul_B!(particles[i],particles[i+1],dbm[i].weights')
-            broadcast!(+, particles[i], particles[i], dbm[i].visbias')
-         else
-            particles[i][:] = 0
-         end
-         if i > 1
-            A_mul_B!(bottominput[i],oldstates[i-1],dbm[i-1].weights)
-            particles[i] += bottominput[i]
-            broadcast!(+, particles[i], particles[i], dbm[i-1].hidbias')
-         end
-
-         for iter in eachindex(particles[i])
-            @inbounds particles[i][iter] = 1.0*(rand() < 1.0/(1.0+exp(-particles[i][iter]*beta)))
-            # @inbounds particles[i][iter] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < particles[i][iter]*beta)
-         end
+   for step in 1:nsteps
+      weightsinput!(input, input2, dbm, particles, temperature)
+      for i in eachindex(input)
+         broadcast!(+, input[i], input[i], biases[i]')
+         particles[i] .= input[i]
       end
+      sigm_bernoulli!(input)
+
    end
 
    particles
+end
+
+
+"""
+Computes the input resulting only from the weights, without biases,
+of the nodes and stores in `input`.
+"""
+function weightsinput!(input::Particles, input2::Particles, dbm::BasicDBM,
+      particles::Particles)
+
+   # first layer gets input only from layer above
+   A_mul_B!(input[1], particles[2], dbm[1].weights')
+
+   # intermediate layers get input from layers above and below
+   for i = 2:(length(particles) - 1)
+      A_mul_B!(input2[i], particles[i+1], dbm[i].weights')
+      A_mul_B!(input[i], particles[i-1], dbm[i-1].weights)
+      input[i] .+= input2[i]
+   end
+
+   # last layer gets only input from layer below
+   A_mul_B!(input[end], particles[end-1], dbm[end].weights)
+
+   input
 end
 
 
@@ -577,6 +593,25 @@ function parthiddens(nhiddens,visibleindex,p)
    nhiddensmat
 end
 
+
+function sigm_bernoulli!(input::Particles)
+   for i in eachindex(input)
+      sigm_bernoulli!(input[i])
+   end
+   input
+end
+
+# const pgrid = collect(linspace(0.00001,0.99999,99999))
+# const etagrid = log.(pgrid./(1.0-pgrid))
+
+function sigm_bernoulli!(input::Matrix{Float64})
+   for i in eachindex(input)
+      @inbounds input[i] = 1.0*(rand() < 1.0/(1.0 + exp(-input[i])))
+      # @inbounds input[i] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < input[i])
+   end
+end
+
+
 function stackparts(x,nhiddensmat,nrbmsjoint,visibleindex,epochs,predbm,samplehidden,learningrate)
    nparts, nrbmspart = size(nhiddensmat)
    n, p = size(x)
@@ -635,7 +670,6 @@ function stackparts(x,nhiddensmat,nrbmsjoint,visibleindex,epochs,predbm,samplehi
 
    partparams, hiddenvals
 end
-
 
 
 """

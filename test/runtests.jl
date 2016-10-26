@@ -10,10 +10,10 @@ include("BMTest.jl")
 
 # Test exact loglikelihood of a baserate RBM
 # vs the calculated loglikelihoodbaserate
-x = rand([0.0 0.0 0.0 1.0 1.0], 1000, 10);
+x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
 @test_approx_eq_eps(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
 @test_approx_eq_eps(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
-x = rand(1000, 10) + randn(1000, 10);
+x = rand(100, 10) + randn(100, 10);
 @test_approx_eq_eps(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, 1e-10)
 
 
