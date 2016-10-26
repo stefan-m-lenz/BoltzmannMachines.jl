@@ -234,9 +234,15 @@ function gibbssample!(particles::Particles,
    particles
 end
 
+
+"""
+    gibbssample!(particles, dbm, nsteps)
+Performs Gibbs sampling on the `particles` in the DBM `dbm` for `nsteps` steps.
+(See also: `Particles`.)
+"""
 function gibbssample!(particles::Particles, dbm::BasicDBM,
-      biases::Particle = BMs.combinedbiases(dbm),
-      nsteps::Int = 5)
+      nsteps::Int = 5,
+      biases::Particle = BMs.combinedbiases(dbm))
 
    input = deepcopy(particles)
    input2 = deepcopy(particles)
@@ -255,10 +261,14 @@ end
 
 
 """
-Computes the input of all nodes in the `dbm` that results only from the weights,
-without biases, and stores it in `input`.
-The `Particle` `input2` must have the same size as `input` and is used as
-preallocated space needed for intermediate results.
+    weightsinput!(input, input2, dbm, particles)
+Computes the input that results only from the weights (without biases)
+and the previous states in `particles` for all nodes in the DBM
+`dbm` and stores it in `input`.
+The state of the `particles` and the `dbm` is not altered.
+`input2` must have the same size as `input` and `particle`.
+For performance reasons, `input2` is used as preallocated space for storing
+intermediate results.
 """
 function weightsinput!(input::Particles, input2::Particles, dbm::BasicDBM,
       particles::Particles)
