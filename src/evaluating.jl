@@ -211,20 +211,26 @@ function aisimportanceweights(dbm::BasicDBM;
 
    for k = 2:length(beta)
       BMs.weightsinput!(input, input2, dbm, particles)
-      for i = 1:nlayers
+
+      for i = 1:2:nlayers # calculate only for odd layers
          input2[i] .= input[i]
-         input[i] .*= beta[k]
          input2[i] .*= beta[k-1]
-         broadcast!(+, input[i], input[i], biases[i]')
          broadcast!(+, input2[i], input2[i], biases[i]')
+      end
+
+      for i = 1:nlayers # calculate for all layers, used for Gibbs transition
+         input[i] .*= beta[k]
+         broadcast!(+, input[i], input[i], biases[i]')
          particles[i] .= input[i]
       end
 
       # Calculate importance weights, analytically sum out all even layers
       for i = 1:2:nlayers
-         for j = 1:nparticles
-            impweights[j] *=
-                  prod((1 + exp(input[i][j,:])) ./ (1 + exp(input2[i][j,:])))
+         for n = 1:size(input[i],2)
+            for j = 1:nparticles
+               impweights[j] *=
+                     (1 + exp(input[i][j,n])) / (1 + exp(input2[i][j,n]))
+            end
          end
       end
 
