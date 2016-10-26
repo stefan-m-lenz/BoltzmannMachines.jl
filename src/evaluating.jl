@@ -218,6 +218,10 @@ function aisimportanceweights(dbm::BasicDBM;
          broadcast!(+, input[i], input[i], biases[i]')
          broadcast!(+, input2[i], input2[i], biases[i]')
          particles[i] .= input[i]
+      end
+
+      # Calculate importance weights, analytically sum out all even layers
+      for i = 1:2:nlayers
          for j = 1:nparticles
             impweights[j] *=
                   prod((1 + exp(input[i][j,:])) ./ (1 + exp(input2[i][j,:])))

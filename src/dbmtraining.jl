@@ -255,8 +255,10 @@ end
 
 
 """
-Computes the input resulting only from the weights, without biases,
-of the nodes and stores in `input`.
+Computes the input of all nodes in the `dbm` that results only from the weights,
+without biases, and stores it in `input`.
+The `Particle` `input2` must have the same size as `input` and is used as
+preallocated space needed for intermediate results.
 """
 function weightsinput!(input::Particles, input2::Particles, dbm::BasicDBM,
       particles::Particles)
