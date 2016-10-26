@@ -6,6 +6,11 @@ type MonitoringItem
 end
 
 typealias Monitor Vector{MonitoringItem}
+
+"
+A dictionary containing names of data sets as keys and the data sets (matrices
+with samples in rows) as values.
+"
 typealias DataDict Dict{AbstractString, Array{Float64,2}}
 
 const monitoraisr = "aisr"
@@ -46,7 +51,12 @@ function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
 end
 
 
-# TODO document
+"""
+    monitorexactloglikelihood!(monitor, bm, epoch, datadict)
+Computes the mean exact log-likelihood in the Boltzmann Machine model `bm`
+for the data sets in the DataDict `datadict` and stores this information in
+the Monitor `monitor`.
+"""
 function monitorexactloglikelihood!(monitor::Monitor, bm::AbstractBM,
       epoch::Int, datadict::DataDict)
 
