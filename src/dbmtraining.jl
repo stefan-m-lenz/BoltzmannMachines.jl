@@ -239,16 +239,15 @@ function gibbssample!(particles::Particles, dbm::BasicDBM,
       nsteps::Int = 5)
 
    input = deepcopy(particles)
-   topinput = deepcopy(particles)
+   input2 = deepcopy(particles)
 
    for step in 1:nsteps
-      weightsinput!(input, input2, dbm, particles, temperature)
+      weightsinput!(input, input2, dbm, particles)
       for i in eachindex(input)
          broadcast!(+, input[i], input[i], biases[i]')
          particles[i] .= input[i]
       end
-      sigm_bernoulli!(input)
-
+      sigm_bernoulli!(particles)
    end
 
    particles
