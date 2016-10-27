@@ -119,7 +119,7 @@ end
 Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given
 Binomial2BernoulliRBM `b2brbm` to the Binomial2BernoulliRBM with same visible
-bias and zero weights.
+and hidden bias.
 """
 function aisimportanceweights(b2brbm::Binomial2BernoulliRBM;
       ntemperatures::Int = 100,
@@ -195,31 +195,23 @@ function aisimportanceweights(dbm::BasicDBM;
 
    impweights = ones(nparticles)
    # Todo: sample from null model, which has changed
-   particles = BMs.initparticles(dbm, nparticles)
+   particles = BMs.initparticles(dbm, nparticles, true)
    nlayers = length(particles)
 
    # for performance reasons: preallocate input and combine biases
-   input = deepcopy(particles)
+   input1 = deepcopy(particles)
    input2 = deepcopy(particles)
    biases = BMs.combinedbiases(dbm)
+   mixdbm = deepcopy(dbm)
 
    for k = 2:length(beta)
-
+      # calculate importance weights
       aisupdateimportanceweights!(impweights, input1, input2,
-            temperature1, temperature2, particles, dbm, biases)
+            beta[k], beta[k-1], dbm, biases, particles)
 
-      BMs.sigm_bernoulli!(particles) # completes first Gibbs transition step
-
-      # other gibbs transition steps
-      for step in 2:burnin
-         BMs.weightsinput!(input, input2, dbm, particles)
-         for i = 1:nlayers
-            input[i] .*= beta[k]
-            broadcast!(+, input[i], input[i], biases[i]')
-            particles[i] .= input[i]
-         end
-         BMs.sigm_bernoulli!(particles)
-      end
+      # Gibbs transition
+      copyannealed!(mixdbm, dbm, beta[k])
+      gibbssample!(particles, mixdbm, burnin)
    end
 
    impweights
@@ -254,12 +246,8 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
             beta[k], beta[k-1], mvdbm.hiddbm, biases, particles[2:end])
 
       # update annealing temperature of weights
-      for i in eachindex(mvdbm.visrbms)
-         copyannealead!(mixmvdbm.visrbms[i], mvdbm.visrbms[i], beta[k])
-      end
-      for i in eachindex(mvdbm.hiddbm)
-         copyannealead!(mixmvdbm.hiddbm[i], mvdbm.hiddbm[i], beta[k])
-      end
+      copyannealead!(mixmvdbm.visrbms, mvdbm.visrbms, beta[k])
+      copyannealead!(mixmvdbm.hiddbm, mvdbm.hiddbm, beta[k])
 
       # Gibbs transition to new temperature
       gibbssample!(particles, mixmvdbm, burnin)
@@ -344,32 +332,26 @@ unnormalized probabilities of the states of the odd layers in the BasicDBM
 `dbm`. The activation states of the DBM's nodes are given by the `particles`.
 For performance reasons, the biases are specified separately
 """
-function aisupdateimportanceweights!(impweights, particles::Particles,
-      input1, input2,
-      temperature1::Float64,
-      temperature2::Float64,
+function aisupdateimportanceweights!(impweights,
+      input1::Particles, input2::Particles,
+      temperature1::Float64, temperature2::Float64,
       dbm::BasicDBM,
-      biases::Particle)
+      biases::Particle,
+      particles::Particles)
 
-   nlayer = length(particles)
-   BMs.weightsinput!(input, input2, dbm, particles)
+   nlayers = length(particles)
+   BMs.weightsinput!(input1, input2, dbm, particles)
 
-   for i = 1:2:nlayers # calculate only for odd layers
+   # analytically sum out all even layers
+   for i = 1:2:nlayers
       input2[i] .= input1[i]
       input2[i] .*= temperature2
       broadcast!(+, input2[i], input2[i], biases[i]')
-   end
-
-   for i = 1:nlayers # calculate for all layers, used for Gibbs transition
       input1[i] .*= temperature1
       broadcast!(+, input1[i], input1[i], biases[i]')
-      particles[i] .= input1[i]
-   end
 
-   # update importance weights, analytically sum out all even layers
-   for i = 1:2:nlayers
       for n = 1:size(input1[i],2)
-         for j = 1:nparticles
+         for j in eachindex(impweights)
             impweights[j] *=
                   (1 + exp(input1[i][j,n])) / (1 + exp(input2[i][j,n]))
          end
@@ -397,6 +379,14 @@ function copyannealed!(annealedrbm::GaussianBernoulliRBM,
    annealdrbm.sd .= rbm.sd
    annealedrbm.weights = gbrbm.weights * sqrt(temperature)
    annealedrbm.sd = gbrbm.sd / sqrt(temperature)
+end
+
+function copyannealed!{T<:AbstractRBM}(annealedrbms::Vector{T}, rbms::Vector{T},
+      temperature::Float64)
+
+   for i in eachindex(rbms)
+      copyannealed!(annealedrbms[i], rbms[i], temperature)
+   end
 end
 
 
