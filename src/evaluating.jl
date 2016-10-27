@@ -1,11 +1,10 @@
 """
     aisimportanceweights(rbm; ...)
 Computes the importance weights for estimating the ratio of the partition
-functions of the given `rbm` to the RBM with zeros weights, zero hidden bias
-and visible bias `visbias` using the Annealed Importance Sampling algorithm,
-(AIS) like described in section 4.1.3 of [Salakhutdinov, 2008].
-`visbias` can be given as optional keyword argument and is by default the
-visible bias of the given `rbm`.
+functions of the given `rbm` to the RBM with zero weights,
+but same visible and hidden bias as the `rbm`.
+This function implements the Annealed Importance Sampling algorithm (AIS)
+like described in section 4.1.3 of [Salakhutdinov, 2008].
 
 # Optional keyword arguments (for all types of Boltzmann Machines):
 * `ntemperatures`: Number of temperatures for annealing from the starting model
@@ -17,32 +16,26 @@ visible bias of the given `rbm`.
 * `burnin`: Number of steps to sample for the Gibbs transition between models
 """
 function aisimportanceweights(rbm::BernoulliRBM;
-      visbias::Array{Float64,1} = rbm.visbias,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 10)
 
    impweights = ones(nparticles)
+   mixrbm = deepcopy(rbm)
 
-   visbiasdiff = rbm.visbias - visbias
+   # start with samples from model with zero weights
+   hh = repmat(rbm.hidbias', nparticles)
+   sigm_bernoulli!(hh)
 
-   for j=1:nparticles
-      v = bernoulli!(sigm(visbias))
+   for k = 2:length(beta)
+      impweights .*= aisunnormalizedprobratios(rbm, hh, beta[k], beta[k-1])
 
-      for k=2:(ntemperatures + 1)
-
-         hinput = hiddeninput(rbm, v)
-         impweights[j] *= exp((beta[k] - beta[k-1]) * dot(visbiasdiff, v)) *
-               prod((1 + exp(beta[k]   * hinput)) ./
-                    (1 + exp(beta[k-1] * hinput)))
-
-         # Gibbs transition
-         for burn=1:burnin
-            h = bernoulli!(hiddenpotential(rbm, v, beta[k]))
-            vinput = beta[k] * visibleinput(rbm, h) + (1 - beta[k]) * visbias
-            v = bernoulli!(sigm(vinput))
-         end
+      # Gibbs transition
+      mixrbm.weights = rbm.weights * beta[k]
+      for burn = 1:burnin
+         vv = samplevisible(mixrbm, hh)
+         hh = samplehidden(mixrbm, vv)
       end
    end
 
@@ -201,6 +194,7 @@ function aisimportanceweights(dbm::BasicDBM;
       burnin::Int = 10)
 
    impweights = ones(nparticles)
+   # Todo: sample from null model, which has changed
    particles = BMs.initparticles(dbm, nparticles)
    nlayers = length(particles)
 
@@ -210,29 +204,9 @@ function aisimportanceweights(dbm::BasicDBM;
    biases = BMs.combinedbiases(dbm)
 
    for k = 2:length(beta)
-      BMs.weightsinput!(input, input2, dbm, particles)
 
-      for i = 1:2:nlayers # calculate only for odd layers
-         input2[i] .= input[i]
-         input2[i] .*= beta[k-1]
-         broadcast!(+, input2[i], input2[i], biases[i]')
-      end
-
-      for i = 1:nlayers # calculate for all layers, used for Gibbs transition
-         input[i] .*= beta[k]
-         broadcast!(+, input[i], input[i], biases[i]')
-         particles[i] .= input[i]
-      end
-
-      # Calculate importance weights, analytically sum out all even layers
-      for i = 1:2:nlayers
-         for n = 1:size(input[i],2)
-            for j = 1:nparticles
-               impweights[j] *=
-                     (1 + exp(input[i][j,n])) / (1 + exp(input2[i][j,n]))
-            end
-         end
-      end
+      aisupdateimportanceweights!(impweights, input1, input2,
+            temperature1, temperature2, particles, dbm, biases)
 
       BMs.sigm_bernoulli!(particles) # completes first Gibbs transition step
 
@@ -258,8 +232,40 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
       nparticles::Int = 100,
       burnin::Int = 10)
 
-      # TODO implement
-   error("Not implemented")
+   impweights = ones(nparticles)
+   # TODO change
+   particles = BMs.initparticles(mvdbm, nparticles)
+
+   # for performance reasons: preallocate input and combine biases
+   hiddbminput1 = deepcopy(particles)
+   hiddbminput2 = deepcopy(particles)
+   biases = BMs.combinedbiases(dbm)
+
+   mixmvdbm = deepcopy(mvdbm)
+
+   for k = 2:length(beta)
+
+      # multiply ratios of unnormalized probabilities to get importance weights
+      for i in eachindex(mvdbm.visrbms)
+         impweights .*= aisunnormalizedprobratios(mvdbm.visrbms[i],
+               particles[2][mvdbm.visrbmhidranges[i]], beta[k], beta[k-1])
+      end
+      aisupdateimportanceweights!(impweights, hiddbminput1, hiddbminput2,
+            beta[k], beta[k-1], mvdbm.hiddbm, biases, particles[2:end])
+
+      # update annealing temperature of weights
+      for i in eachindex(mvdbm.visrbms)
+         copyannealead!(mixmvdbm.visrbms[i], mvdbm.visrbms[i], beta[k])
+      end
+      for i in eachindex(mvdbm.hiddbm)
+         copyannealead!(mixmvdbm.hiddbm[i], mvdbm.hiddbm[i], beta[k])
+      end
+
+      # Gibbs transition to new temperature
+      gibbssample!(particles, mixmvdbm, burnin)
+   end
+
+   impweights
 end
 
 
@@ -296,6 +302,101 @@ Computes the standard deviation of the AIS estimator
 "
 function aisstandarddeviation(impweights::Array{Float64,1})
    aissd = sqrt(var(impweights) / length(impweights))
+end
+
+
+function aisunnormalizedprobratios(rbm::BernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   weightsinput = hh * rbm.weights'
+   vec(prod(
+         (1 + exp(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2))
+end
+
+function aisunnormalizedprobratios(rbm::Binomial2BernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   weightsinput = hh * rbm.weights'
+   vec(prod(
+         (1 + exp(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2).^2)
+end
+
+function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   wht = hh * gbrbm.weights
+   exp((temperature1 - temperature2) * sum(
+         0.5 * wht.^2 + broadcast(.*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
+end
+
+
+"""
+Updates the importance weights `impweights` in AIS by multiplying the ratio of
+unnormalized probabilities of the states of the odd layers in the BasicDBM
+`dbm`. The activation states of the DBM's nodes are given by the `particles`.
+For performance reasons, the biases are specified separately
+"""
+function aisupdateimportanceweights!(impweights, particles::Particles,
+      input1, input2,
+      temperature1::Float64,
+      temperature2::Float64,
+      dbm::BasicDBM,
+      biases::Particle)
+
+   nlayer = length(particles)
+   BMs.weightsinput!(input, input2, dbm, particles)
+
+   for i = 1:2:nlayers # calculate only for odd layers
+      input2[i] .= input1[i]
+      input2[i] .*= temperature2
+      broadcast!(+, input2[i], input2[i], biases[i]')
+   end
+
+   for i = 1:nlayers # calculate for all layers, used for Gibbs transition
+      input1[i] .*= temperature1
+      broadcast!(+, input1[i], input1[i], biases[i]')
+      particles[i] .= input1[i]
+   end
+
+   # update importance weights, analytically sum out all even layers
+   for i = 1:2:nlayers
+      for n = 1:size(input1[i],2)
+         for j = 1:nparticles
+            impweights[j] *=
+                  (1 + exp(input1[i][j,n])) / (1 + exp(input2[i][j,n]))
+         end
+      end
+   end
+end
+
+
+"""
+    copyannealed!(annealedrbm, rbm, temperature)
+Copies all parameters that are to be annealed from the RBM `rbm` to the RBM
+`annealedrbm` and anneals them with the given `temperature`.
+"""
+function copyannealed!(annealedrbm::AbstractRBM,
+      rbm::AbstractRBM, temperature::Float64)
+
+   annealedrbm.weights .= rbm.weights
+   annealedrbm.weights .*= temperature
+end
+
+function copyannealed!(annealedrbm::GaussianBernoulliRBM,
+         rbm::GaussianBernoulliRBM, temperature::Float64)
+
+   annealedrbm.weights .= rbm.weights
+   annealdrbm.sd .= rbm.sd
+   annealedrbm.weights = gbrbm.weights * sqrt(temperature)
+   annealedrbm.sd = gbrbm.sd / sqrt(temperature)
 end
 
 
@@ -792,100 +893,50 @@ end
 
 
 """
-    logpartitionfunction(rbm)
-    logpartitionfunction(rbm, r)
-    logpartitionfunction(rbm, visbias, r)
-Calculates the log of the partition function of the RBM from the estimator `r`.
-`r` is an estimator of the ratio of the RBM's partition function Z to the
-partition function Z_0 of the RBM with zero weights and visible bias `visbias`.
+    logpartitionfunction(bm)
+    logpartitionfunction(bm, r)
+Calculates the log of the partition function of the Boltzmann Machine `bm`
+from the estimator `r`.
+`r` is an estimator of the ratio of the `bm`'s partition function Z to the
+partition function Z_0 of the reference BM with zero weights but same biases
+as the given `bm`. In case of a GaussianBernoulliRBM, the reference model
+also has the same standard deviation parameter.
 If the estimator `r` is not given as argument, Annealed Importance Sampling
-is performed to get a value for it.
-By default, `visbias` is the visible bias of the `rbm`.
+is performed (with default parameters) to get a value for it.
 The estimated partition function of the Boltzmann Machine is Z = r * Z_0
 with `r` being the mean of the importance weights.
 Therefore, the log of the estimated partition function is
 log(Z) = log(r) + log(Z_0)
 """
-function logpartitionfunction(rbm::BernoulliRBM,
-      r::Float64 = mean(aisimportanceweights(rbm)))
+function logpartitionfunction(bm::AbstractBM,
+      r::Float64 = mean(aisimportanceweights(bm)))
 
-   logpartitionfunction(rbm, rbm.visbias, r)
-end
-
-function logpartitionfunction(rbm::BernoulliRBM,
-      visbias::Vector{Float64},
-      r::Float64 = mean(aisimportanceweights(rbm; visbias = visbias)))
-
-   nhidden = length(rbm.hidbias)
-   # Uses equation 43 in [Salakhutdinov, 2008]
-   logz = log(r) + log(2)*nhidden + sum(log(1 + exp(visbias)))
+   logz = log(r) + logpartitionfunctionzeroweights(bm)
 end
 
 
 """
-    logpartitionfunction(b2brbm)
-    logpartitionfunction(b2brbm, r)
-Calculates the log of the partition function of the Binomial2BernoulliRBM
-`b2brbm` from the estimator `r`.
-`r` is an estimator of the ratio of the `b2brbm`'s partition function to the
-partition function of the B2BRBM with zero weights, zero hidden bias, and
-same visible bias as the given `b2brbm`.
+    logpartitionfunctionzeroweights(bm)
+Returns the value of the log of the partition function of the Boltzmann Machine
+that results when one sets the weights of `bm` to zero,
+and leaves the other parameters (biases) unchanged.
 """
-function logpartitionfunction(b2brbm::Binomial2BernoulliRBM,
-      r::Float64 = mean(aisimportanceweights(b2brbm)))
-
-   nhidden = length(b2brbm.hidbias)
-   logz = log(r) + log(2)*nhidden + 2*sum(log(1 + exp(b2brbm.visbias)))
+function logpartitionfunctionzeroweights(rbm::BernoulliRBM)
+   sum(log(1 + exp(rbm.visbias))) + sum(log(1 + exp(rbm.hidbias)))
 end
 
+function logpartitionfunctionzeroweights(bgrbm::BernoulliGaussianRBM)
+   nhidden = length(bgrbm.hidbias)
+   nhidden / 2 * log(2pi) + sum(log(1 + exp(bgrbm.visbias)))
+end
 
-"""
-    logpartitionfunction(gbrbm)
-    logpartitionfunction(gbrbm, r)
-Calculates the log of the partition function of the GaussianBernoulliRBM `gbrbm`
-from the estimator `r`.
-`r` is an estimator of the ratio of the `gbrbm`'s partition function to the
-partition function of the GBRBM with zero weights, and same
-standard deviation and same visible and hidden bias as the given `gbrbm`.
-"""
-function logpartitionfunction(gbrbm::GaussianBernoulliRBM,
-      r::Float64 = mean(aisimportanceweights(gbrbm)))
+function logpartitionfunctionzeroweights(b2brbm::Binomial2BernoulliRBM)
+   2*sum(log(1 + exp(b2brbm.visbias))) + sum(log(1 + exp(b2brbm.hidbias)))
+end
 
+function logpartitionfunctionzeroweights(gbrbm::GaussianBernoulliRBM)
    nvisible = length(gbrbm.visbias)
    logz0 = nvisible / 2 * log(2*pi) + sum(log(gbrbm.sd)) + sum(log(1 + exp(gbrbm.hidbias)))
-   logz = log(r) + logz0
-end
-
-
-"""
-    logpartitionfunction(bgrbm)
-    logpartitionfunction(bgrbm, r)
-Calculates the log of the partition function of the BernoulliGaussianRBM `bgrbm`
-from the estimator `r`.
-`r` is an estimator of the ratio of the `bgrbm`'s partition function to the
-partition function of the BGRBM with zero weights
-and same visible and hidden bias as the given `bgrbm`.
-"""
-function logpartitionfunction(bgrbm::BernoulliGaussianRBM,
-      r::Float64 = mean(aisimportanceweights(bgrbm)))
-
-   nhidden = length(bgrbm.hidbias)
-   logz0 = nhidden / 2 * log(2pi) + sum(log(1 + exp(bgrbm.visbias)))
-   logz = log(r) + logz0
-end
-
-
-"""
-    logpartitionfunction(dbm)
-    logpartitionfunction(dbm, r)
-Calculates the log of the partition function of the DBM from the estimator `r`.
-`r` is an estimator of the ratio of the DBM's partition function to the
-partition function of the DBM with zero weights but same biases as the `dbm`.
-"""
-function logpartitionfunction(dbm::BasicDBM,
-      r::Float64 = mean(aisimportanceweights(dbm)))
-
-   logz = log(r) + logpartitionfunctionzeroweights(dbm)
 end
 
 function logpartitionfunctionzeroweights(dbm::BasicDBM)

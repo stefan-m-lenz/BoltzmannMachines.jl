@@ -189,7 +189,7 @@ end
 # TODO document
 function gibbssample!(particles::Particles,
       mvdbm::MultivisionDBM,
-      nsteps::Int = 5, beta::Float64 = 1.0)
+      nsteps::Int = 5)
 
    nhiddenlayers = length(mvdbm.hiddbm) + 1
 
@@ -211,11 +211,11 @@ function gibbssample!(particles::Particles,
          input = hinputtop[:,hiddenrange] +
                hiddeninput(mvdbm.visrbms[i], particles[1][:,visiblerange])
          particles[2][:,hiddenrange] =
-               bernoulli(sigm(beta * input))
+               bernoulli(sigm(input))
 
          # sample visible from old first hidden
          particles[1][:,visiblerange] =
-               samplevisible(mvdbm.visrbms[i], oldstate[:,hiddenrange], beta)
+               samplevisible(mvdbm.visrbms[i], oldstate[:,hiddenrange])
       end
 
       # sample other hidden layers
@@ -227,7 +227,7 @@ function gibbssample!(particles::Particles,
             broadcast!(+, input, input, mvdbm.hiddbm[i].visbias')
          end
          oldstate = copy(particles[i+1])
-         particles[i+1] = bernoulli(sigm(beta * input))
+         particles[i+1] = bernoulli(sigm(input))
       end
    end
 
@@ -297,6 +297,7 @@ Bernoulli distributed (p=0.5) values.
 Returns an array containing in the i'th entry a matrix of size
 (`nparticles`, number of nodes in layer i) such that
 the particles are contained in the rows of these matrices.
+(See also: `Particles`)
 """
 function initparticles(dbm::BasicDBM, nparticles::Int)
    nlayers = length(dbm) + 1

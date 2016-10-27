@@ -196,7 +196,7 @@ In RBMs with Bernoulli distributed hidden units, the potential of the hidden
 nodes is the vector of probabilities for them to be turned on.
 
 The total input can be scaled with the `factor`. This is needed when pretraining
-the `rbm` as part of a DBM or in Annealed Importance Sampling as temperature.
+the `rbm` as part of a DBM.
 """
 function hiddenpotential(rbm::AbstractXBernoulliRBM, v::Array{Float64}, factor::Float64 = 1.0)
    sigm(factor*(hiddeninput(rbm, v)))
@@ -457,7 +457,7 @@ The potential is a deterministic value to which sampling can be applied to get
 the activations.
 
 The total input can be scaled with the `factor`. This is needed when pretraining
-the `rbm` as part of a DBM or in Annealed Importance Sampling as temperature.
+the `rbm` as part of a DBM.
 
 In RBMs with Bernoulli distributed visible units, the potential of the visible
 nodes is the vector of probabilities for them to be turned on.
