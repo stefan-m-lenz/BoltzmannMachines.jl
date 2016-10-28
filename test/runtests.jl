@@ -41,4 +41,8 @@ for nunits in Array[[10;5;4;3], [18;6;3], [11;6;7;4]]
    BMTest.testexactloglikelihood_bernoullimvdbm(nunits)
 end
 
+for nunits in Array[[50;10;90;20], [18;6;79], [100;6;50;15]]
+   BMTest.testlogpartitionfunction_bernoullimvdbm(nunits)
+end
+
 BMTest.testloglikelihood_b2brbm()

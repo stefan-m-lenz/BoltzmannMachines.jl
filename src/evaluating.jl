@@ -947,6 +947,8 @@ function logpartitionfunctionzeroweights(mvdbm::MultivisionDBM)
       rbm2.hidbias .= 0.0
       logz0 += logpartitionfunctionzeroweights(rbm2)
    end
+   # subtract contribution of zero hidden bias in visrbms
+   logz0 -= log(2) * length(mvdbm.hiddbm[1].visbias)
    for i in eachindex(hidbiases)
       logz0 += sum(log(1 + exp(hidbiases[i])))
    end
