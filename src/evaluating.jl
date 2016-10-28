@@ -195,13 +195,13 @@ function aisimportanceweights(dbm::BasicDBM;
 
    impweights = ones(nparticles)
    # Todo: sample from null model, which has changed
-   particles = BMs.initparticles(dbm, nparticles, true)
+   particles = initparticles(dbm, nparticles, biased = true)
    nlayers = length(particles)
 
    # for performance reasons: preallocate input and combine biases
    input1 = deepcopy(particles)
    input2 = deepcopy(particles)
-   biases = BMs.combinedbiases(dbm)
+   biases = combinedbiases(dbm)
    mixdbm = deepcopy(dbm)
 
    for k = 2:length(beta)
@@ -226,12 +226,12 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
 
    impweights = ones(nparticles)
    # TODO change
-   particles = BMs.initparticles(mvdbm, nparticles)
+   particles = initparticles(mvdbm, nparticles, biased = true)
 
    # for performance reasons: preallocate input and combine biases
-   hiddbminput1 = deepcopy(particles)
-   hiddbminput2 = deepcopy(particles)
-   biases = BMs.combinedbiases(dbm)
+   hiddbminput1 = deepcopy(particles[2:end])
+   hiddbminput2 = deepcopy(particles[2:end])
+   hidbiases = combinedbiases(mvdbm.hiddbm)
 
    mixmvdbm = deepcopy(mvdbm)
 
@@ -240,14 +240,14 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
       # multiply ratios of unnormalized probabilities to get importance weights
       for i in eachindex(mvdbm.visrbms)
          impweights .*= aisunnormalizedprobratios(mvdbm.visrbms[i],
-               particles[2][mvdbm.visrbmhidranges[i]], beta[k], beta[k-1])
+               particles[2][:,mvdbm.visrbmshidranges[i]], beta[k], beta[k-1])
       end
       aisupdateimportanceweights!(impweights, hiddbminput1, hiddbminput2,
-            beta[k], beta[k-1], mvdbm.hiddbm, biases, particles[2:end])
+            beta[k], beta[k-1], mvdbm.hiddbm, hidbiases, particles[2:end])
 
       # update annealing temperature of weights
-      copyannealead!(mixmvdbm.visrbms, mvdbm.visrbms, beta[k])
-      copyannealead!(mixmvdbm.hiddbm, mvdbm.hiddbm, beta[k])
+      copyannealed!(mixmvdbm.visrbms, mvdbm.visrbms, beta[k])
+      copyannealed!(mixmvdbm.hiddbm, mvdbm.hiddbm, beta[k])
 
       # Gibbs transition to new temperature
       gibbssample!(particles, mixmvdbm, burnin)
@@ -320,9 +320,9 @@ function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
       temperature1::Float64,
       temperature2::Float64)
 
-   wht = hh * gbrbm.weights
-   exp((temperature1 - temperature2) * sum(
-         0.5 * wht.^2 + broadcast(.*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
+   wht = hh * gbrbm.weights'
+   vec(exp((temperature1 - temperature2) * sum(
+         0.5 * wht.^2 + broadcast(.*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2)))
 end
 
 
@@ -373,10 +373,10 @@ function copyannealed!(annealedrbm::AbstractRBM,
 end
 
 function copyannealed!(annealedrbm::GaussianBernoulliRBM,
-         rbm::GaussianBernoulliRBM, temperature::Float64)
+         gbrbm::GaussianBernoulliRBM, temperature::Float64)
 
-   annealedrbm.weights .= rbm.weights
-   annealdrbm.sd .= rbm.sd
+   annealedrbm.weights .= gbrbm.weights
+   annealedrbm.sd .= gbrbm.sd
    annealedrbm.weights = gbrbm.weights * sqrt(temperature)
    annealedrbm.sd = gbrbm.sd / sqrt(temperature)
 end
@@ -934,6 +934,21 @@ function logpartitionfunctionzeroweights(dbm::BasicDBM)
    biases = combinedbiases(dbm)
    for i in eachindex(biases)
       logz0 += sum(log(1 + exp(biases[i])))
+   end
+   logz0
+end
+
+function logpartitionfunctionzeroweights(mvdbm::MultivisionDBM)
+   logz0 = 0.0
+   hidbiases = combinedbiases(mvdbm.hiddbm)
+   for i in eachindex(mvdbm.visrbms)
+      rbm2 = deepcopy(mvdbm.visrbms[i])
+      hidbiases[1][mvdbm.visrbmshidranges[i]] += rbm2.hidbias
+      rbm2.hidbias .= 0.0
+      logz0 += logpartitionfunctionzeroweights(rbm2)
+   end
+   for i in eachindex(hidbiases)
+      logz0 += sum(log(1 + exp(hidbiases[i])))
    end
    logz0
 end

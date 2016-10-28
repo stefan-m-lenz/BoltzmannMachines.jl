@@ -6,6 +6,8 @@ typealias BasicDBM Array{BernoulliRBM,1}
 The i'th matrix contains in each row the vector of states of the nodes
 of the i'th layer of an RBM or a DBM. The set of rows with the same index define
 an activation state in a Boltzmann Machine.
+Therefore, the size of the i'th matrix is
+(number of samples/particles, number of nodes in layer i).
 "
 typealias Particles Array{Array{Float64,2},1}
 
@@ -140,11 +142,12 @@ end
 
 function combinedbiases(dbm::BasicDBM)
    biases = Particle(length(dbm) + 1)
-   biases[1] = dbm[1].visbias
+   # create copy to avoid accidental modification of dbm
+   biases[1] = copy(dbm[1].visbias)
    for i = 2:length(dbm)
       biases[i] = dbm[i].visbias + dbm[i-1].hidbias
    end
-   biases[end] = dbm[end].hidbias
+   biases[end] = copy(dbm[end].hidbias)
    biases
 end
 
@@ -294,22 +297,31 @@ end
     initparticles(dbm, nparticles)
 Creates particles for Gibbs sampling in a DBM and initializes them with random
 Bernoulli distributed (p=0.5) values.
-Returns an array containing in the i'th entry a matrix of size
-(`nparticles`, number of nodes in layer i) such that
-the particles are contained in the rows of these matrices.
 (See also: `Particles`)
+
+# Optional keyword arguments:
+If the boolean flag `biased` is set to true, the values will be sampled
+according to the biases of the `dbm`.
 """
-function initparticles(dbm::BasicDBM, nparticles::Int)
+function initparticles(dbm::BasicDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
-   particles[1] = rand([0.0 1.0], nparticles, length(dbm[1].visbias))
-   for i in 2:nlayers
-      particles[i] = rand([0.0 1.0], nparticles, length(dbm[i-1].hidbias))
+   if biased
+      biases = combinedbiases(dbm)
+      for i in 1:nlayers
+         particles[i] = bernoulli(repmat(sigm(biases[i])', nparticles))
+      end
+   else
+      nunits = BMs.nunits(dbm)
+      for i in 1:nlayers
+         particles[i] = rand([0.0 1.0], nparticles, nunits[i])
+      end
    end
    particles
 end
 
-function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
+function initparticles(mvdbm::MultivisionDBM, nparticles::Int; biased::Bool = false)
+
    nhidrbms = length(mvdbm.hiddbm)
    if nhidrbms == 0
       error("Add layers to MultivisionDBM to be able to call `initparticles`")
@@ -317,12 +329,19 @@ function initparticles(mvdbm::MultivisionDBM, nparticles::Int)
 
    particles = Particles(nhidrbms + 2)
    particles[1] = Matrix{Float64}(nparticles, mvdbm.visrbmsvisranges[end][end])
+   particles[2:end] = initparticles(mvdbm.hiddbm, nparticles, biased = biased)
    for i = 1:length(mvdbm.visrbms)
       visiblerange = mvdbm.visrbmsvisranges[i]
-      # TODO treat Gaussian visible differently
-      particles[1][:,visiblerange] = rand([0.0 1.0], nparticles, length(mvdbm.visrbms[i].visbias))
+      hiddenrange = mvdbm.visrbmshidranges[i]
+      rbm = deepcopy(mvdbm.visrbms[i])
+      rbm.weights .= 0.0
+      if !biased
+         rbm.visbias .= 0.0
+      end
+      particles[1][:,visiblerange] =
+               samplevisible(rbm, particles[2][:,hiddenrange])
    end
-   particles[2:end] = initparticles(mvdbm.hiddbm, nparticles)
+
    particles
 end
 
@@ -621,6 +640,7 @@ function sigm_bernoulli!(input::Matrix{Float64})
       @inbounds input[i] = 1.0*(rand() < 1.0/(1.0 + exp(-input[i])))
       # @inbounds input[i] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < input[i])
    end
+   input
 end
 
 
