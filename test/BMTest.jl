@@ -166,12 +166,9 @@ function exactloglikelihoodwithoutsummingout(dbm::BMs.BasicDBM, x::Array{Float64
 end
 
 "
-Tests
-* whether the exact loglikelihood of a MultivisionDBM with two visible
-  input layers of Bernoulli units is equal to the loglikelihood of the DBM
-  where the two visible RBMs are joined to one RBM.
-* and whether the exact loglikelihood of a BernoulliDBM with only a single
-
+Tests whether the exact loglikelihood of a MultivisionDBM with two visible
+input layers of Bernoulli units is equal to the loglikelihood of the DBM
+where the two visible RBMs are joined to one RBM.
 "
 function testexactloglikelihood_bernoullimvdbm(nunits::Vector{Int})
 
@@ -216,7 +213,7 @@ function testlogpartitionfunction_bernoullimvdbm(nunits::Vector{Int})
    r_dbm = mean(BMs.aisimportanceweights(dbm; nparticles = 200,
          ntemperatures = 200, burnin = 5))
    logzdbm = BMs.logpartitionfunction(dbm, r_dbm)
-   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.01
+   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.015
 end
 
 
@@ -251,6 +248,34 @@ function testloglikelihood_b2brbm()
    @test abs((exactloglik - emploglik)/exactloglik) < 0.01
 
    # Test AIS
+   estimatedlogz = BMs.logpartitionfunction(mvdbm)
+   @test abs((exactlogz - estimatedlogz)/exactlogz) < 0.01
+end
+
+
+function testgaussianmvdbm()
+   nsamples = 100
+   nvariables1 = 10
+   nvariables2 = 11
+   x1 = createsamples(nsamples, nvariables1)
+   x2 = createsamples(nsamples, nvariables2)
+   sd1 = rand(nvariables1)
+   sd2 = rand(nvariables2)
+   x1 += broadcast(.*, randn(nsamples, nvariables1), sd1')
+   x2 += broadcast(.*, randn(nsamples, nvariables2), sd2')
+   x = hcat(x1, x2)
+
+   gbrbm1 = BMs.fitrbm(x1, rbmtype = BMs.GaussianBernoulliRBM, epochs = 30,
+         nhidden = 5, learningrate = 0.001)
+   gbrbm2 = BMs.fitrbm(x2, rbmtype = BMs.GaussianBernoulliRBM, epochs = 30,
+         nhidden = 6, learningrate = 0.001)
+   mvdbm = BMs.MultivisionDBM([gbrbm1, gbrbm2])
+
+   BMs.addlayer!(mvdbm, x, nhidden = 17)
+   BMs.addlayer!(mvdbm, x, nhidden = 5, islast = true)
+   mvdbm = BMs.traindbm!(mvdbm, x; epochs = 20)
+
+   exactlogz = BMs.exactlogpartitionfunction(mvdbm)
    estimatedlogz = BMs.logpartitionfunction(mvdbm)
    @test abs((exactlogz - estimatedlogz)/exactlogz) < 0.01
 end

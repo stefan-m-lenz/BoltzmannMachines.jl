@@ -225,7 +225,6 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
       burnin::Int = 10)
 
    impweights = ones(nparticles)
-   # TODO change
    particles = initparticles(mvdbm, nparticles, biased = true)
 
    # for performance reasons: preallocate input and combine biases
@@ -377,8 +376,8 @@ function copyannealed!(annealedrbm::GaussianBernoulliRBM,
 
    annealedrbm.weights .= gbrbm.weights
    annealedrbm.sd .= gbrbm.sd
-   annealedrbm.weights = gbrbm.weights * sqrt(temperature)
-   annealedrbm.sd = gbrbm.sd / sqrt(temperature)
+   annealedrbm.weights .*= sqrt(temperature)
+   annealedrbm.sd ./= sqrt(temperature)
 end
 
 function copyannealed!{T<:AbstractRBM}(annealedrbms::Vector{T}, rbms::Vector{T},
