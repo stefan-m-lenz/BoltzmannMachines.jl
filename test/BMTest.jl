@@ -257,8 +257,8 @@ function testgaussianmvdbm()
    nsamples = 100
    nvariables1 = 10
    nvariables2 = 11
-   x1 = createsamples(nsamples, nvariables1)
-   x2 = createsamples(nsamples, nvariables2)
+   x1 = BMTest.createsamples(nsamples, nvariables1)
+   x2 = BMTest.createsamples(nsamples, nvariables2)
    sd1 = rand(nvariables1)
    sd2 = rand(nvariables2)
    x1 += broadcast(.*, randn(nsamples, nvariables1), sd1')
@@ -278,6 +278,9 @@ function testgaussianmvdbm()
    exactlogz = BMs.exactlogpartitionfunction(mvdbm)
    estimatedlogz = BMs.logpartitionfunction(mvdbm)
    @test abs((exactlogz - estimatedlogz)/exactlogz) < 0.01
+
+   exactloglik = BMs.exactloglikelihood(mvdbm, x, exactlogz)
+   estimatedloglik = BMs.loglikelihood(mvdbm, x)
 end
 
 end

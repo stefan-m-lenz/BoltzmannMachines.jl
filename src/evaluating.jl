@@ -852,19 +852,25 @@ function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
       nparticles::Int = 100,
       burnin::Int = 10)
 
+   nsamples = size(x,1)
    r = mean(aisimportanceweights(mvdbm; ntemperatures = ntemperatures,
          beta = beta, nparticles = nparticles, burnin = burnin))
    logz = logpartitionfunction(mvdbm, r)
 
    hiddbm = deepcopy(mvdbm.hiddbm)
+   zerohiddens = [zeros(length(mvdbm.visrbmshidranges[i])) for i in eachindex(mvdbm.visrbms)]
 
    logp = 0.0
-   h1 = visiblestofirsthidden(mvdbm, x)
-
    for j = 1:nsamples
       v = vec(x[j,:])
-      logp += dot(dbm[1].visbias, v)
-      hdbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
+      hiddbm[1].visbias .= mvdbm.hiddbm[1].visbias
+      for i in eachindex(mvdbm.visrbms)
+         vi = v[mvdbm.visrbmsvisranges[i]]
+         logp -= energy(mvdbm.visrbms[i], vi, zerohiddens[i])
+         hiddbm[1].visbias[mvdbm.visrbmshidranges[i]] .+= 
+               hiddeninput(mvdbm.visrbms[i], vi)
+      end
+      
       r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
       logp += log(r)
