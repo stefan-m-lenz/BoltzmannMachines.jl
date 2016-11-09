@@ -213,7 +213,7 @@ function testlogpartitionfunction_bernoullimvdbm(nunits::Vector{Int})
    r_dbm = mean(BMs.aisimportanceweights(dbm; nparticles = 200,
          ntemperatures = 200, burnin = 5))
    logzdbm = BMs.logpartitionfunction(dbm, r_dbm)
-   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.015
+   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.02
 end
 
 

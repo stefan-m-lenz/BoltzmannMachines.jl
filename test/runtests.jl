@@ -46,3 +46,5 @@ for nunits in Array[[50;10;90;20], [18;6;79], [100;6;50;15]]
 end
 
 BMTest.testloglikelihood_b2brbm()
+
+BMTest.testgaussianmvdbm()

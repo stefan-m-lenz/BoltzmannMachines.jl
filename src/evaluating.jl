@@ -814,7 +814,7 @@ Estimates the mean log-likelihood of the DBM on the data set `x`
 with Annealed Importance Sampling.
 This requires a separate run of AIS for each sample.
 """
-function loglikelihood(dbm::BasicDBM, x::Array{Float64,2};
+function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -827,20 +827,51 @@ function loglikelihood(dbm::BasicDBM, x::Array{Float64,2};
    logz = logpartitionfunction(dbm, r)
 
    # DBM consisting only of hidden layers, with visible bias incorporating v
-   hdbm = deepcopy(dbm[2:end])
+   hiddbm = deepcopy(dbm[2:end])
 
    logp = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
       logp += dot(dbm[1].visbias, v)
-      hdbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
-      r = mean(aisimportanceweights(hdbm; ntemperatures = ntemperatures,
+      hiddbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
+      r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
       logp += log(r)
    end
 
    logp /= nsamples
-   logp += log(2)*sum(nunits(hdbm)) # log(Z_0) for hdbm
+   logp += logpartitionfunctionzeroweights(hiddbm)
+   logp -= logz
+   logp
+end
+
+
+function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 10)
+
+   r = mean(aisimportanceweights(mvdbm; ntemperatures = ntemperatures,
+         beta = beta, nparticles = nparticles, burnin = burnin))
+   logz = logpartitionfunction(mvdbm, r)
+
+   hiddbm = deepcopy(mvdbm.hiddbm)
+
+   logp = 0.0
+   h1 = visiblestofirsthidden(mvdbm, x)
+
+   for j = 1:nsamples
+      v = vec(x[j,:])
+      logp += dot(dbm[1].visbias, v)
+      hdbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
+      r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
+            beta = beta, nparticles = nparticles, burnin = burnin))
+      logp += log(r)
+   end
+
+   logp /= nsamples
+   logp += logpartitionfunctionzeroweights(hiddbm)
    logp -= logz
    logp
 end
