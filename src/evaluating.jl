@@ -826,7 +826,6 @@ function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
          beta = beta, nparticles = nparticles, burnin = burnin))
    logz = logpartitionfunction(dbm, r)
 
-   # DBM consisting only of hidden layers, with visible bias incorporating v
    hiddbm = deepcopy(dbm[2:end])
 
    logp = 0.0
@@ -836,11 +835,10 @@ function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
       hiddbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
       r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
-      logp += log(r)
+      logp += logpartitionfunction(hiddbm, r)
    end
 
    logp /= nsamples
-   logp += logpartitionfunctionzeroweights(hiddbm)
    logp -= logz
    logp
 end
@@ -873,11 +871,10 @@ function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
       
       r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
-      logp += log(r)
+      logp += logpartitionfunction(hiddbm, r)
    end
 
    logp /= nsamples
-   logp += logpartitionfunctionzeroweights(hiddbm)
    logp -= logz
    logp
 end
