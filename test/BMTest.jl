@@ -207,13 +207,11 @@ function testlogpartitionfunction_bernoullimvdbm(nunits::Vector{Int})
    mvdbm = BMs.MultivisionDBM([visrbm])
    mvdbm.hiddbm = hiddbm
    dbm = BMs.BernoulliRBM[visrbm, hiddbm...]
-   r_mvdbm = mean(BMs.aisimportanceweights(mvdbm; nparticles = 200,
-         ntemperatures = 200, burnin = 5))
+   r_mvdbm = mean(BMs.aisimportanceweights(mvdbm))
    logzmvdbm = BMs.logpartitionfunction(mvdbm, r_mvdbm)
-   r_dbm = mean(BMs.aisimportanceweights(dbm; nparticles = 200,
-         ntemperatures = 200, burnin = 5))
+   r_dbm = mean(BMs.aisimportanceweights(dbm))
    logzdbm = BMs.logpartitionfunction(dbm, r_dbm)
-   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.02
+   @test abs((logzmvdbm - logzdbm)/logzmvdbm) < 0.01
 end
 
 
@@ -225,8 +223,8 @@ Tests whether
 * the partition function estimated by AIS is near the exact value.
 "
 function testloglikelihood_b2brbm()
-   x1 = createsamples(100, 4) + createsamples(100, 4)
-   x2 = createsamples(100, 4)
+   x1 = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4)
+   x2 = BMTest.createsamples(100, 4)
    x = hcat(x1, x2)
    b2brbm = BMs.fitrbm(x1, rbmtype = BMs.Binomial2BernoulliRBM, epochs = 30,
          nhidden = 4, learningrate = 0.001)
@@ -250,6 +248,9 @@ function testloglikelihood_b2brbm()
    # Test AIS
    estimatedlogz = BMs.logpartitionfunction(mvdbm)
    @test abs((exactlogz - estimatedlogz)/exactlogz) < 0.01
+
+   estimatedloglik = BMs.loglikelihood(mvdbm, x, ntemperatures = 1000, nparticles =1000)
+   @test abs((estimatedloglik - exactloglik)/exactloglik) < 0.01
 end
 
 
@@ -275,12 +276,19 @@ function testgaussianmvdbm()
    BMs.addlayer!(mvdbm, x, nhidden = 5, islast = true)
    mvdbm = BMs.traindbm!(mvdbm, x; epochs = 20)
 
+   gbrbm = BMs.joinrbms(gbrbm1, gbrbm2)
+   mvdbm2 = deepcopy(mvdbm)
+   mvdbm2.hiddbm[1].weights .= 0.0
+   mvdbm2.hiddbm[1].visbias .= 0.0
+   @test_approx_eq(BMs.exactloglikelihood(gbrbm, x), BMs.exactloglikelihood(mvdbm2,x))
+
    exactlogz = BMs.exactlogpartitionfunction(mvdbm)
    estimatedlogz = BMs.logpartitionfunction(mvdbm)
    @test abs((exactlogz - estimatedlogz)/exactlogz) < 0.01
 
    exactloglik = BMs.exactloglikelihood(mvdbm, x, exactlogz)
    estimatedloglik = BMs.loglikelihood(mvdbm, x)
+   @test abs((exactloglik - estimatedloglik)/exactloglik) < 0.01
 end
 
 end

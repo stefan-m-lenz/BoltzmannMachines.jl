@@ -339,10 +339,10 @@ function aisupdateimportanceweights!(impweights,
       particles::Particles)
 
    nlayers = length(particles)
-   BMs.weightsinput!(input1, input2, dbm, particles)
+   weightsinput!(input1, input2, dbm, particles)
 
    # analytically sum out all even layers
-   for i = 1:2:nlayers
+   for i = 2:2:nlayers
       input2[i] .= input1[i]
       input2[i] .*= temperature2
       broadcast!(+, input2[i], input2[i], biases[i]')
