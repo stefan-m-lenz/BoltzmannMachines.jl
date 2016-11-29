@@ -19,7 +19,7 @@ function aisimportanceweights(rbm::BernoulliRBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    impweights = ones(nparticles)
    mixrbm = deepcopy(rbm)
@@ -53,7 +53,7 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    nvisible = length(rbm1.visbias)
 
@@ -106,7 +106,7 @@ function aisimportanceweights(bgrbm::BernoulliGaussianRBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    # reversed RBM has the same partition function
    aisimportanceweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
@@ -125,7 +125,7 @@ function aisimportanceweights(b2brbm::Binomial2BernoulliRBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    # compute importance weights for BernoulliRBM with duplicated weights and
    # visible bias
@@ -149,7 +149,7 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    logimpweights = zeros(nparticles)
 
@@ -191,7 +191,7 @@ function aisimportanceweights(dbm::BasicDBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    impweights = ones(nparticles)
    # Todo: sample from null model, which has changed
@@ -222,7 +222,7 @@ function aisimportanceweights(mvdbm::MultivisionDBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    impweights = ones(nparticles)
    particles = initparticles(mvdbm, nparticles, biased = true)
@@ -818,7 +818,7 @@ function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    nsamples = size(x,1)
 
@@ -848,7 +848,7 @@ function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    nsamples = size(x,1)
    r = mean(aisimportanceweights(mvdbm; ntemperatures = ntemperatures,

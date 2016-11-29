@@ -41,7 +41,7 @@ correlation matrices for (original) datasets contained in the `cordict`.
 """
 function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       cordict::DataDict;
-      nparticles::Int = 3000, burnin = 10)
+      nparticles::Int = 3000, burnin::Int = 10)
 
    samplecor = cor(BMs.sampleparticles(bm, nparticles, burnin)[1])
    for (datasetname, datacor) in cordict
@@ -84,7 +84,7 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    impweights = BMs.aisimportanceweights(rbm;
          ntemperatures = ntemperatures, beta = beta,
@@ -109,7 +109,7 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 10)
+      burnin::Int = 5)
 
    impweights = BMs.aisimportanceweights(dbm;
          ntemperatures = ntemperatures, beta = beta,
