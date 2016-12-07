@@ -15,7 +15,7 @@ export
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
-         fitrbm, freeenergy, inirbm, joinrbms,
+         fitrbm, freeenergy, initrbm, joinrbms,
          trainrbm!, samplehidden, samplevisible,
          hiddenpotential, hiddeninput, visiblepotential, visibleinput,
          samplerbm, # TODO
