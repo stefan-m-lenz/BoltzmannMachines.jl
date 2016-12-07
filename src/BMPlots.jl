@@ -63,8 +63,8 @@ function extractaisdata(monitor::BMs.Monitor, evaluation::AbstractString, sdrang
          # log(Z) is subtracted from logproblowerbound, so overstimating log(Z)
          # means underestimating the log probability
          bottom, top = BMs.aisprecision(r, sd, sdrange)
-         plotdata[:ymin][plotdata[:epoch] .== epoch] -= bottom
-         plotdata[:ymax][plotdata[:epoch] .== epoch] -= top
+         plotdata[:ymin][plotdata[:epoch] .== epoch] -= top
+         plotdata[:ymax][plotdata[:epoch] .== epoch] -= bottom
       end
    end
 
