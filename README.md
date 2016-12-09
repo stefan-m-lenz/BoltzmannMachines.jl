@@ -1,10 +1,10 @@
 # BoltzmannMachines
 
-This package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
+This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
-* Learning of Restricted Boltzmann Machines (RBMs) using Contrastive Divergence (CD).
+* Learning of Restricted Boltzmann Machines (RBMs) using Contrastive Divergence (CD)
 * Greedy layerwise pre-training of Deep Boltzmann Machines (DBMs) and Multimodal DBMs
-* Learning procedure for general Boltzmann Machines using mean-field inference and stochastic approximation. Applicable to DBMs and Multimodal DBMs and used for fine-tuning the weights after the pre-training.
+* Learning procedure for general Boltzmann Machines using mean-field inference and stochastic approximation. Applicable to DBMs and Multimodal DBMs and used for fine-tuning the weights after the pre-training
 * Exact calculation of the likelihood of BMs (only suitable for small models)
 * Annealed Importance Sampling (AIS) for estimating the likelihood of larger BMs
 
@@ -15,12 +15,16 @@ This package implements algorithms for training and evaluating several types of 
 
 The package contains the following types of RBMs:
 
-
-
+Type                    | Distribution of visible units    | Distribution of hidden units
+------------------------|----------------------------------|-----------------------------
+`BernoulliRBM`          | Bernoulli                        | Bernoulli
+`GaussianBernoulliRBM`  | Gaussian                         | Bernoulli
+`Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
+`BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
 ## Overview of functions
 
-The following table provides tables with lists of functions of the package together with a short description. The tables are grouped by function. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `? ` at the beginning of the Julia command prompt).
+The following table provides tables with lists of functions of the package together with a short description. The tables are grouped by function. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `?` at the beginning of the Julia command prompt).
 
 ### Functions for Training
 
@@ -31,6 +35,9 @@ Function name    | Short description
 `fitrbm`         | Fits a RBM model to a dataset using CD.
 `trainrbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
 `samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
+`visiblepotential` (`hiddenpotential`) | 
+`trainrbm!` | 
+`initrbm` | 
 
 
 #### Training of DBMs and Multimodal DBMs
@@ -41,14 +48,14 @@ Function name    | Short description
 `fitdbm`         | Fits a DBM model to a dataset. This includes pre-training, followed by the general Boltzmann Machine learning procedure for fine-tuning.
 `gibbssample!`   | Performs Gibbs sampling in a DBM or Multimodal DBM.
 `meanfield`      | Computes the mean-field inference of the hidden nodes' activations in a DBM or Multimodal DBM.
-`traindbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
+`traindbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
 
 
 ### Functions for evaluating a trained model
 
 Function name          | Short description
 --------------         | -----------------
-`aisimportanceweights` | Performs AIS on a BM.
+`aisimportanceweights` | Performs AIS on a BM. Calculates the importance weights for estimating the BM's partition function.
 `freeenergy`           | Computes the free energy of an RBM.
 `loglikelihood`        | Estimates the loglikelihood of a dataset in a BM model using AIS.
 `logpartitionfunction` | Estimates the log of the partition function of a BM. 
@@ -58,6 +65,7 @@ Function name          | Short description
 
 
 ### Monitoring the learning process
+
 The functions of the form `monitor*!` can be used for monitoring a property of the model during the learning process.
 The following words, corresponding to properties, may stand in place of `*`: 
 
@@ -74,5 +82,11 @@ For intended usage of these functions, best see the examples.
 
 
 ## Examples
-TODO
+
+### Fitting RBMs
+
+### Fitting DBMs
+
+
+
 
