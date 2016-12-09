@@ -230,8 +230,35 @@ function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::I
    particles
 end
 
+"""
+    joindbms(dbms)
+Joins the DBMs given by the vector `dbms` by joining each layer of RBMs.
+"""
+function joindbms(dbms::Vector{BasicDBM})
+   jointdbm = BasicDBM(length(dbms[1]))
+   for j in eachindex(dbms[1])
+      jointdbm[j] = joinrbms([dbms[i][j] for i in eachindex(dbms)]...)
+   end
+   jointdbm
+end
+
+
 function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
    joinrbms(T[rbm1, rbm2])
+end
+
+function joinrbms(rbms::Vector{BernoulliRBM})
+   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
+   BernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias)
+end
+
+function joinrbms(rbms::Vector{GaussianBernoulliRBM})
+   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
+   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
+   jointsd = cat(1, map(rbm -> rbm.sd, rbms)...)
+   GaussianBernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias,
+         jointsd)
 end
 
 function joinweights{T<:AbstractRBM}(rbms::Vector{T})
@@ -249,20 +276,6 @@ function joinweights{T<:AbstractRBM}(rbms::Vector{T})
       offset2 += nhidden
    end
    jointweights
-end
-
-function joinrbms(rbms::Vector{BernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
-   BernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias)
-end
-
-function joinrbms(rbms::Vector{GaussianBernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
-   jointsd = cat(1, map(rbm -> rbm.sd, rbms)...)
-   GaussianBernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias,
-         jointsd)
 end
 
 "

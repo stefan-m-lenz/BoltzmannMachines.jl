@@ -48,6 +48,7 @@ Function name    | Short description
 `fitdbm`         | Fits a DBM model to a dataset. This includes pre-training, followed by the general Boltzmann Machine learning procedure for fine-tuning.
 `gibbssample!`   | Performs Gibbs sampling in a DBM or Multimodal DBM.
 `meanfield`      | Computes the mean-field inference of the hidden nodes' activations in a DBM or Multimodal DBM.
+`stackrbms`      | Greedy layerwise pre-training of a DBM model or a Deep Belief Network.
 `traindbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
 
 
@@ -76,10 +77,9 @@ The following words, corresponding to properties, may stand in place of `*`:
 * `reconstructionerror`
 * `weightsnorm`
 
-The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by the function `plotevaluation(monitor, *)` in the submodule `BMPlots`.
+The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the package.
 
 For intended usage of these functions, best see the examples.
-
 
 ## Examples
 

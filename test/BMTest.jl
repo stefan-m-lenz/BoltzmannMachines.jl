@@ -195,6 +195,14 @@ function testexactloglikelihood_bernoullimvdbm(nunits::Vector{Int})
          BMs.exactloglikelihood(mvdbm, x))
 end
 
+function testdbmjoining()
+   dbm1 = BMTest.randdbm([5;4;3])
+   dbm2 = BMTest.randdbm([4;5;2])
+   @test_approx_eq(BMs.exactlogpartitionfunction(dbm1) +
+         BMs.exactlogpartitionfunction(dbm2),
+         BMs.exactlogpartitionfunction(BMs.joindbms(BMs.BasicDBM[dbm1, dbm2])))
+end
+
 "
 Tests whether the estimation of the partition function of a MVDBM with only one
 BernoulliRBM in the first layer is near the estimation of the partition function
