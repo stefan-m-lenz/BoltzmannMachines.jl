@@ -38,6 +38,32 @@ include("dbmtraining.jl")
 
 typealias AbstractBM Union{AbstractDBM, AbstractRBM}
 
+
+"""
+    barsandstripes(nsamples, nvariables)
+Generates a test data set. To see the structure in the data set, run e. g.
+`reshape(barsandstripes(1, 16), 4,4)` a few times.
+"""
+function barsandstripes(nsamples::Int, nvariables::Int)
+   squareside = sqrt(nvariables)
+   if squareside != floor(squareside)
+      error("Number of variables must be a square number")
+   end
+   squareside = round(Int, squareside)
+   x = zeros(nsamples, nvariables)
+   for i in 1:nsamples
+      sample = hcat([(rand() < 0.5 ? ones(squareside) : zeros(squareside))
+            for j in 1:squareside]...)
+      if rand() < 0.5
+         sample = transpose(sample)
+      end
+      x[i,:] .= sample[:]
+      fill!(sample, 0.0)
+   end
+   x
+end
+
+
 function sigm(x::Array{Float64,1})
    1./(1 + exp(-x))
 end
@@ -229,6 +255,7 @@ function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::I
    particles[1] = visiblepotential(gbrbm, particles[2])
    particles
 end
+
 
 """
     joindbms(dbms)

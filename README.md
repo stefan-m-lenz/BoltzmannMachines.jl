@@ -8,9 +8,6 @@ This Julia package implements algorithms for training and evaluating several typ
 * Exact calculation of the likelihood of BMs (only suitable for small models)
 * Annealed Importance Sampling (AIS) for estimating the likelihood of larger BMs
 
-
-## References
-
 ## Types of Boltzmann Machines
 
 The package contains the following types of RBMs:
@@ -22,9 +19,15 @@ Type                    | Distribution of visible units    | Distribution of hid
 `Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
 `BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
+TODO DBMs:
+
+Multimodal DBMs
+
+TODO Bild
+
 ## Overview of functions
 
-The following table provides tables with lists of functions of the package together with a short description. The tables are grouped by function. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `?` at the beginning of the Julia command prompt).
+The following tables provide an overview of the functions of the package, together with a short description. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `?` at the beginning of the Julia command prompt).
 
 ### Functions for Training
 
@@ -35,7 +38,8 @@ Function name    | Short description
 `fitrbm`         | Fits a RBM model to a dataset using CD.
 `trainrbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
 `samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
-`visiblepotential` (`hiddenpotential`) | 
+`visiblepotential` (`hiddenpotential`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
+`visibleinput` (`hiddeninput`) | Computes the total input received by the visible (hidden) layer of an RBM.
 `trainrbm!` | 
 `initrbm` | 
 
@@ -56,12 +60,12 @@ Function name    | Short description
 
 Function name          | Short description
 --------------         | -----------------
-`aisimportanceweights` | Performs AIS on a BM. Calculates the importance weights for estimating the BM's partition function.
-`freeenergy`           | Computes the free energy of an RBM.
-`loglikelihood`        | Estimates the loglikelihood of a dataset in a BM model using AIS.
+`aisimportanceweights` | Performs AIS on a BM and calculates the importance weights for estimating the BM's partition function.
+`freeenergy`           | Computes the mean free energy of a data set in an RBM model.
+`loglikelihood`        | Estimates the mean loglikelihood of a dataset in a BM model using AIS.
 `logpartitionfunction` | Estimates the log of the partition function of a BM. 
-`logproblowerbound`    | Estimates the lower bound of the log probability of a dataset in a DBM model.
-`reconstructionerror`  | Computes the reconstruction error of a dataset in am RBM.
+`logproblowerbound`    | Estimates the mean lower bound of the log probability of a dataset in a DBM model.
+`reconstructionerror`  | Computes the mean reconstruction error of a dataset in an RBM model.
 `sampleparticles`      | Samples from a BM model.
 
 
@@ -77,16 +81,36 @@ The following words, corresponding to properties, may stand in place of `*`:
 * `reconstructionerror`
 * `weightsnorm`
 
-The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the package.
+The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the module.
 
 For intended usage of these functions, best see the examples.
 
 ## Examples
 
-### Fitting RBMs
+Prerequisite for running the following code snippets is that the `BoltzmannMachines` package is installed and loaded:
 
-### Fitting DBMs
+    Pkg.add("BoltzmannMachines")
+    using BoltzmannMachines
+    
+If you want to use the plotting functionality in the submodule `BMPlots`, you are required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
+
+    
+### RBMs
 
 
 
+### DBMs
+
+<!--TODO: Two ways, fitdbm or addlayer! and traindbm!
+ Small dbm, exact, big dbm loglikelihood am Schlus, logproblowerbound während training, alle 2 Schritte.
+Partitioned Training-->
+
+
+## References
+
+[Salakhutdinov, 2015] : Learning Deep Generative Models
+[Salakhutdinov+Hinton, 2012] : An Efficient Learning Procedure for Deep Boltzmann Machines
+[Salakhutdinov, 2008] : Learning and Evaluating Boltzmann Machines
+[Krizhevsky, 2009] : Learning Multiple Layers of Features from Tiny Images
+[Srivastava+Salakhutdinov, 2014] : Multimodal Learning with Deep Boltzmann Machines
 
