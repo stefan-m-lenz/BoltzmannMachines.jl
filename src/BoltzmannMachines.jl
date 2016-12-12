@@ -115,6 +115,21 @@ function samplerbm(rbm::BernoulliRBM, n::Int, burnin::Int = 10)
 end
 
 
+"""
+    splitdata(x, ratio)
+Splits the data set `x` randomly in two data sets `x1` and `x2`, such that
+the ratio `n2`/`n1` of the numbers of lines/samples in `x1` and `x2` is
+approximately equal to the given `ratio`.
+"""
+function splitdata(x::Matrix{Float64}, ratio::Float64)
+   nsamples = size(x,1)
+   testidxs = randperm(nsamples)[1:(round(Int, nsamples*ratio))]
+   xtest = x[testidxs,:]
+   xtraining = x[setdiff(1:nsamples, testidxs),:]
+   xtraining, xtest
+end
+
+
 function fitpartdbmcore(x::Array{Float64,2},
       nhiddens::Array{Int,1},
       visibleindex,
