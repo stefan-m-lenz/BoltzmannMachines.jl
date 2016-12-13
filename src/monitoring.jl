@@ -1,3 +1,8 @@
+"""
+Encapsulates the value of an evaluation calculated in one training epoch.
+If the evaluation depends on a dataset,
+the dataset's name can be specified also.
+"""
 type MonitoringItem
    evaluation::AbstractString
    epoch::Int
@@ -5,13 +10,19 @@ type MonitoringItem
    datasetname::AbstractString
 end
 
+
+"""
+A vector for collecting `MonitoringItem`s during training.
+"""
 typealias Monitor Vector{MonitoringItem}
 
-"
+
+"""
 A dictionary containing names of data sets as keys and the data sets (matrices
 with samples in rows) as values.
-"
+"""
 typealias DataDict Dict{AbstractString, Array{Float64,2}}
+
 
 const monitoraisr = "aisr"
 const monitoraisstandarddeviation = "aisstandarddeviation"
@@ -25,14 +36,16 @@ const monitorsd = "sd"
 const monitorweightsnorm = "weightsnorm"
 
 
-"
+"""
+    correlations(datadict)
 Creates and returns a dictionary with the same keys as the given `datadict`.
 The values of the returned dictionary are the correlations of the samples in
 the datasets given as values in the `datadict`.
-"
+"""
 function correlations(datadict::DataDict)
    DataDict(map(kv -> (kv[1] => cor(kv[2])), datadict))
 end
+
 
 """
     monitorcordiff!(monitor, rbm, epoch, cordict)
@@ -68,6 +81,11 @@ function monitorexactloglikelihood!(monitor::Monitor, bm::AbstractBM,
 end
 
 
+"""
+    monitorfreeenergy!(monitor, rbm, epoch, datadict)
+Computes the free energy for the `datadict`'s data sets in the RBM model `rbm`
+and stores the information in the `monitor`.
+"""
 function monitorfreeenergy!(monitor::Monitor, rbm::AbstractRBM,
       epoch::Int, datadict::DataDict)
 
@@ -78,6 +96,15 @@ function monitorfreeenergy!(monitor::Monitor, rbm::AbstractRBM,
 end
 
 
+"""
+    monitorloglikelihood!(monitor, rbm, epoch, datadict)
+Estimates the log-likelihood of the `datadict`'s data sets in the RBM model
+`rbm` with AIS and stores the values, together with information about the
+variance of the estimator, in the `monitor`.
+
+See also: `loglikelihood`.
+For the optional keyword arguments, see `aisimportanceweights`.
+"""
 function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
       epoch::Int, datadict::DataDict;
       # optional arguments for AIS:
@@ -103,6 +130,15 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
 end
 
 
+"""
+    monitorlogproblowerbound!(monitor, dbm, epoch, datadict)
+Estimates the lower bound of the log probability of the `datadict`'s data sets
+in the DBM `dbm` with AIS and stores the values, together with information about
+the variance of the estimator, in the `monitor`.
+
+See also: `logproblowerbound`.
+For the optional keyword arguments, see `aisimportanceweights`.
+"""
 function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       epoch::Int, datadict::DataDict;
       # optional arguments for AIS:
@@ -129,6 +165,11 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
 end
 
 
+"""
+    monitorreconstructionerror!(monitor, rbm, epoch, datadict)
+Computes the reconstruction error for the data sets in the `datadict`
+and the `rbm` and stores the values in the `monitor`.
+"""
 function monitorreconstructionerror!(monitor::Monitor, rbm::AbstractRBM,
       epoch::Int, datadict::DataDict)
 
@@ -148,6 +189,13 @@ function monitorsd!(monitor::Monitor, gbrbm::GaussianBernoulliRBM, epoch::Int)
 end
 
 
+"""
+    monitorweightsnorm!(monitor, rbm, epoch)
+Computes the L2-norm of the weights matrix and the bias vectors of the `rbm`
+and stores the values in the `monitor`.
+These values can give a hint how much the updates are changing the parameters
+during learning.
+"""
 function monitorweightsnorm!(monitor::Monitor, rbm::AbstractRBM, epoch::Int)
    push!(monitor,
          MonitoringItem(BMs.monitorweightsnorm, epoch,

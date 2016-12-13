@@ -865,10 +865,10 @@ function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
       for i in eachindex(mvdbm.visrbms)
          vi = v[mvdbm.visrbmsvisranges[i]]
          logp -= energy(mvdbm.visrbms[i], vi, zerohiddens[i])
-         hiddbm[1].visbias[mvdbm.visrbmshidranges[i]] .+= 
+         hiddbm[1].visbias[mvdbm.visrbmshidranges[i]] .+=
                hiddeninput(mvdbm.visrbms[i], vi)
       end
-      
+
       r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
       logp += logpartitionfunction(hiddbm, r)
@@ -997,13 +997,13 @@ in [Salakhutdinov, 2015].
 
 # Optional keyword arguments:
 * If importance weights `impweights` are given, they are used for estimation
-of the partition function; otherwise the partition function will be estimated
-by running the Annealed Importance Sampling algorithm with default parameters
-for the DBM.
+  of the partition function; otherwise the partition function will be estimated
+  by running the Annealed Importance Sampling algorithm with default parameters
+  for the DBM.
 * The approximate posterior distribution may be given as argument `mu`
-or is calculated by the mean-field method.
+  or is calculated by the mean-field method.
 * The `logpartitionfunction` can be specified directly
-or is calculated using the `impweights`.
+  or is calculated using the `impweights`.
 """
 function logproblowerbound(dbm::BasicDBM,
       x::Array{Float64};

@@ -34,7 +34,7 @@ Function name    | Short description
 ---------------- | -----------------
 `initrbm`        | Initializes an RBM model.
 `trainrbm!`      | Performs CD-learning on an RBM model.
-`fitrbm`         | Fits a RBM model to a dataset using CD. (Wraps `initrbm` and `trainrbm!`.)
+`fitrbm`         | Fits a RBM model to a dataset using CD. (Wraps `initrbm` and `trainrbm!`)
 `samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
 `visiblepotential` (`hiddenpotential`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
 `visibleinput` (`hiddeninput`) | Computes the total input received by the visible (hidden) layer of an RBM.
@@ -68,7 +68,7 @@ Function name          | Short description
 ### Monitoring the learning process
 
 The functions of the form `monitor*!` can be used for monitoring a property of the model during the learning process.
-The following words, corresponding to properties, may stand in place of `*`: 
+The following words, corresponding to the denominated properties, may stand in place of `*`: 
 
 * `freeenergy`
 * `exactloglikelihood`
@@ -79,16 +79,17 @@ The following words, corresponding to properties, may stand in place of `*`:
 
 The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the module.
 
+<!--The functions `BMPlots.plotloglikelihood` and `BMPlots.plotlogproblowerbound` take -->
+
 For intended usage of these functions, best see the examples.
 
 ## Examples
 
-Prerequisite for running the following code snippets is that the `BoltzmannMachines` package is installed and loaded:
+Prerequisite for running the [example code here](test/examples.jl) is that the `BoltzmannMachines` package is installed:
 
     Pkg.add("BoltzmannMachines")
-    using BoltzmannMachines
     
-If you want to use the plotting functionality in the submodule `BMPlots`, you are required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
+If you want to use the plotting functionality in the submodule `BMPlots`, you are also required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
 
 
 <!--TODO: Two ways, fitdbm or addlayer! and traindbm!
@@ -104,7 +105,7 @@ Partitioned Training-->
  
 [3] Salakhutdinov. R. (2008). *Learning and Evaluating Boltzmann Machines*. Technical Report UTML TR 2008-002, Department of Computer Science, University of Toronto.
 
-[4] Krizhevsky, A., Hinton, G.  (2009). *Learning Multiple Layers of Features from Tiny Images*
+[4] Krizhevsky, A., Hinton, G. (2009). *Learning Multiple Layers of Features from Tiny Images*.
 
-[5] Srivastava, N., Salakhutdinov R. (2014). *Multimodal Learning with Deep Boltzmann Machines*
+[5] Srivastava, N., Salakhutdinov R. (2014). *Multimodal Learning with Deep Boltzmann Machines*. Journal of Machine Learning Research, 15, 2949-2980.
 
