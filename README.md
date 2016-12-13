@@ -90,12 +90,6 @@ Prerequisite for running the following code snippets is that the `BoltzmannMachi
     
 If you want to use the plotting functionality in the submodule `BMPlots`, you are required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
 
-    
-### RBMs
-
-
-
-### DBMs
 
 <!--TODO: Two ways, fitdbm or addlayer! and traindbm!
  Small dbm, exact, big dbm loglikelihood am Schlus, logproblowerbound während training, alle 2 Schritte.
