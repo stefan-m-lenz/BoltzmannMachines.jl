@@ -30,7 +30,9 @@ export
       monitorlogproblowerbound, monitorlogproblowerbound!,
       monitorloglikelihood, monitorloglikelihood!,
       monitorreconstructionerror, monitorreconstructionerror!,
-      monitorweightsnorm, monitorweightsnorm!
+      monitorweightsnorm, monitorweightsnorm!,
+   barsandstripes, splitdata,
+   BMPlots
 
 
 include("rbmtraining.jl")
