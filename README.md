@@ -3,8 +3,8 @@
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
 * Learning of Restricted Boltzmann Machines (RBMs) using Contrastive Divergence (CD)
-* Greedy layerwise pre-training of Deep Boltzmann Machines (DBMs) and Multimodal DBMs
-* Learning procedure for general Boltzmann Machines using mean-field inference and stochastic approximation. Applicable to DBMs and Multimodal DBMs and used for fine-tuning the weights after the pre-training
+* Greedy layerwise pre-training of Deep Boltzmann Machines (DBMs)
+* Learning procedure for general Boltzmann Machines using mean-field inference and stochastic approximation. Applicable to DBMs and used for fine-tuning the weights after the pre-training
 * Exact calculation of the likelihood of BMs (only suitable for small models)
 * Annealed Importance Sampling (AIS) for estimating the likelihood of larger BMs
 
@@ -19,11 +19,8 @@ Type                    | Distribution of visible units    | Distribution of hid
 `Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
 `BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
-TODO DBMs:
+It also contains the type `BasicDBM`, encapsulating the parameters of a DBM with Bernoulli-distributed units. (In the next release, it is planned to provide Multimodal DBMs.)
 
-Multimodal DBMs
-
-TODO Bild
 
 ## Overview of functions
 
@@ -35,25 +32,24 @@ The following tables provide an overview of the functions of the package, togeth
 
 Function name    | Short description
 ---------------- | -----------------
-`fitrbm`         | Fits a RBM model to a dataset using CD.
-`trainrbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
+`initrbm`        | Initializes an RBM model.
+`trainrbm!`      | Performs CD-learning on an RBM model.
+`fitrbm`         | Fits a RBM model to a dataset using CD. (Wraps `initrbm` and `trainrbm!`.)
 `samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
 `visiblepotential` (`hiddenpotential`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
 `visibleinput` (`hiddeninput`) | Computes the total input received by the visible (hidden) layer of an RBM.
-`trainrbm!` | 
-`initrbm` | 
 
 
-#### Training of DBMs and Multimodal DBMs
+#### Training of DBMs
 
 Function name    | Short description
 ---------------- | -----------------
 `addlayer!`      | Adds an additional layer of nodes to a DBM and pre-trains the new weights.
 `fitdbm`         | Fits a DBM model to a dataset. This includes pre-training, followed by the general Boltzmann Machine learning procedure for fine-tuning.
-`gibbssample!`   | Performs Gibbs sampling in a DBM or Multimodal DBM.
-`meanfield`      | Computes the mean-field inference of the hidden nodes' activations in a DBM or Multimodal DBM.
+`gibbssample!`   | Performs Gibbs sampling in a DBM.
+`meanfield`      | Computes the mean-field inference of the hidden nodes' activations in a DBM.
 `stackrbms`      | Greedy layerwise pre-training of a DBM model or a Deep Belief Network.
-`traindbm!`      | Trains a DBM or Multimodal DBM using the learning procedure for a general Boltzmann Machine.
+`traindbm!`      | Trains a DBM using the learning procedure for a general Boltzmann Machine.
 
 
 ### Functions for evaluating a trained model
@@ -108,9 +104,13 @@ Partitioned Training-->
 
 ## References
 
-[Salakhutdinov, 2015] : Learning Deep Generative Models
-[Salakhutdinov+Hinton, 2012] : An Efficient Learning Procedure for Deep Boltzmann Machines
-[Salakhutdinov, 2008] : Learning and Evaluating Boltzmann Machines
-[Krizhevsky, 2009] : Learning Multiple Layers of Features from Tiny Images
-[Srivastava+Salakhutdinov, 2014] : Multimodal Learning with Deep Boltzmann Machines
+[1] Salakhutdinov, R. (2015). *Learning Deep Generative Models*. Annual Review of Statistics and Its Application, 2, 361-385.
+
+[2] Salakhutdinov, R. Hinton, G. (2012). *An Efficient Learning Procedure for Deep Boltzmann Machines*. Neural computation, 24(8), 1967-2006.
+ 
+[3] Salakhutdinov. R. (2008). *Learning and Evaluating Boltzmann Machines*. Technical Report UTML TR 2008-002, Department of Computer Science, University of Toronto.
+
+[4] Krizhevsky, A., Hinton, G.  (2009). *Learning Multiple Layers of Features from Tiny Images*
+
+[5] Srivastava, N., Salakhutdinov R. (2014). *Multimodal Learning with Deep Boltzmann Machines*
 
