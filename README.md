@@ -19,7 +19,7 @@ Type                    | Distribution of visible units    | Distribution of hid
 `Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
 `BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
-TODO DBMs:
+It also contains the type `BasicDBM`, encapsulating the parameters of a DBM with Bernoulli-distributed units. (In the next release, it is planned to provide Multimodal DBMs.)
 
 
 ## Overview of functions
@@ -32,12 +32,12 @@ The following tables provide an overview of the functions of the package, togeth
 
 Function name    | Short description
 ---------------- | -----------------
-`fitrbm`         | Fits a RBM model to a dataset using CD.
+`initrbm`        | Initializes an RBM model.
+`trainrbm!`      | Performs CD-learning on an RBM model.
+`fitrbm`         | Fits a RBM model to a dataset using CD. (Wraps `initrbm` and `trainrbm!`.)
 `samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
 `visiblepotential` (`hiddenpotential`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
 `visibleinput` (`hiddeninput`) | Computes the total input received by the visible (hidden) layer of an RBM.
-`trainrbm!` | 
-`initrbm` | 
 
 
 #### Training of DBMs
@@ -104,9 +104,13 @@ Partitioned Training-->
 
 ## References
 
-[Salakhutdinov, 2015] : Learning Deep Generative Models
-[Salakhutdinov+Hinton, 2012] : An Efficient Learning Procedure for Deep Boltzmann Machines
-[Salakhutdinov, 2008] : Learning and Evaluating Boltzmann Machines
-[Krizhevsky, 2009] : Learning Multiple Layers of Features from Tiny Images
-[Srivastava+Salakhutdinov, 2014] : Multimodal Learning with Deep Boltzmann Machines
+[1] Salakhutdinov, R. (2015). *Learning Deep Generative Models*. Annual Review of Statistics and Its Application, 2, 361-385.
+
+[2] Salakhutdinov, R. Hinton, G. (2012). *An Efficient Learning Procedure for Deep Boltzmann Machines*. Neural computation, 24(8), 1967-2006.
+ 
+[3] Salakhutdinov. R. (2008). *Learning and Evaluating Boltzmann Machines*. Technical Report UTML TR 2008-002, Department of Computer Science, University of Toronto.
+
+[4] Krizhevsky, A., Hinton, G.  (2009). *Learning Multiple Layers of Features from Tiny Images*
+
+[5] Srivastava, N., Salakhutdinov R. (2014). *Multimodal Learning with Deep Boltzmann Machines*
 
