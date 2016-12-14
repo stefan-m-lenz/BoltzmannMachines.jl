@@ -18,11 +18,10 @@ export
          fitrbm, freeenergy, initrbm, joinrbms,
          trainrbm!, samplehidden, samplevisible,
          hiddenpotential, hiddeninput, visiblepotential, visibleinput,
-         samplerbm, # TODO
       AbstractDBM,
          BasicDBM,
          MultivisionDBM,
-         fitdbm, gibbssample!, meanfield, sampledbm, stackrbms, traindbm!,
+         addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
    Particle, Particles,
    Monitor, MonitoringItem, DataDict,
       monitorexactloglikelihood, monitorexactloglikelihood!,

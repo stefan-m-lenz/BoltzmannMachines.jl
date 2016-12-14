@@ -1,4 +1,4 @@
-# BoltzmannMachines
+# BoltzmannMachines.jl
 
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
@@ -52,6 +52,16 @@ Function name    | Short description
 `traindbm!`      | Trains a DBM using the learning procedure for a general Boltzmann Machine.
 
 
+### Partitioned training and joining of models
+
+The following functions may be used to join models trained fitted on partitioned data sets. The weights cross-linking the models are initialized with zeros.
+
+Function name | Short description
+--------------|------------------
+`joindbms`    | Joins two or more DBM models together.
+`joinrbms`    | Joins two or more RBM models to form a joint RBM model of the same type.
+
+
 ### Functions for evaluating a trained model
 
 Function name          | Short description
@@ -62,7 +72,7 @@ Function name          | Short description
 `logpartitionfunction` | Estimates the log of the partition function of a BM. 
 `logproblowerbound`    | Estimates the mean lower bound of the log probability of a dataset in a DBM model.
 `reconstructionerror`  | Computes the mean reconstruction error of a dataset in an RBM model.
-`sampleparticles`      | Samples from a BM model.
+`sampleparticles`      | Generates samples from the distribution defined by a BM model.
 
 
 ### Monitoring the learning process

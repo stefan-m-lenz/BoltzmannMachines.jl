@@ -455,8 +455,7 @@ function stackrbms(x::Array{Float64,2};
       epochs::Int = 10,
       predbm::Bool = false,
       samplehidden::Bool = false,
-      learningrate::Float64 = 0.005,
-      layerwisemonitoring::Function = (rbmindex, rbm, epoch) -> nothing)
+      learningrate::Float64 = 0.005)
 
    nrbms = length(nhiddens)
    dbmn = Array{BernoulliRBM,1}(nrbms)
@@ -468,14 +467,15 @@ function stackrbms(x::Array{Float64,2};
 
    dbmn[1] = BMs.fitrbm(x, nhidden = nhiddens[1], epochs = epochs,
          upfactor = upfactor, downfactor = downfactor, pcd = true,
-         learningrate = learningrate,
-         monitoring = (rbm, epoch) -> layerwisemonitoring(1, rbm, epoch))
+         learningrate = learningrate)
 
    hiddenval = x
    for i=2:nrbms
       hiddenval = BMs.hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
          hiddenval = bernoulli(hiddenval)
+      #else
+      #   someunusedstuff = bernoulli(hiddenval)
       end
       if predbm
          upfactor = downfactor = 2.0
@@ -487,8 +487,7 @@ function stackrbms(x::Array{Float64,2};
       end
       dbmn[i] = BMs.fitrbm(hiddenval, nhidden = nhiddens[i], epochs = epochs,
             upfactor = upfactor, downfactor = downfactor, pcd = true,
-            learningrate = learningrate,
-            monitoring = (rbm, epoch) -> layerwisemonitoring(i, rbm, epoch))
+            learningrate = learningrate)
    end
 
    dbmn
@@ -638,8 +637,10 @@ end
 function sigm_bernoulli!(input::Matrix{Float64})
    for i in eachindex(input)
       @inbounds input[i] = 1.0*(rand() < 1.0/(1.0 + exp(-input[i])))
+      #@inbounds input[i] = 1.0/(1.0 + exp(-input[i]))
       # @inbounds input[i] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < input[i])
    end
+   #input .= bernoulli(input)
    input
 end
 
