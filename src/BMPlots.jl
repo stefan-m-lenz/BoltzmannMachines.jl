@@ -1,6 +1,6 @@
 "
 Contains all plotting functions for displaying information collected
-in module BoltzmannMachines.
+in module `BoltzmannMachines`. Most important function is `plotevaluation`.
 "
 module BMPlots
 
@@ -103,7 +103,32 @@ plottitledict = Dict(
       BMs.monitorcordiff => "L²-difference between correlation matrices \nof generated and original data",
       BMs.monitorfreeenergy => "Free energy")
 
-function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString)
+
+"""
+    plotevaluation(monitor, evaluationkey; ...)
+Plots a curve that shows the values of the evaluation contained in the `monitor`
+and specified by the `evaluationkey` over the course of the training epochs.
+
+Optional keyword argument `sdrange`:
+For evaluations with keys `BoltzmannMachines.monitorloglikelihood` and
+`BoltzmannMachines.monitorlogproblowerbound`,
+there is additional information about the standard
+deviation of the estimator. With the parameter `sdrange`, it is possible
+to display this information as a ribbon around the curve. The ribbon indicates
+the area around the curve that contains the values that deviate at maximum
+`sdrange` times the standard deviation from the estimator.
+Default value for `sdrange` is 2.0.
+"""
+function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString;
+      sdrange::Float64 = 2.0)
+
+   if evaluationkey == BMs.monitorloglikelihood
+      return plotloglikelihood(monitor, sdrange = sdrange)
+   elseif evaluationkey == BMs.monitorlogproblowerbound
+      return plotlogproblowerbound(monitor, sdrange = sdrange)
+   end
+
+   # Otherwise, it is a simple line plot.
    requiresgadfly()
    title = get(plottitledict, evaluationkey, evaluationkey)
    plotdata = extractevaluationdata(monitor, evaluationkey)
@@ -148,7 +173,7 @@ function bivariategaussiandensity(x1::Vector{Float64}, x2::Vector{Float64})
 end
 
 "
-Makes pair plot for each variable of the data set `x` versus each other variable.
+Pairs plot for each variable of the data set `x` versus each other variable.
 "
 function plotpairs(x::Matrix{Float64};
       filename::AbstractString = "pairs",
@@ -219,6 +244,7 @@ function plotpairs(x::Matrix{Float64};
    draw(PNG(string(filename, ".png"), nvariables*cellsize, nvariables*cellsize),
          gridstack(grid))
 end
+
 
 function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       hiddennodes::Tuple{Int,Int} = (1,2),

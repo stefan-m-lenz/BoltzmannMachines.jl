@@ -249,6 +249,14 @@ function sampledbm(dbm::BasicDBM, n::Int, burnin::Int=10, returnall=false)
    end
 end
 
+
+"""
+    sampleparticles(bm, nparticles, burnin)
+Samples in the Boltzmann Machine model `bm` by running `nparticles` parallel,
+randomly initialized Gibbs chains for `burnin` steps.
+Returns particles containing `nparticles` generated samples.
+See also: `Particles`.
+"""
 function sampleparticles(dbm::AbstractDBM, nparticles::Int, burnin::Int = 10)
    particles = initparticles(dbm, nparticles)
    gibbssample!(particles, dbm, burnin)
@@ -287,6 +295,11 @@ function joindbms(dbms::Vector{BasicDBM})
 end
 
 
+"""
+    joinrbms(rbms)
+Joins the given vector of `rbms` of the same type to form one RBM of this type.
+and returns the joined RBM.
+"""
 function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
    joinrbms(T[rbm1, rbm2])
 end
@@ -686,11 +699,3 @@ include("monitoring.jl")
 include("BMPlots.jl")
 
 end # of module BoltzmannMachines
-
-
-# References:
-# [Salakhutdinov, 2015]: Learning Deep Generative Models
-# [Salakhutdinov+Hinton, 2012]: An Efficient Learning Procedure for Deep Boltzmann Machines
-# [Salakhutdinov, 2008]: Learning and Evaluating Boltzmann Machines
-# [Krizhevsky, 2009] : Learning Multiple Layers of Features from Tiny Images
-# [Srivastava+Salakhutdinov, 2014]: Multimodal Learning with Deep Boltzmann Machines

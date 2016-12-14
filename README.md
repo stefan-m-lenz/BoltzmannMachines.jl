@@ -79,9 +79,7 @@ The following words, corresponding to the denominated properties, may stand in p
 
 The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the module.
 
-<!--The functions `BMPlots.plotloglikelihood` and `BMPlots.plotlogproblowerbound` take -->
-
-For intended usage of these functions, best see the examples.
+For intended usage of these functions, best see the [examples](test/examples.jl).
 
 ## Examples
 
