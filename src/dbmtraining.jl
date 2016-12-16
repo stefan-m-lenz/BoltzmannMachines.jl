@@ -474,8 +474,6 @@ function stackrbms(x::Array{Float64,2};
       hiddenval = BMs.hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
          hiddenval = bernoulli(hiddenval)
-      #else
-      #   someunusedstuff = bernoulli(hiddenval)
       end
       if predbm
          upfactor = downfactor = 2.0
@@ -637,10 +635,8 @@ end
 function sigm_bernoulli!(input::Matrix{Float64})
    for i in eachindex(input)
       @inbounds input[i] = 1.0*(rand() < 1.0/(1.0 + exp(-input[i])))
-      #@inbounds input[i] = 1.0/(1.0 + exp(-input[i]))
       # @inbounds input[i] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < input[i])
    end
-   #input .= bernoulli(input)
    input
 end
 
