@@ -30,6 +30,7 @@ export
       monitorloglikelihood, monitorloglikelihood!,
       monitorreconstructionerror, monitorreconstructionerror!,
       monitorweightsnorm, monitorweightsnorm!,
+      propagateforward,
    barsandstripes, splitdata,
    BMPlots
 

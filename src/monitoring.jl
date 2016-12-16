@@ -206,3 +206,14 @@ function monitorweightsnorm!(monitor::Monitor, rbm::AbstractRBM, epoch::Int)
                norm(rbm.hidbias), "Hidden bias"))
 end
 
+
+"""
+    propagateforward(rbm, datadict, factor)
+Returns a new `DataDict` containing the same labels as the given `datadict` but
+as mapped values it contains the hidden potential in the `rbm` of the original
+datasets. The factor is applied for calculating the hidden potential and is 1.0
+by default.
+"""
+function propagateforward(rbm::AbstractRBM, datadict::DataDict, factor::Float64 = 1.0)
+    DataDict(map(kv -> (kv[1] => hiddenpotential(rbm, kv[2], factor)), datadict))
+end

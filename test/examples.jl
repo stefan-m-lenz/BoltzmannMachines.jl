@@ -28,37 +28,49 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 BMPlots.plotevaluation(monitor, monitorreconstructionerror)
 
 
-# DBM-Fitting approach 1 - Pretraining, adding layer by layer.
-dbm = BasicDBM();
-
+# DBM-Fitting approach 1 - Step 1: Pre-training, adding layer by layer.
 # With this approach it is possible to also monitor the layerwise pretraining,
 # which is basically the same as fitting an RBM.
-# (Here only demonstrated for first layer)
+
+dbm = BasicDBM();
+
+srand(12);
 monitor1 = Monitor()
-addlayer!(dbm, x; nhidden = 6, epochs = 20,
+addlayer!(dbm, x; 
+      nhidden = 6, epochs = 20, learningrate = 0.05,
       monitoring = (rbm, epoch) ->
             monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
 BMPlots.plotevaluation(monitor1, monitorreconstructionerror)
 
-addlayer!(dbm, x; nhidden = 2, islast = true);
+monitor2  = Monitor()
+datadict2 = propagateforward(dbm[1], datadict, 2.0);
+addlayer!(dbm, x; islast = true, 
+      nhidden = 2, epochs = 20, learningrate = 0.05, 
+      monitoring = (rbm, epoch) ->
+            monitorreconstructionerror!(monitor2, rbm, epoch, datadict2));
+BMPlots.plotevaluation(monitor2, monitorreconstructionerror)
 
-# DBM-Fitting approach 1 - Fine-Tuning
+# DBM-Fitting approach 1 - Step 2: Fine-Tuning
 monitor = Monitor();
-traindbm!(dbm, x; epochs = 10, learningrate = 0.05,
+traindbm!(dbm, x; epochs = 50, learningrate = 0.05,
       monitoring = (dbm, epoch) ->
             monitorexactloglikelihood!(monitor, dbm, epoch, datadict));
 
 BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 # DBM-Fitting approach 2: Pretraining and Fine-Tuning combined in one function
-dbm = fitdbm(x, nhiddens = [6;5;2], epochs = 20, epochspretraining = 20,
+dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, epochspretraining = 20,
       learningratepretraining = 0.05, learningrate = 0.05);
+
+# Evaluate final result with exact computation of likelihood
+exactloglikelihood(dbm, xtest)
 
 
 # If the model has more parameters, in this case more hidden nodes,
 # the exact calclation is not feasible any more:
 # We need to calculate the likelihood using AIS.
 
+srand(12);
 monitor = Monitor();
 rbm = fitrbm(x, nhidden = 36, epochs = 100,
       learningrates = [0.008*ones(80); 0.001*ones(20)],
@@ -74,16 +86,17 @@ BMPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3.0)
 # (But on the other hand, in some cases it might be too conservative to be 
 # useful as it is only a lower bound.)
 
+srand(12);
 monitor = Monitor();
-dbm = stackrbms(x; nhiddens = [36;10;5], predbm = true, learningrate = 0.05)
-traindbm!(dbm, x; epochs = 100, learningrates = [0.008*ones(80); 0.001*ones(20)],
+dbm = stackrbms(x; nhiddens = [36;10;5], predbm = true, learningrate = 0.05);
+traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
       monitoring = (rbm, epoch) ->
             monitorlogproblowerbound!(monitor, rbm, epoch, datadict));
 
-# Evaluate final result
-loglikelihood(dbm, x)
-
 BMPlots.plotevaluation(monitor, monitorlogproblowerbound; sdrange = 3.0)
+
+# Evaluate final result with AIS-estimated likelihood
+loglikelihood(dbm, xtest)
 
 
 # ==============================================================================
@@ -106,7 +119,7 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 
 # ==============================================================================
-# Data with values in {0,1,2}: Binomial2BernoulliRBM
+# Data with binomially distributed values in {0,1,2}: Binomial2BernoulliRBM
 # ------------------------------------------------------------------------------
 
 # Generate data and split it in training and test data set
