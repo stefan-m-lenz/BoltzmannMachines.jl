@@ -1,14 +1,14 @@
 
 typealias BasicDBM Array{BernoulliRBM,1}
 
-"
+"""
 `Particles` are an array of matrices.
 The i'th matrix contains in each row the vector of states of the nodes
 of the i'th layer of an RBM or a DBM. The set of rows with the same index define
 an activation state in a Boltzmann Machine.
 Therefore, the size of the i'th matrix is
 (number of samples/particles, number of nodes in layer i).
-"
+"""
 typealias Particles Array{Array{Float64,2},1}
 
 typealias Particle Array{Array{Float64,1},1}
@@ -139,7 +139,12 @@ function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
    mvdbm
 end
 
-
+"""
+    combinedbiases(dbm)
+Returns a vector containing in the i'th element the bias vector for the i'th
+layer of the `dbm`. For intermediate layers, visible and hidden biases are
+combined to a single bias vector.
+"""
 function combinedbiases(dbm::BasicDBM)
    biases = Particle(length(dbm) + 1)
    # create copy to avoid accidental modification of dbm
@@ -445,10 +450,22 @@ function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.00
 end
 
 
-# TODO document parameters
 """
+    stackrbms(x; ...)
 Performs greedy layerwise training for Deep Belief Networks or greedy layerwise
-pretraining for Deep Boltzmann Machines.
+pretraining for Deep Boltzmann Machines and returns the trained model.
+
+# Optional keyword arguments (ordered by importance):
+* `predbm`: boolean indicating that the greedy layerwise training is
+   pre-training for a DBM. 
+   If its value is false (default), a DBN is trained. 
+* `nhiddens`: vector containing the number of nodes of the i'th hidden layer in 
+   the i'th entry
+* `epochs`: number of training epochs
+* `learningrate`: learningrate, default 0.005
+* `samplehidden`: boolean indicating that consequent layers are to be trained
+   with sampled values instead of the deterministic potential, 
+   which is the default.
 """
 function stackrbms(x::Array{Float64,2};
       nhiddens::Array{Int,1} = size(x,2)*ones(2),
