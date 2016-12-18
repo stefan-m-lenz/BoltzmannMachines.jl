@@ -45,6 +45,9 @@ typealias AbstractBM Union{AbstractDBM, AbstractRBM}
     barsandstripes(nsamples, nvariables)
 Generates a test data set. To see the structure in the data set, run e. g.
 `reshape(barsandstripes(1, 16), 4,4)` a few times.
+
+Example from:
+MacKay, D. (2003). Information Theory, Inference, and Learning Algorithms
 """
 function barsandstripes(nsamples::Int, nvariables::Int)
    squareside = sqrt(nvariables)
@@ -251,45 +254,21 @@ end
 
 
 """
-    sampleparticles(bm, nparticles, burnin)
-Samples in the Boltzmann Machine model `bm` by running `nparticles` parallel,
-randomly initialized Gibbs chains for `burnin` steps.
-Returns particles containing `nparticles` generated samples.
-See also: `Particles`.
-"""
-function sampleparticles(dbm::AbstractDBM, nparticles::Int, burnin::Int = 10)
-   particles = initparticles(dbm, nparticles)
-   gibbssample!(particles, dbm, burnin)
-   particles
-end
-
-function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
-   particles = Particles(2)
-   particles[2] = rand([0.0 1.0], nparticles, length(rbm.hidbias))
-
-   for i=1:burnin
-      particles[1] = samplevisible(rbm, particles[2])
-      particles[2] = samplehidden(rbm, particles[1])
-   end
-   particles
-end
-
-function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
-   particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
-   # do not sample in last step to avoid that the noise dominates the data
-   particles[1] = visiblepotential(gbrbm, particles[2])
-   particles
-end
-
-
-"""
     joindbms(dbms)
+    joindbms(dbms, visibleindexes)
 Joins the DBMs given by the vector `dbms` by joining each layer of RBMs.
+
+If the vector `visibleindexes` is specified, it is supposed to contain in the 
+i'th entry an indexing vector that determines the positions in the combined 
+DBM for the visible nodes of the i'th of the `dbms`.
+By default the indexes of the visible nodes are assumed to be consecutive.
 """
-function joindbms(dbms::Vector{BasicDBM})
+function joindbms(dbms::Vector{BasicDBM}, visibleindexes = [])
    jointdbm = BasicDBM(length(dbms[1]))
-   for j in eachindex(dbms[1])
-      jointdbm[j] = joinrbms([dbms[i][j] for i in eachindex(dbms)]...)
+   jointdbm[1] = joinrbms([dbms[i][1] for i in eachindex(dbms)], 
+         visibleindexes)
+   for j = 2:length(dbms[1])
+      jointdbm[j] = joinrbms([dbms[i][j] for i in eachindex(dbms)])
    end
    jointdbm
 end
@@ -297,41 +276,85 @@ end
 
 """
     joinrbms(rbms)
-Joins the given vector of `rbms` of the same type to form one RBM of this type.
+    joinrbms(rbms, visibleindexes)
+Joins the given vector of `rbms` of the same type to form one RBM of this type
 and returns the joined RBM.
 """
 function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
    joinrbms(T[rbm1, rbm2])
 end
 
-function joinrbms(rbms::Vector{BernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
-   BernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias)
+function joinrbms(rbms::Vector{BernoulliRBM}, visibleindexes = [])
+   jointvisiblebias = joinvecs([rbm.visbias for rbm in rbms], visibleindexes)
+   jointhiddenbias = vcat(map(rbm -> rbm.hidbias, rbms)...)
+   BernoulliRBM(joinweights(rbms, visibleindexes), 
+         jointvisiblebias, jointhiddenbias)
 end
 
-function joinrbms(rbms::Vector{GaussianBernoulliRBM})
-   jointvisiblebias = cat(1, map(rbm -> rbm.visbias, rbms)...)
-   jointhiddenbias = cat(1, map(rbm -> rbm.hidbias, rbms)...)
-   jointsd = cat(1, map(rbm -> rbm.sd, rbms)...)
-   GaussianBernoulliRBM(joinweights(rbms), jointvisiblebias, jointhiddenbias,
-         jointsd)
+function joinrbms(rbms::Vector{GaussianBernoulliRBM}, visibleindexes = [])
+   jointvisiblebias = joinvecs([rbm.visbias for rbm in rbms], visibleindexes)
+   jointhiddenbias = vcat(map(rbm -> rbm.hidbias, rbms)...)
+   jointsd = joinvecs([rbm.sd for rbm in rbms], visibleindexes)
+   GaussianBernoulliRBM(joinweights(rbms, visibleindexes), 
+         jointvisiblebias, jointhiddenbias, jointsd)
 end
 
-function joinweights{T<:AbstractRBM}(rbms::Vector{T})
+
+"""
+    joinvecs(vecs, indexes)
+Combines the Float-vectors in `vecs` into one vector. The `indexes`` vector must
+contain in the i'th entry the indexes that the elements of the i'th vector in 
+`vecs` are supposed to have in the resulting combined vector.
+"""
+function joinvecs(vecs::Vector{Vector{Float64}}, indexes = [])
+   if isempty(indexes)
+      jointvec = vcat(vecs...)
+   else
+      jointlength = mapreduce(v -> length(v), +, 0, vecs)
+      jointvec = Vector{Float64}(jointlength)
+      for i in eachindex(vecs)
+         jointvec[indexes[i]] = vecs[i]
+      end
+   end
+   jointvec
+end
+
+"""
+    joinweights(rbms)
+    joinweights(rbms, visibleindexes)
+Combines the weight matrices of the RBMs in the vector `rbms` into one weight 
+matrix and returns it. 
+
+If the vector `visibleindexes` is specified, it is supposed to contain in the 
+i'th entry an indexing vector that determines the positions in the combined 
+weight matrix for the visible nodes of the i'th of the `rbms`.
+By default the indexes of the visible nodes are assumed to be consecutive.
+"""
+function joinweights{T<:AbstractRBM}(rbms::Vector{T}, visibleindexes = [])
    jointnhidden = mapreduce(rbm -> length(rbm.hidbias), +, 0, rbms)
    jointnvisible = mapreduce(rbm -> length(rbm.visbias), +, 0, rbms)
    jointweights = zeros(jointnvisible, jointnhidden)
-   offset1 = 0
-   offset2 = 0
-   for i = eachindex(rbms)
-      nvisible = length(rbms[i].visbias)
-      nhidden = length(rbms[i].hidbias)
-      jointweights[offset1 + (1:nvisible), offset2 + (1:nhidden)] =
-            rbms[i].weights
-      offset1 += nvisible
-      offset2 += nhidden
+   offset = 0
+
+   # if visibleindexes are not provided, construct them
+   if isempty(visibleindexes)
+      visibleindexes = Array{UnitRange}(length(rbms))
+      for i in eachindex(rbms)
+         nvisible = length(rbms[i].visbias)
+         visibleindexes[i] = offset + (1:nvisible)
+         offset += nvisible
+      end
+   elseif length(visibleindexes) != length(rbms)
+      error("There must be as many indexing vectors as RBMs.")
    end
+
+   offset = 0
+   for i = eachindex(rbms)
+      nhidden = length(rbms[i].hidbias)
+      jointweights[visibleindexes[i], offset + (1:nhidden)] = rbms[i].weights
+      offset += nhidden
+   end
+
    jointweights
 end
 

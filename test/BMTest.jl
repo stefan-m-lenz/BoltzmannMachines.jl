@@ -198,9 +198,24 @@ end
 function testdbmjoining()
    dbm1 = BMTest.randdbm([5;4;3])
    dbm2 = BMTest.randdbm([4;5;2])
-   @test_approx_eq(BMs.exactlogpartitionfunction(dbm1) +
-         BMs.exactlogpartitionfunction(dbm2),
-         BMs.exactlogpartitionfunction(BMs.joindbms(BMs.BasicDBM[dbm1, dbm2])))
+   dbm3 = BMTest.randdbm([6;7;8])
+
+   exactlogpartitionfunction1 = BMs.exactlogpartitionfunction(dbm1)
+   exactlogpartitionfunction2 = BMs.exactlogpartitionfunction(dbm2)
+   exactlogpartitionfunction3 = BMs.exactlogpartitionfunction(dbm3)
+
+   jointdbm1 = BMs.joindbms(BMs.BasicDBM[dbm1, dbm2])
+   # Test use of visibleindexes
+   indexes = randperm(15)
+   
+   jointdbm2 = BMs.joindbms(BMs.BasicDBM[dbm1, dbm2, dbm3], 
+            [indexes[1:5], indexes[6:9], indexes[10:15]])
+
+   @test_approx_eq(exactlogpartitionfunction1 + exactlogpartitionfunction2,
+         BMs.exactlogpartitionfunction(jointdbm1))
+   
+   @test_approx_eq(exactlogpartitionfunction1 + exactlogpartitionfunction2 +
+         exactlogpartitionfunction3, BMs.exactlogpartitionfunction(jointdbm2))
 end
 
 "

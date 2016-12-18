@@ -7,6 +7,11 @@ module BMPlots
 import ..BoltzmannMachines
 const BMs = BoltzmannMachines
 
+export plotevaluation
+
+
+# global flag to load Gadfly and related packages only when necessary and 
+# only once
 gadflyinitialized = false
 
 function requiresgadfly()

@@ -1186,6 +1186,38 @@ function samplefrequencies{T}(x::Array{T,2})
 end
 
 
+"""
+    sampleparticles(bm, nparticles, burnin)
+Samples in the Boltzmann Machine model `bm` by running `nparticles` parallel,
+randomly initialized Gibbs chains for `burnin` steps.
+Returns particles containing `nparticles` generated samples.
+See also: `Particles`.
+"""
+function sampleparticles(dbm::AbstractDBM, nparticles::Int, burnin::Int = 10)
+   particles = initparticles(dbm, nparticles)
+   gibbssample!(particles, dbm, burnin)
+   particles
+end
+
+function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
+   particles = Particles(2)
+   particles[2] = rand([0.0 1.0], nparticles, length(rbm.hidbias))
+
+   for i=1:burnin
+      particles[1] = samplevisible(rbm, particles[2])
+      particles[2] = samplehidden(rbm, particles[1])
+   end
+   particles
+end
+
+function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
+   particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
+   # do not sample in last step to avoid that the noise dominates the data
+   particles[1] = visiblepotential(gbrbm, particles[2])
+   particles
+end
+
+
 "
 Computes the unnormalized probability of the nodes in layers with odd indexes,
 i. e. p*(v, h2, h4, ...).
