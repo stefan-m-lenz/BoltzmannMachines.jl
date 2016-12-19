@@ -1,6 +1,6 @@
 The BoltzmannMachines.jl package is licensed under the MIT "Expat" License:
 
-> Copyright (c) 2016: Harald Binder, Stefan Lenz.
+> Copyright (c) 2016: Harald Binder, Moritz Hess, Stefan Lenz.
 > 
 > 
 > Permission is hereby granted, free of charge, to any person obtaining a copy
