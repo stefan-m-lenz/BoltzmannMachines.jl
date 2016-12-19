@@ -50,3 +50,6 @@ BMTest.testdbmjoining()
 BMTest.testloglikelihood_b2brbm()
 
 BMTest.testgaussianmvdbm()
+
+# run examples
+include("examples.jl")
