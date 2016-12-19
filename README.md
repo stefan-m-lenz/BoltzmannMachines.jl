@@ -54,7 +54,7 @@ Function name    | Short description
 
 ### Partitioned training and joining of models
 
-The following functions may be used to join models trained fitted on partitioned data sets. The weights cross-linking the models are initialized with zeros.
+The following functions may be used to join models fitted on partitioned data sets. The weights cross-linking the models are initialized with zeros.
 
 Function name | Short description
 --------------|------------------
