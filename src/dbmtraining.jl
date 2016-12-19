@@ -13,63 +13,21 @@ typealias Particles Array{Array{Float64,2},1}
 
 typealias Particle Array{Array{Float64,1},1}
 
-
 """
-A MultivisionDBM consists of several visible layers (may have different
-input types) and binary hidden layers.
-Nodes of different visible layers are connected to non-overlapping parts
-of the first hidden layer.
+Not implemented yet. Planned for future release.
 """
-type MultivisionDBM
-
-   visrbms::Vector{AbstractXBernoulliRBM}
-   visrbmsvisranges::Array{UnitRange{Int}}
-   visrbmshidranges::Array{UnitRange{Int}}
-
-   hiddbm::BasicDBM
-
-   function MultivisionDBM(visrbms, hiddbm)
-      # initialize ranges of hidden units for different RBMs
-      nvisrbms = length(visrbms)
-
-      # calculate visible ranges
-      visrbmsvisranges = Array{UnitRange{Int}}(nvisrbms)
-      offset = 0
-      for i = 1:nvisrbms
-         nvisibleofcurrentvisrbm = length(visrbms[i].visbias)
-         visrbmsvisranges[i] = offset + (1:nvisibleofcurrentvisrbm)
-         offset += nvisibleofcurrentvisrbm
-      end
-
-      # calculate hidden ranges
-      visrbmshidranges = Array{UnitRange{Int}}(nvisrbms)
-      offset = 0
-      for i = 1:nvisrbms
-         nhiddenofcurrentvisrbm = length(visrbms[i].hidbias)
-         visrbmshidranges[i] = offset + (1:nhiddenofcurrentvisrbm)
-         offset += nhiddenofcurrentvisrbm
-      end
-
-      new(visrbms, visrbmsvisranges, visrbmshidranges, hiddbm)
-   end
+type MultimodalDBM
 end
 
-typealias AbstractDBM Union{BasicDBM, MultivisionDBM}
+typealias AbstractDBM Union{BasicDBM, MultimodalDBM}
 
-function MultivisionDBM{T<:AbstractXBernoulliRBM}(visrbms::Vector{T})
-   MultivisionDBM(visrbms, BasicDBM())
-end
-
-function MultivisionDBM(visrbm::AbstractXBernoulliRBM)
-   MultivisionDBM([visrbm], BasicDBM())
-end
 
 """
     addlayer!(dbm, x)
 Adds a pretrained layer to the BasicDBM `dbm`, given the dataset `x` as input
 for the visible layer of the `dbm`.
 
-# Optional keyword arguments (apply to BasicDBM and MultivisionDBM):
+# Optional keyword arguments:
 * `isfirst`, `islast`: indicating that the new RBM should be trained as
    first (assumed if `dbm` is empty) or last layer of the DBM, respectively.
    If those flags are not set, the added layer is trained as intermediate layer.
@@ -115,29 +73,6 @@ function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
    dbm
 end
 
-"""
-    addlayer!(mvdbm, x)
-Adds a pretrained layer to the MultivisionDBM, given the dataset `x` as input
-for the visible layers of the bottom RBMs.
-The variables/columns of `x` are divided among the visible RBMs.
-"""
-function addlayer!(mvdbm::MultivisionDBM, x::Matrix{Float64};
-      islast::Bool = false,
-      nhidden::Int = size(x,2),
-      epochs::Int = 10,
-      learningrate::Float64 = 0.005,
-      learningrates::Vector{Float64} = learningrate * ones(epochs),
-      pcd::Bool = true,
-      cdsteps::Int = 1,
-      monitoring::Function = ((rbm, epoch) -> nothing))
-
-   addlayer!(mvdbm.hiddbm, visiblestofirsthidden(mvdbm, x);
-         isfirst = false,
-         islast = islast, nhidden = nhidden, epochs = epochs,
-         learningrate = learningrate, learningrates = learningrates, pcd = pcd,
-         cdsteps = cdsteps, monitoring = monitoring)
-   mvdbm
-end
 
 """
     combinedbiases(dbm)
@@ -191,55 +126,6 @@ function fitdbm(x::Matrix{Float64};
 
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
       learningrate = learningrate)
-end
-
-
-# TODO document
-function gibbssample!(particles::Particles,
-      mvdbm::MultivisionDBM,
-      nsteps::Int = 5)
-
-   nhiddenlayers = length(mvdbm.hiddbm) + 1
-
-   for step in 1:nsteps
-
-      # save state of first hidden layer
-      oldstate = copy(particles[2])
-
-      # input of first hidden layer from second hidden layer
-      hinputtop = particles[3] * mvdbm.hiddbm[1].weights'
-      broadcast!(+, hinputtop, hinputtop, mvdbm.hiddbm[1].visbias')
-
-      for i = eachindex(mvdbm.visrbms)
-         hiddenrange = mvdbm.visrbmshidranges[i]
-         visiblerange = mvdbm.visrbmsvisranges[i]
-
-         # sample first hidden from visible layers of visrbms
-         # and second hidden layer
-         input = hinputtop[:,hiddenrange] +
-               hiddeninput(mvdbm.visrbms[i], particles[1][:,visiblerange])
-         particles[2][:,hiddenrange] =
-               bernoulli(sigm(input))
-
-         # sample visible from old first hidden
-         particles[1][:,visiblerange] =
-               samplevisible(mvdbm.visrbms[i], oldstate[:,hiddenrange])
-      end
-
-      # sample other hidden layers
-      for i = 2:nhiddenlayers
-         input = oldstate * mvdbm.hiddbm[i-1].weights
-         broadcast!(+, input, input, mvdbm.hiddbm[i-1].hidbias')
-         if i < nhiddenlayers
-            input += particles[i+2] * mvdbm.hiddbm[i].weights'
-            broadcast!(+, input, input, mvdbm.hiddbm[i].visbias')
-         end
-         oldstate = copy(particles[i+1])
-         particles[i+1] = bernoulli(sigm(input))
-      end
-   end
-
-   particles
 end
 
 
@@ -325,31 +211,6 @@ function initparticles(dbm::BasicDBM, nparticles::Int; biased::Bool = false)
    particles
 end
 
-function initparticles(mvdbm::MultivisionDBM, nparticles::Int; biased::Bool = false)
-
-   nhidrbms = length(mvdbm.hiddbm)
-   if nhidrbms == 0
-      error("Add layers to MultivisionDBM to be able to call `initparticles`")
-   end
-
-   particles = Particles(nhidrbms + 2)
-   particles[1] = Matrix{Float64}(nparticles, mvdbm.visrbmsvisranges[end][end])
-   particles[2:end] = initparticles(mvdbm.hiddbm, nparticles, biased = biased)
-   for i = 1:length(mvdbm.visrbms)
-      visiblerange = mvdbm.visrbmsvisranges[i]
-      hiddenrange = mvdbm.visrbmshidranges[i]
-      rbm = deepcopy(mvdbm.visrbms[i])
-      rbm.weights .= 0.0
-      if !biased
-         rbm.visbias .= 0.0
-      end
-      particles[1][:,visiblerange] =
-               samplevisible(rbm, particles[2][:,hiddenrange])
-   end
-
-   particles
-end
-
 
 """
     meanfield(dbm, x)
@@ -395,55 +256,6 @@ function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
          delta = newdelta
       end
       mu[nlayers] = newmu
-   end
-
-   mu
-end
-
-function meanfield(mvdbm::MultivisionDBM, x::Array{Float64}, eps::Float64 = 0.001)
-
-   nlayers = length(mvdbm.hiddbm) + 2
-   nsamples = size(x,1)
-   nfirsthidden = length(mvdbm.hiddbm[1].visbias)
-   mu = Particles(nlayers)
-
-   # Initialization with single bottom-up pass
-   mu[1] = x
-   mu[2] = visiblestofirsthidden(mvdbm, x)
-   for i = 3:(nlayers-1) # intermediate hidden layers after second
-      mu[i] = hiddenpotential(mvdbm.hiddbm[i-2], mu[i-1], 2.0)
-   end
-   mu[nlayers] = hiddenpotential(mvdbm.hiddbm[nlayers-2], mu[nlayers-1])
-
-   # mean-field updates until convergence criterion is met
-   delta = Inf
-   while delta > eps
-      delta = 0.0
-
-      # input of first hidden layer from second hidden layer
-      hinputtop = mu[3] * mvdbm.hiddbm[1].weights'
-      newmu = Matrix{Float64}(nsamples, nfirsthidden)
-      for i = eachindex(mvdbm.visrbms)
-         hiddenrange = mvdbm.visrbmshidranges[i]
-         visiblerange = mvdbm.visrbmsvisranges[i]
-
-         newmu[:,hiddenrange] = sigm(hinputtop[:,hiddenrange] +
-               hiddeninput(mvdbm.visrbms[i], mu[1][:,visiblerange]))
-      end
-      delta = max(delta, maximum(abs(mu[2] - newmu)))
-      mu[2] = newmu
-
-      for i = 3:nlayers
-         input = mu[i-1] * mvdbm.hiddbm[i-2].weights
-         broadcast!(+, input, input, mvdbm.hiddbm[i-2].hidbias')
-         if i < nlayers
-            input += mu[i+1] * mvdbm.hiddbm[i-1].weights'
-            broadcast!(+, input, input, mvdbm.hiddbm[i-1].visbias')
-         end
-         newmu = sigm(input)
-         delta = max(delta, maximum(abs(mu[i] - newmu)))
-         mu[i] = newmu
-      end
    end
 
    mu
@@ -587,31 +399,6 @@ function traindbm!(dbm::BasicDBM, x::Array{Float64,2}, particles::Particles,
    dbm
 end
 
-function traindbm!(mvdbm::MultivisionDBM, x::Array{Float64,2},
-      particles::Particles, learningrate::Float64)
-
-   gibbssample!(particles, mvdbm)
-   mu = meanfield(mvdbm, x)
-
-   # update parameters of each visible RBM
-   for i = eachindex(mvdbm.visrbms)
-      visiblerange = mvdbm.visrbmsvisranges[i]
-      hiddenrange = mvdbm.visrbmshidranges[i]
-
-      updatedbmpart!(mvdbm.visrbms[i], learningrate,
-            particles[1][:,visiblerange], particles[2][:,hiddenrange],
-            mu[1][:,visiblerange], mu[2][:,hiddenrange])
-   end
-
-   # update parameters of each RBM in hiddbm
-   for i = eachindex(mvdbm.hiddbm)
-      updatedbmpart!(mvdbm.hiddbm[i], learningrate,
-            particles[i+1], particles[i+2], mu[i+1], mu[i+2])
-   end
-
-   mvdbm
-end
-
 
 function updatedbmpart!(dbmpart::BernoulliRBM,
       learningrate::Float64,
@@ -676,26 +463,4 @@ function updatedbmpartcore!(dbmpart::AbstractRBM,
    dbmpart.visbias += learningrate*(lefta - righta)
    dbmpart.hidbias += learningrate*(leftb - rightb)
    nothing
-end
-
-
-"""
-    visiblestofirsthidden(mvdbm, x)
-Returns the activations induced by the forward pass of the dataset `x`
-as inputs for the visible layer.
-The variables/columns of `x` are divided among the visible RBMs.
-"""
-function visiblestofirsthidden(mvdbm::MultivisionDBM, x::Matrix{Float64})
-   nsamples = size(x, 1)
-   nvisrbms = length(mvdbm.visrbms)
-
-   probs = Vector{Matrix{Float64}}(nvisrbms)
-
-   for i = 1:nvisrbms
-      visiblerange = mvdbm.visrbmsvisranges[i]
-      input = hiddeninput(mvdbm.visrbms[i], x[:, visiblerange])
-      probs[i] = bernoulli(sigm(2.0 * input))
-   end
-
-   hcat(probs...)
 end

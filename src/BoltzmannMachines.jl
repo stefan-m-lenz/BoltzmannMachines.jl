@@ -20,7 +20,6 @@ export
          hiddenpotential, hiddeninput, visiblepotential, visibleinput,
       AbstractDBM,
          BasicDBM,
-         MultivisionDBM,
          addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
    Particle, Particles,
    Monitor, MonitoringItem, DataDict,

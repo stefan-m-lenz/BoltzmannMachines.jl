@@ -218,44 +218,6 @@ function aisimportanceweights(dbm::BasicDBM;
 end
 
 
-function aisimportanceweights(mvdbm::MultivisionDBM;
-      ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   impweights = ones(nparticles)
-   particles = initparticles(mvdbm, nparticles, biased = true)
-
-   # for performance reasons: preallocate input and combine biases
-   hiddbminput1 = deepcopy(particles[2:end])
-   hiddbminput2 = deepcopy(particles[2:end])
-   hidbiases = combinedbiases(mvdbm.hiddbm)
-
-   mixmvdbm = deepcopy(mvdbm)
-
-   for k = 2:length(beta)
-
-      # multiply ratios of unnormalized probabilities to get importance weights
-      for i in eachindex(mvdbm.visrbms)
-         impweights .*= aisunnormalizedprobratios(mvdbm.visrbms[i],
-               particles[2][:,mvdbm.visrbmshidranges[i]], beta[k], beta[k-1])
-      end
-      aisupdateimportanceweights!(impweights, hiddbminput1, hiddbminput2,
-            beta[k], beta[k-1], mvdbm.hiddbm, hidbiases, particles[2:end])
-
-      # update annealing temperature of weights
-      copyannealed!(mixmvdbm.visrbms, mvdbm.visrbms, beta[k])
-      copyannealed!(mixmvdbm.hiddbm, mvdbm.hiddbm, beta[k])
-
-      # Gibbs transition to new temperature
-      gibbssample!(particles, mixmvdbm, burnin)
-   end
-
-   impweights
-end
-
-
 """
     aisprecision(r, aissd, sdrange)
 Returns the differences of the estimated logratio `r` to the lower
@@ -505,44 +467,6 @@ function exactloglikelihood(dbm::BasicDBM, x::Matrix{Float64},
    logp
 end
 
-function exactloglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64},
-      logz = exactlogpartitionfunction(mvdbm))
-
-   nsamples = size(x, 1)
-   combinedbiases = BMs.combinedbiases(mvdbm.hiddbm)
-
-   # combinations of hidden layers with odd index (i. e. h1, h3, ...)
-   hodd = initcombinationoddlayersonly(mvdbm.hiddbm)
-
-   logpx = 0.0
-   for j = 1:nsamples
-      v = vec(x[j,:])
-      px = 0.0
-      while true
-         pun = unnormalizedproboddlayers(mvdbm.hiddbm, hodd, combinedbiases)
-
-         firstlayerenergy = 0.0
-         for i = eachindex(mvdbm.visrbms)
-            firstlayerenergy += energy(mvdbm.visrbms[i],
-                  v[mvdbm.visrbmsvisranges[i]],
-                  hodd[1][mvdbm.visrbmshidranges[i]])
-         end
-         pun *= exp(-firstlayerenergy)
-
-         px += pun
-
-         # next combination of hidden nodes' activations
-         next!(hodd) || break
-      end
-
-      logpx += log(px)
-   end
-
-   logpx /= nsamples
-   logpx -= logz
-   logpx
-end
-
 
 """
     exactlogpartitionfunction(rbm)
@@ -663,32 +587,6 @@ function exactlogpartitionfunction(dbm::BasicDBM)
       z += pun
 
       # next combination of odd hidden layers' nodes
-      next!(hodd) || break
-   end
-   log(z)
-end
-
-
-"""
-    exactlogpartitionfunction(mvdbm)
-Calculates the log of the partition function of the MultivisionDBM `mvdbm`
-exactly.
-The execution time grows exponentially with the total number of nodes in hidden
-layers with odd indexes (i. e. h1, h3, ...).
-"""
-function exactlogpartitionfunction(mvdbm::MultivisionDBM)
-   hodd = initcombinationoddlayersonly(mvdbm.hiddbm)
-   combinedbiases = BMs.combinedbiases(mvdbm.hiddbm)
-   z = 0.0
-   while true
-      pun = unnormalizedproboddlayers(mvdbm.hiddbm, hodd, combinedbiases)
-
-      for i = 1:length(mvdbm.visrbms)
-         pun *= unnormalizedprobhidden(mvdbm.visrbms[i],
-               hodd[1][mvdbm.visrbmshidranges[i]])
-      end
-
-      z += pun
       next!(hodd) || break
    end
    log(z)
@@ -844,42 +742,6 @@ function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
 end
 
 
-function loglikelihood(mvdbm::MultivisionDBM, x::Matrix{Float64};
-      ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   nsamples = size(x,1)
-   r = mean(aisimportanceweights(mvdbm; ntemperatures = ntemperatures,
-         beta = beta, nparticles = nparticles, burnin = burnin))
-   logz = logpartitionfunction(mvdbm, r)
-
-   hiddbm = deepcopy(mvdbm.hiddbm)
-   zerohiddens = [zeros(length(mvdbm.visrbmshidranges[i])) for i in eachindex(mvdbm.visrbms)]
-
-   logp = 0.0
-   for j = 1:nsamples
-      v = vec(x[j,:])
-      hiddbm[1].visbias .= mvdbm.hiddbm[1].visbias
-      for i in eachindex(mvdbm.visrbms)
-         vi = v[mvdbm.visrbmsvisranges[i]]
-         logp -= energy(mvdbm.visrbms[i], vi, zerohiddens[i])
-         hiddbm[1].visbias[mvdbm.visrbmshidranges[i]] .+=
-               hiddeninput(mvdbm.visrbms[i], vi)
-      end
-
-      r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin))
-      logp += logpartitionfunction(hiddbm, r)
-   end
-
-   logp /= nsamples
-   logp -= logz
-   logp
-end
-
-
 """
     loglikelihooddiff(rbm1, rbm2, x)
     loglikelihooddiff(rbm1, rbm2, x, impweights)
@@ -967,23 +829,6 @@ function logpartitionfunctionzeroweights(dbm::BasicDBM)
    biases = combinedbiases(dbm)
    for i in eachindex(biases)
       logz0 += sum(log(1 + exp(biases[i])))
-   end
-   logz0
-end
-
-function logpartitionfunctionzeroweights(mvdbm::MultivisionDBM)
-   logz0 = 0.0
-   hidbiases = combinedbiases(mvdbm.hiddbm)
-   for i in eachindex(mvdbm.visrbms)
-      rbm2 = deepcopy(mvdbm.visrbms[i])
-      hidbiases[1][mvdbm.visrbmshidranges[i]] += rbm2.hidbias
-      rbm2.hidbias .= 0.0
-      logz0 += logpartitionfunctionzeroweights(rbm2)
-   end
-   # subtract contribution of zero hidden bias in visrbms
-   logz0 -= log(2) * length(mvdbm.hiddbm[1].visbias)
-   for i in eachindex(hidbiases)
-      logz0 += sum(log(1 + exp(hidbiases[i])))
    end
    logz0
 end
@@ -1115,11 +960,6 @@ end
 
 function nmodelparameters(gbrbm::GaussianBernoulliRBM)
    invoke(nmodelparameters, (AbstractRBM,), gbrbm) + length(gbrbm.sd)
-end
-
-function nmodelparameters(mvdbm::MultivisionDBM)
-   nmodelparameters(mvdbm.hiddbm) - length(mvdbm.hiddbm[1].visbias) +
-         mapreduce(nmodelparameters, +, 0, mvdbm.visrbms)
 end
 
 

@@ -37,19 +37,9 @@ for nunits in Array[[10;5;4], [20;5;4;2], [4;2;2;3;2]]
    BMTest.testsummingoutforexactloglikelihood(nunits)
 end
 
-for nunits in Array[[10;5;4;3], [18;6;3], [11;6;7;4]]
-   BMTest.testexactloglikelihood_bernoullimvdbm(nunits)
-end
-
-for nunits in Array[[50;10;90;20], [18;6;79], [100;6;50;15]]
-   BMTest.testlogpartitionfunction_bernoullimvdbm(nunits)
-end
-
 BMTest.testdbmjoining()
 
 BMTest.testloglikelihood_b2brbm()
-
-BMTest.testgaussianmvdbm()
 
 # run examples
 include("examples.jl")
