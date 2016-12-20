@@ -95,7 +95,7 @@ For intended usage of these functions, best see the [examples](test/examples.jl)
 
 Prerequisite for running the [example code here](test/examples.jl) is that the `BoltzmannMachines` package is installed:
 
-    Pkg.add("BoltzmannMachines")
+    Pkg.clone("https://github.com/binderh/BoltzmannMachines.jl.git")
     
 If you want to use the plotting functionality in the submodule `BMPlots`, you are also required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
 
