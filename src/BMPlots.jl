@@ -10,22 +10,36 @@ const BMs = BoltzmannMachines
 export plotevaluation
 
 
-# global flag to load Gadfly and related packages only when necessary and 
+# global flag to load Gadfly and related packages only when necessary and
 # only once
 gadflyinitialized = false
 
+# Called when loading the package, initializes Gadfly only if it is installed
+function __init__()
+   if Pkg.installed("Gadfly") != nothing
+      initgadfly()
+   end
+end
+
+
+function initgadfly()
+   @eval begin
+      using DataFrames, Gadfly, Compose
+      gadflyinitialized = true
+   end
+end
+
+
 function requiresgadfly()
    if !gadflyinitialized
-      if typeof(Pkg.installed("Gadfly")) == Void
+      if Pkg.installed("Gadfly") == nothing
          error("Plotting requires Gadfly. Please install package \"Gadfly\".")
       else
-         @eval begin
-            using DataFrames, Gadfly, Compose
-            gadflyinitialized = true
-         end
+         initgadfly()
       end
    end
 end
+
 
 function checkdata(plotdata)
    if size(plotdata, 1) == 0
