@@ -14,14 +14,14 @@ end
 """
 A vector for collecting `MonitoringItem`s during training.
 """
-typealias Monitor Vector{MonitoringItem}
+const Monitor = Vector{MonitoringItem}
 
 
 """
 A dictionary containing names of data sets as keys and the data sets (matrices
 with samples in rows) as values.
 """
-typealias DataDict Dict{AbstractString, Array{Float64,2}}
+const DataDict = Dict{AbstractString,Array{Float64,2}}
 
 
 const monitoraisr = "aisr"

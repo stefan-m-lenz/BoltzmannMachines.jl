@@ -1,5 +1,4 @@
-
-typealias BasicDBM Array{BernoulliRBM,1}
+const BasicDBM = Array{BernoulliRBM,1}
 
 """
 `Particles` are an array of matrices.
@@ -9,9 +8,9 @@ an activation state in a Boltzmann Machine.
 Therefore, the size of the i'th matrix is
 (number of samples/particles, number of nodes in layer i).
 """
-typealias Particles Array{Array{Float64,2},1}
+const Particles = Array{Array{Float64,2},1}
 
-typealias Particle Array{Array{Float64,1},1}
+const Particle = Array{Array{Float64,1},1}
 
 """
 Not implemented yet. Planned for future release.
@@ -19,7 +18,7 @@ Not implemented yet. Planned for future release.
 type MultimodalDBM
 end
 
-typealias AbstractDBM Union{BasicDBM, MultimodalDBM}
+const AbstractDBM = Union{BasicDBM,MultimodalDBM}
 
 
 """
@@ -242,7 +241,7 @@ function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
          newmu = mu[i+1]*dbm[i].weights' + mu[i-1]*dbm[i-1].weights
          broadcast!(+, newmu, newmu, (dbm[i-1].hidbias + dbm[i].visbias)')
          newmu = sigm(newmu)
-         newdelta = maximum(abs(mu[i] - newmu))
+         newdelta = maximum(abs.(mu[i] - newmu))
          if newdelta > delta
             delta = newdelta
          end
@@ -251,7 +250,7 @@ function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
       # last layer
       newmu = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
-      newdelta = maximum(abs(mu[nlayers] - newmu))
+      newdelta = maximum(abs.(mu[nlayers] - newmu))
       if newdelta > delta
          delta = newdelta
       end

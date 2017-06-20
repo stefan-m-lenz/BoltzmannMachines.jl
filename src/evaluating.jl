@@ -83,11 +83,11 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
          # Multiply ratios of unnormalized probabilities
          hinput1 = hiddeninput(rbm1, v)
          hinput2 = hiddeninput(rbm2, v)
-         impweights[j] *= exp((beta[k]-beta[k-1]) * dot(visbiasdiff, v)) *
-               prod((1 + exp( (1-beta[k])  * hinput1 )) ./
-                    (1 + exp( (1-beta[k-1])* hinput1 ))) *
-               prod((1 + exp(  beta[k]     * hinput2 )) ./
-                    (1 + exp(  beta[k-1]   * hinput2 )))
+         impweights[j] *= exp.((beta[k]-beta[k-1]) * dot(visbiasdiff, v)) *
+               prod((1 + exp.( (1-beta[k])  * hinput1 )) ./
+                    (1 + exp.( (1-beta[k-1])* hinput1 ))) *
+               prod((1 + exp.(  beta[k]     * hinput2 )) ./
+                    (1 + exp.(  beta[k-1]   * hinput2 )))
       end
    end
 
@@ -175,7 +175,7 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
       end
    end
 
-   exp(logimpweights)
+   exp.(logimpweights)
 end
 
 
@@ -261,8 +261,8 @@ function aisunnormalizedprobratios(rbm::BernoulliRBM,
 
    weightsinput = hh * rbm.weights'
    vec(prod(
-         (1 + exp(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2))
+         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2))
 end
 
 function aisunnormalizedprobratios(rbm::Binomial2BernoulliRBM,
@@ -272,8 +272,8 @@ function aisunnormalizedprobratios(rbm::Binomial2BernoulliRBM,
 
    weightsinput = hh * rbm.weights'
    vec(prod(
-         (1 + exp(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2).^2)
+         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2).^2)
 end
 
 function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
@@ -282,7 +282,7 @@ function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
       temperature2::Float64)
 
    wht = hh * gbrbm.weights'
-   vec(exp((temperature1 - temperature2) * sum(
+   vec(exp.((temperature1 - temperature2) * sum(
          0.5 * wht.^2 + broadcast(.*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2)))
 end
 
@@ -314,7 +314,7 @@ function aisupdateimportanceweights!(impweights,
       for n = 1:size(input1[i],2)
          for j in eachindex(impweights)
             impweights[j] *=
-                  (1 + exp(input1[i][j,n])) / (1 + exp(input2[i][j,n]))
+                  (1 + exp.(input1[i][j,n])) / (1 + exp.(input2[i][j,n]))
          end
       end
    end
@@ -481,14 +481,14 @@ function exactlogpartitionfunction(rbm::BernoulliRBM)
    if nvisible <= nhidden
       v = zeros(nvisible)
       while true
-         z += exp(-freeenergy(rbm, v))
+         z += exp.(-freeenergy(rbm, v))
          next!(v) || break
       end
    else
       h = zeros(nhidden)
       revrbm = reversedrbm(rbm)
       while true
-         z += exp(-freeenergy(revrbm, h))
+         z += exp.(-freeenergy(revrbm, h))
          next!(h) || break
       end
    end
@@ -522,7 +522,7 @@ function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
       z += exp(dot(gbrbm.hidbias, h) + sum(0.5*wh.^2 + gbrbm.visbias ./ gbrbm.sd .* wh))
       next!(h) || break
    end
-   log(z) + nvisible/2 * log(2*pi) + sum(log(gbrbm.sd))
+   log(z) + nvisible/2 * log(2*pi) + sum(log.(gbrbm.sd))
 end
 
 """
@@ -572,16 +572,16 @@ function exactlogpartitionfunction(dbm::BasicDBM)
    biases = combinedbiases(dbm)
    nintermediatelayerstobesummedout = div(nhiddenlayers - 1, 2)
    while true
-      pun = prod(1 + exp(visibleinput(dbm[1], hodd[1])))
+      pun = prod(1 + exp.(visibleinput(dbm[1], hodd[1])))
       for i = 1:nintermediatelayerstobesummedout
-         pun *= prod(1 + exp(
+         pun *= prod(1 + exp.(
                hiddeninput(dbm[2i], hodd[i]) + visibleinput(dbm[2i+1], hodd[i+1])))
       end
       if nhiddenlayers % 2 == 0
-         pun *= prod(1 + exp(hiddeninput(dbm[end], hodd[end])))
+         pun *= prod(1 + exp.(hiddeninput(dbm[end], hodd[end])))
       end
       for i = 1:length(hodd)
-         pun *= exp(dot(biases[2i], hodd[i]))
+         pun *= exp.(dot(biases[2i], hodd[i]))
       end
 
       z += pun
@@ -603,14 +603,14 @@ function freeenergy(rbm::BernoulliRBM, x::Matrix{Float64})
    freeenergy = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
-      freeenergy -= dot(rbm.visbias, v) + sum(log(1 + exp(hiddeninput(rbm, v))))
+      freeenergy -= dot(rbm.visbias, v) + sum(log.(1 + exp.(hiddeninput(rbm, v))))
    end
    freeenergy /= nsamples
    freeenergy
 end
 
 function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
-   - dot(rbm.visbias, v) - sum(log(1 + exp(hiddeninput(rbm, v))))
+   - dot(rbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(rbm, v))))
 end
 
 function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
@@ -623,7 +623,7 @@ function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
       # this number of combinations in the 00/01/10/11 space, all having equal
       # probability.
       freeenergy -= sum(v .== 1.0) * log(2) +
-            dot(b2brbm.visbias, v) + sum(log(1 + exp(hiddeninput(b2brbm, v))))
+            dot(b2brbm.visbias, v) + sum(log.(1 + exp.(hiddeninput(b2brbm, v))))
    end
    freeenergy /= nsamples
    freeenergy
@@ -765,8 +765,8 @@ function loglikelihooddiff(rbm1::BernoulliRBM, rbm2::BernoulliRBM,
    for j=1:nsamples
       v = vec(x[j,:])
       lldiff += dot(visbiasdiff, v) +
-            sum(log(1 + exp(hiddeninput(rbm1, v)))) -
-            sum(log(1 + exp(hiddeninput(rbm2, v))))
+            sum(log.(1 + exp.(hiddeninput(rbm1, v)))) -
+            sum(log.(1 + exp.(hiddeninput(rbm2, v))))
    end
 
    # average over samples
@@ -807,28 +807,28 @@ that results when one sets the weights of `bm` to zero,
 and leaves the other parameters (biases) unchanged.
 """
 function logpartitionfunctionzeroweights(rbm::BernoulliRBM)
-   sum(log(1 + exp(rbm.visbias))) + sum(log(1 + exp(rbm.hidbias)))
+   sum(log.(1 + exp.(rbm.visbias))) + sum(log.(1 + exp.(rbm.hidbias)))
 end
 
 function logpartitionfunctionzeroweights(bgrbm::BernoulliGaussianRBM)
    nhidden = length(bgrbm.hidbias)
-   nhidden / 2 * log(2pi) + sum(log(1 + exp(bgrbm.visbias)))
+   nhidden / 2 * log(2pi) + sum(log.(1 + exp.(bgrbm.visbias)))
 end
 
 function logpartitionfunctionzeroweights(b2brbm::Binomial2BernoulliRBM)
-   2*sum(log(1 + exp(b2brbm.visbias))) + sum(log(1 + exp(b2brbm.hidbias)))
+   2*sum(log.(1 + exp.(b2brbm.visbias))) + sum(log.(1 + exp.(b2brbm.hidbias)))
 end
 
 function logpartitionfunctionzeroweights(gbrbm::GaussianBernoulliRBM)
    nvisible = length(gbrbm.visbias)
-   logz0 = nvisible / 2 * log(2*pi) + sum(log(gbrbm.sd)) + sum(log(1 + exp(gbrbm.hidbias)))
+   logz0 = nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd)) + sum(log.(1 + exp(gbrbm.hidbias)))
 end
 
 function logpartitionfunctionzeroweights(dbm::BasicDBM)
    logz0 = 0.0
    biases = combinedbiases(dbm)
    for i in eachindex(biases)
-      logz0 += sum(log(1 + exp(biases[i])))
+      logz0 += sum(log.(1 + exp.(biases[i])))
    end
    logz0
 end
@@ -871,8 +871,8 @@ function logproblowerbound(dbm::BasicDBM,
                dot(v, dbm[i].visbias) + dot(h, dbm[i].hidbias) + dot(v, dbm[i].weights * h)
 
          # add entropy of approximate posterior Q
-         h = h[(h .> 0.0) & (h .< 1.0)]
-         lowerbound += - dot(h, log(h)) - dot(1-h, log(1-h))
+         h = h[(h .> 0.0) .& (h .< 1.0)]
+         lowerbound += - dot(h, log.(h)) - dot(1-h, log.(1-h))
       end
 
    end
@@ -979,7 +979,7 @@ function reconstructionerror(rbm::AbstractRBM,
       v = vec(x[sample,:])
       hmodel = hiddenpotential(rbm, v, upfactor)
       vmodel = visiblepotential(rbm, hmodel, downfactor)
-      reconstructionerror += sum(abs(v - vmodel))
+      reconstructionerror += sum(abs.(v - vmodel))
    end
 
    reconstructionerror /= nsamples
@@ -1001,7 +1001,7 @@ end
 
 function reverseddbm(dbm::BasicDBM)
    revdbm = reverse(dbm)
-   map!(reversedrbm, revdbm)
+   map!(reversedrbm, revdbm, revdbm)
 end
 
 
@@ -1069,11 +1069,11 @@ function unnormalizedproboddlayers(dbm::BasicDBM, uodd::Particle,
    nintermediatelayerstobesummedout = div(nlayers - 1, 2)
    pun = 1.0
    for i = 1:nintermediatelayerstobesummedout
-      pun *= prod(1 + exp(
+      pun *= prod(1 + exp.(
             hiddeninput(dbm[2i-1], uodd[i]) + visibleinput(dbm[2i], uodd[i+1])))
    end
    if nlayers % 2 == 0
-      pun *= prod(1 + exp(hiddeninput(dbm[end], uodd[end])))
+      pun *= prod(1 + exp.(hiddeninput(dbm[end], uodd[end])))
    end
    for i = 1:length(uodd)
       pun *= exp(dot(combinedbiases[2i-1], uodd[i]))
@@ -1090,11 +1090,11 @@ Calculates the unnormalized probability of the `rbm`'s hidden nodes'
 activations given by `h`.
 """
 function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.hidbias, h)) * prod(1 + exp(visibleinput(rbm, h)))
+   exp(dot(rbm.hidbias, h)) * prod(1 + exp.(visibleinput(rbm, h)))
 end
 
 function unnormalizedprobhidden(rbm::Binomial2BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.hidbias, h)) * prod(1 + exp(visibleinput(rbm, h)))^2
+   exp(dot(rbm.hidbias, h)) * prod(1 + exp.(visibleinput(rbm, h)))^2
 end
 
 const sqrt2pi = sqrt(2pi)
@@ -1177,7 +1177,7 @@ function gaussianloglikelihoodbaserate(x::Matrix{Float64})
       loglikelihood -= sum((vec(x[j,:]) - mu).^2 ./ sigmasq)
    end
    loglikelihood /= nsamples
-   loglikelihood -= log(2*pi) * nvariables + sum(log(sigmasq))
+   loglikelihood -= log(2*pi) * nvariables + sum(log.(sigmasq))
    loglikelihood /= 2
    loglikelihood
 end

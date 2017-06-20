@@ -5,7 +5,7 @@ import BoltzmannMachines
 const BMs = BoltzmannMachines
 
 function createsamples(nsamples::Int, nvariables::Int, samerate=0.7)
-   x = round(rand(nsamples,nvariables))
+   x = round.(rand(nsamples,nvariables))
    samerange = 1:round(Int, samerate*nsamples)
    x[samerange,3] = x[samerange,2] = x[samerange,1]
    x = x[randperm(nsamples),:] # shuffle lines
@@ -44,7 +44,7 @@ function randdbm(nunits)
 end
 
 function logit(p::Array{Float64})
-   log(p./(1-p))
+   log.(p./(1-p))
 end
 
 function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
@@ -134,7 +134,7 @@ function testsummingoutforexactloglikelihood(nunits::Vector{Int})
          learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
          epochs = 30);
    logz = BMs.exactlogpartitionfunction(dbm)
-   @test_approx_eq(BMs.exactloglikelihood(dbm, x, logz),
+   @test isapprox(BMs.exactloglikelihood(dbm, x, logz),
          exactloglikelihoodwithoutsummingout(dbm, x, logz))
 end
 
@@ -182,11 +182,14 @@ function testdbmjoining()
    jointdbm2 = BMs.joindbms(BMs.BasicDBM[dbm1, dbm2, dbm3],
             [indexes[1:5], indexes[6:9], indexes[10:15]])
 
-   @test_approx_eq(exactlogpartitionfunction1 + exactlogpartitionfunction2,
-         BMs.exactlogpartitionfunction(jointdbm1))
+   @test isapprox(
+               exactlogpartitionfunction1 + exactlogpartitionfunction2,
+               BMs.exactlogpartitionfunction(jointdbm1))
 
-   @test_approx_eq(exactlogpartitionfunction1 + exactlogpartitionfunction2 +
-         exactlogpartitionfunction3, BMs.exactlogpartitionfunction(jointdbm2))
+   @test isapprox(
+            exactlogpartitionfunction1 + exactlogpartitionfunction2 +
+                  exactlogpartitionfunction3,
+            BMs.exactlogpartitionfunction(jointdbm2))
 end
 
 

@@ -1,9 +1,9 @@
-abstract AbstractRBM
+@compat abstract type AbstractRBM end
 
 """
 Abstract super type for RBMs with binary and Bernoulli distributed hidden nodes.
 """
-abstract AbstractXBernoulliRBM <: AbstractRBM
+@compat abstract type AbstractXBernoulliRBM <: AbstractRBM end
 
 """
     BernoulliRBM(weights, visbias, hidbias)

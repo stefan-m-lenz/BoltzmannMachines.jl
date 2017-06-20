@@ -1,5 +1,7 @@
 module BoltzmannMachines
 
+using Compat
+
 const BMs = BoltzmannMachines
 
 export
@@ -37,7 +39,7 @@ export
 include("rbmtraining.jl")
 include("dbmtraining.jl")
 
-typealias AbstractBM Union{AbstractDBM, AbstractRBM}
+const AbstractBM = Union{AbstractDBM,AbstractRBM}
 
 
 """
@@ -69,11 +71,11 @@ end
 
 
 function sigm(x::Array{Float64,1})
-   1./(1 + exp(-x))
+   1./(1 + exp.(-x))
 end
 
 function sigm(x::Array{Float64,2})
-   1./(1 + exp(-x))
+   1./(1 + exp.(-x))
 end
 
 function bernoulli(x::Float64)
@@ -81,7 +83,7 @@ function bernoulli(x::Float64)
 end
 
 function bernoulli!(x::Array{Float64,1})
-   map!(bernoulli, x)
+   map!(bernoulli, x, x)
 end
 
 function bernoulli(x::Array{Float64,1})
