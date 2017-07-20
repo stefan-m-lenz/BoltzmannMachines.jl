@@ -91,6 +91,7 @@ The results of evaluations are stored in `Monitor` objects. The evaluations can 
 
 For intended usage of these functions, best see the [examples](test/examples.jl).
 
+
 ## Examples
 
 Prerequisite for running the [example code here](test/examples.jl) is that the `BoltzmannMachines` package is installed:
@@ -99,11 +100,13 @@ Prerequisite for running the [example code here](test/examples.jl) is that the `
     
 If you want to use the plotting functionality in the submodule `BMPlots`, you are also required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
 
+### Applications
 
-<!--TODO: Two ways, fitdbm or addlayer! and traindbm!
- Small dbm, exact, big dbm loglikelihood am Schlus, logproblowerbound w‰hrend training, alle 2 Schritte.
-Partitioned Training-->
+The package has been used for an approach to uncover patterns in high-dimensional genetic data, described in the article
 
+> Hess M., Lenz S., Bl√§tte T. J., Bullinger L., Binder H. *Partitioned learning of deep Boltzmann machines for SNP data*. Bioinformatics 2017 btx408. doi: https://doi.org/10.1093/bioinformatics/btx408.
+
+The code for the analyses presented there is available in the article supplement.
 
 ## References
 
