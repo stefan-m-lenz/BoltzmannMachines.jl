@@ -47,6 +47,51 @@ function logit(p::Array{Float64})
    log.(p./(1-p))
 end
 
+
+"""
+Tests the functions for computing the total input
+"""
+function testpotentials()
+   nvisible = 3
+   nhidden = 2
+   nsamples = 5
+   vv = rand(nsamples, nvisible)
+
+   # Test Test activation potential of hidden nodes for BernoulliRBM
+   hh = rand(nsamples, nhidden)
+   rbm = BMTest.randrbm(nvisible, nhidden)
+   BMs.hiddenpotential!(hh, rbm, vv)
+   @test sum(abs.(hh - BMs.hiddenpotential(rbm, vv))) == 0
+   # Test that activation potential of Binomial2BernoulliRBM is the same 
+   # as that of a BernoulliRBM
+   b2brbm = BMs.Binomial2BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias)
+   hh2 = BMs.hiddenpotential(b2brbm, vv)
+   @test sum(abs.(hh - hh2)) == 0
+   BMs.hiddenpotential!(hh, b2brbm, vv)
+   @test sum(abs.(hh - hh2)) == 0
+
+   # Test activation potential of hidden nodes for GBRBM 
+   BMTest.randgbrbm(nvisible, nhidden)
+   hh = rand(nsamples, nhidden)
+   gbrbm = BMTest.randgbrbm(nvisible, nhidden)
+   BMs.hiddenpotential!(hh, gbrbm, vv)
+   @test sum(abs.(hh - BMs.hiddenpotential(gbrbm, vv))) == 0
+
+   # Test activation potential of hidden nodes for PartitionedRBM
+   # consisting of BernoulliRBMs is the same as the activation potential
+   # of the BernoulliRBM resulting from joining the weights
+   nvisible2 = 7
+   nhidden2 = 4
+   vv = rand(nsamples, nvisible + nvisible2)
+   hhpartitioned = rand(nsamples, nhidden + nhidden2)
+   rbm2 = BMTest.randrbm(nvisible2, nhidden2)
+   prbm = BMs.PartitionedRBM([rbm; rbm2])
+   joinedrbm = BMs.joinrbms([rbm; rbm2])
+   BMs.hiddenpotential!(hhpartitioned, joinedrbm, vv)
+   @test sum(abs.(hhpartitioned - BMs.hiddenpotential(joinedrbm, vv))) == 0
+end
+
+
 function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
    a = logit(vec(mean(x,1)))
    nvisible = length(a)

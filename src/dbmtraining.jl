@@ -18,7 +18,7 @@ Not implemented yet. Planned for future release.
 type MultimodalDBM
 end
 
-const AbstractDBM = Union{BasicDBM,MultimodalDBM}
+const AbstractDBM = Vector{<:AbstractRBM}
 
 
 """

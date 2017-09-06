@@ -63,6 +63,40 @@ end
 
 
 """
+    ranges(numbers)
+Returns a vector of consecutive integer ranges, the first starting with 1.
+The i'th such range spans over `numbers[i]` items.
+"""
+function ranges(numbers::Vector{Int})
+   ranges = Vector{UnitRange{Int}}(length(numbers))
+   offset = 0
+   for i in eachindex(numbers)
+      ranges[i] = offset + (1:numbers[i])
+      offset += numbers[i]
+   end
+   ranges
+end
+
+
+"""
+    PartitionedRBM(rbms)
+Encapsulates several (parallel) AbstractRBMs that form one partitioned RBM.
+The nodes of the parallel RBMs are not connected between the RBMs.
+"""
+type PartitionedRBM <: AbstractRBM
+   rbms::Vector{AbstractRBM}
+   visranges::Vector{UnitRange{Int}}
+   hidranges::Vector{UnitRange{Int}}
+
+   function PartitionedRBM(rbms::Vector{<:AbstractRBM})
+      visranges = ranges([length(rbm.visbias) for rbm in rbms])
+      hidranges = ranges([length(rbm.hidbias) for rbm in rbms])
+      new(rbms, visranges, hidranges)
+   end
+end
+
+
+"""
     fitrbm(x; ...)
 Fits an RBM model to the data set `x`, using Stochastic Gradient Descent (SGD)
 with Contrastive Divergence (CD), and returns it.
@@ -169,18 +203,49 @@ function hiddeninput(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1})
 end
 
 function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
-   mu = broadcast(./, vv, gbrbm.sd')
-   mu = mu*gbrbm.weights
-   broadcast!(+, mu, mu, gbrbm.hidbias')
-   mu
+   hh = broadcast(/, vv, gbrbm.sd')
+   hh = hh * gbrbm.weights
+   broadcast!(+, hh, hh, gbrbm.hidbias')
+   hh
 end
 
-function hiddeninput!(h::Vector{Float64}, rbm::BernoulliRBM, v::Vector{Float64},
-      temperature::Float64 = 1.0)
+function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M
+      ) where{M <: AbstractArray{Float64,2}}
 
-   A_mul_B!(h, rbm.weights', v)
-   h .*= temperature
-   broadcast!(+, h, rbm.hidbias)
+   A_mul_B!(hh, vv, rbm.weights)
+   broadcast!(+, hh, hh, rbm.hidbias')
+end
+
+
+"""
+    hiddeninput!(hh, rbm, vv)
+Like `hiddeninput`, but stores the returned result in `hh`.
+"""
+function hiddeninput!(hh::M, rbm::Binomial2BernoulliRBM, vv::M, 
+      ) where{M <: AbstractArray{Float64,2}}
+
+   # again same code for Binomial2BernoulliRBM as for BernoullitRBM
+   A_mul_B!(hh, vv, rbm.weights)
+   broadcast!(+, hh, hh, rbm.hidbias')
+end
+
+function hiddeninput!(hh::M, gbrbm::GaussianBernoulliRBM, vv::M, 
+      ) where{M <: AbstractArray{Float64,2}}
+
+   scaledweights = broadcast(/, gbrbm.weights, gbrbm.sd)
+   A_mul_B!(hh, vv, scaledweights)
+   broadcast!(+, hh, hh, gbrbm.hidbias')
+end
+
+function hiddeninput!(hh::M, prbm::PartitionedRBM, vv::M, 
+      ) where{M <: AbstractArray{Float64,2}}
+
+   for i in eachindex(pbrbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      hiddeninput!(hh[:, hidrange], prbm.rbms[i], vv[:, visrange])
+   end
+   hh
 end
 
 
@@ -213,6 +278,39 @@ The factor is ignored in this case.
 "
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
    broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
+end
+
+
+"""
+    hiddenpotential!(hh, rbm, vv)
+    hiddenpotential!(hh, rbm, vv, factor)
+Like `hiddenpotential`, but stores the returned result in `hh`.
+"""
+function hiddenpotential!(hh::M, rbm::AbstractXBernoulliRBM, vv::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+   
+   hiddeninput!(hh, rbm, vv)
+   hh .*= factor
+   sigm!(hh)
+end
+
+function hiddenpotential!(hh::M, bgrbm::BernoulliGaussianRBM, vv::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+   
+   A_mul_B!(hh, vv, bgrbm.weights)
+   broadcast!(+, hh, hh, bgrbm.hidbias')
+   hh .*= factor
+end
+
+function hiddenpotential!(hh::M, rbm::PartitionedRBM, vv::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+   for i in eachindex(pbrbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      hiddenpotential!(hh[:, hidrange], prbm.rbms[i], vv[:, visrange])
+   end
+   hh
 end
 
 
@@ -438,13 +536,42 @@ function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    broadcast!(+, input, input, b2brbm.visbias')
 end
 
-function visibleinput!(v::Vector{Float64}, rbm::BernoulliRBM, h::Vector{Float64},
-      temperature::Float64 = 1.0)
+# function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M, 
+#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
-   A_mul_B!(v, rbm.weights, h)
-   v .*= temperature
-   broadcast!(+, v, rbm.visbias)
-end
+#    A_mul_B!(hh, vv, rbm.weights)
+#    hh .*= factor
+#    broadcast!(+, hh, hh, rbm.hidbias')
+# end
+
+# function hiddeninput!(hh::M, rbm::Binomial2BernoulliRBM, vv::M, 
+#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+#    # again same code for Binomial2BernoulliRBM as for BernoullitRBM
+#    A_mul_B!(hh, vv, rbm.weights)
+#    hh .*= factor
+#    broadcast!(+, hh, hh, rbm.hidbias')
+# end
+
+# function hiddeninput!(hh::M, gbrbm::GaussianBernoulliRBM, vv::M, 
+#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+#    scaledweights = broadcast(/, gbrbm.weights, gbrbm.sd)
+#    A_mul_B!(hh, vv, scaledweights)
+#    broadcast!(+, hh, hh, gbrbm.hidbias')
+#    hh
+# end
+
+# function hiddeninput!(hh::M, prbm::PartitionedRBM, vv::M, 
+#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+#    for i in eachindex(pbrbm.rbms)
+#       visrange = prbm.visranges[i]
+#       hidrange = prbm.hidranges[i]
+#       visibleinput!(vv[:, visrange], prbm.rbms[i], hh[:, hidrange])
+#    end
+#    hh
+# end
 
 
 """

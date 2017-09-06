@@ -78,6 +78,13 @@ function sigm(x::Array{Float64,2})
    1./(1 + exp.(-x))
 end
 
+function sigm!(x::Array{Float64,2})
+   for i in eachindex(x)
+      @inbounds x[i] = 1/(1.0 + exp(-x[i]))
+   end
+   x
+end
+
 function bernoulli(x::Float64)
    float(rand() < x)
 end
