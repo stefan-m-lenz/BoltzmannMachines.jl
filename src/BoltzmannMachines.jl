@@ -17,6 +17,7 @@ export
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
+         PartitionedRBM,
          fitrbm, freeenergy, initrbm, joinrbms,
          trainrbm!, samplehidden, samplevisible,
          hiddenpotential, hiddeninput, visiblepotential, visibleinput,
@@ -85,20 +86,17 @@ function sigm!(x::Array{Float64,2})
    x
 end
 
-function bernoulli(x::Float64)
-   float(rand() < x)
+function bernoulli!(x::M) where{M <:AbstractArray{Float64}}
+   for i in eachindex(x)
+      @inbounds x[i] = float(rand() < x[i])
+   end
+   x
 end
 
-function bernoulli!(x::Array{Float64,1})
-   map!(bernoulli, x, x)
-end
-
-function bernoulli(x::Array{Float64,1})
-   float(rand(length(x)) .< x)
-end
-
-function bernoulli(x::Array{Float64,2})
-   float(rand(size(x)) .< x)
+function bernoulli(x::M) where{M <:AbstractArray{Float64}}
+   ret = rand(size(x))
+   ret .= float.(ret .< x)
+   ret
 end
 
 

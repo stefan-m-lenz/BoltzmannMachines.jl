@@ -83,12 +83,12 @@ end
 Encapsulates several (parallel) AbstractRBMs that form one partitioned RBM.
 The nodes of the parallel RBMs are not connected between the RBMs.
 """
-type PartitionedRBM <: AbstractRBM
-   rbms::Vector{AbstractRBM}
+type PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
+   rbms::Vector{R}
    visranges::Vector{UnitRange{Int}}
    hidranges::Vector{UnitRange{Int}}
 
-   function PartitionedRBM(rbms::Vector{<:AbstractRBM})
+   function PartitionedRBM{R}(rbms::Vector{R}) where R
       visranges = ranges([length(rbm.visbias) for rbm in rbms])
       hidranges = ranges([length(rbm.hidbias) for rbm in rbms])
       new(rbms, visranges, hidranges)
@@ -376,32 +376,43 @@ from the state `v` of the visible nodes.
 `v` may be a vector or a matrix that contains the samples in its rows.
 For the `factor`, see `hiddenpotential(rbm, v, factor)`.
 """
-function samplehidden(rbm::AbstractXBernoulliRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
+function samplehidden(rbm::AbstractXBernoulliRBM, v::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
    bernoulli!(hiddenpotential(rbm, v, factor))
 end
 
-function samplehidden(rbm::AbstractXBernoulliRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(hiddenpotential(rbm, vv, factor))
+function samplehidden(bgrbm::BernoulliGaussianRBM, v::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
+   h = hiddenpotential(bgrbm, v, factor)
+   h .+ randn(size(hh))
 end
 
-function samplehidden(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   hiddenpotential(bgrbm, h, factor) + randn(length(bgrbm.hidbias))
+
+"""
+    samplehidden!(h, rbm, v)
+    samplehidden!(h, rbm, v, factor)
+Like `samplehidden`, but stores the returned result in `h`.
+"""
+function samplehidden!(h, rbm::AbstractRBM, v::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
+
+   samplehiddenpotential!(hiddenpotential!(h, rbm, v, factor), rbm)
 end
 
-function samplehidden(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   hh = hiddenpotential(bgrbm, hh, factor)
-   hh + randn(size(hh))
-end
 
-"
+"""
 Samples the activation of the hidden nodes from the potential.
-"
-function samplehiddenpotential!(h::Vector{Float64}, rbm::AbstractXBernoulliRBM)
+"""
+function samplehiddenpotential!(h::M, rbm::AbstractXBernoulliRBM
+      ) where{M <: AbstractArray{Float64}}
+
    bernoulli!(h)
 end
 
-function samplehiddenpotential!(h::Vector{Float64}, rbm::BernoulliGaussianRBM)
-   h .+= randn(length(h))
+function samplehiddenpotential!(h::M, rbm::BernoulliGaussianRBM
+      ) where{M <: AbstractArray{Float64}}
+
+   h .+= randn(size(h))
 end
 
 """
@@ -412,23 +423,14 @@ from the state `h` of the hidden nodes.
 `h` may be a vector or a matrix that contains the samples in its rows.
 For the `factor`, see `visiblepotential(rbm, h, factor)`.
 """
-function samplevisible(rbm::BernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(visiblepotential(rbm, h, factor))
+function samplevisible(rbm::AbstractXBernoulliRBM, hh::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
+   bernoulli!(visiblepotential(rbm, hh, factor))
 end
 
-function samplevisible(rbm::BernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(visiblepotential(rbm, hh, factor))
-end
-
-function samplevisible(bgrbm::BernoulliGaussianRBM, h::Array{Float64,1}, factor::Float64 = 1.0)
-   bernoulli!(visiblepotential(bgrbm, h, factor))
-end
-
-function samplevisible(bgrbm::BernoulliGaussianRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
-   bernoulli(visiblepotential(bgrbm, hh, factor))
-end
-
-function samplevisible{N}(b2brbm::Binomial2BernoulliRBM, h::Array{Float64,N}, factor::Float64 = 1.0)
+function samplevisible(b2brbm::Binomial2BernoulliRBM, hh::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
+   
    v = sigm(factor * visibleinput(b2brbm, h))
    bernoulli(v) + bernoulli(v)
 end

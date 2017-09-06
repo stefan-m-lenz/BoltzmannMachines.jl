@@ -85,7 +85,7 @@ function testpotentials()
    vv = rand(nsamples, nvisible + nvisible2)
    hhpartitioned = rand(nsamples, nhidden + nhidden2)
    rbm2 = BMTest.randrbm(nvisible2, nhidden2)
-   prbm = BMs.PartitionedRBM([rbm; rbm2])
+   prbm = BMs.PartitionedRBM{BMs.BernoulliRBM}([rbm; rbm2])
    joinedrbm = BMs.joinrbms([rbm; rbm2])
    BMs.hiddenpotential!(hhpartitioned, joinedrbm, vv)
    @test sum(abs.(hhpartitioned - BMs.hiddenpotential(joinedrbm, vv))) == 0

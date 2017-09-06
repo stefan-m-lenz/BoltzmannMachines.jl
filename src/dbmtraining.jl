@@ -132,8 +132,9 @@ end
     gibbssample!(particles, dbm, nsteps)
 Performs Gibbs sampling on the `particles` in the DBM `dbm` for `nsteps` steps.
 (See also: `Particles`.)
+In-between layers are assumed to contain only Bernoulli-distributed nodes.
 """
-function gibbssample!(particles::Particles, dbm::BasicDBM,
+function gibbssample!(particles::Particles, dbm::AbstractDBM,
       nsteps::Int = 5,
       biases::Particle = BMs.combinedbiases(dbm))
 
@@ -141,15 +142,41 @@ function gibbssample!(particles::Particles, dbm::BasicDBM,
    input2 = deepcopy(particles)
 
    for step in 1:nsteps
-      weightsinput!(input, input2, dbm, particles)
-      for i in eachindex(input)
-         broadcast!(+, input[i], input[i], biases[i]')
-         particles[i] .= input[i]
+      # first layer gets input only from layer above
+      samplevisible!(input[1], dbm[1], particles[1])
+   
+      # intermediate layers get input from layers above and below
+      for i = 2:(length(particles) - 1)
+         visibleinput!(input[i], dbm[i], particles[i])
+         hiddeninput!(input2[i], dbm[i-1], particles[i-1])
+         input[i] .+= input2[i]
+         sigm_bernoulli!(input[i]) # Bernoulli-sample from total input
       end
-      sigm_bernoulli!(particles)
+   
+      # last layer gets only input from layer below
+      samplehidden!(input[end], dbm[end], particles[i-1])
+
+      # swap input and particles
+      tmp = particles
+      particles = input
+      input = tmp
    end
 
    particles
+end
+
+
+"""
+    newparticleslike(particles)
+Creates new and uninitialized particles of the same dimensions as the given
+`particles`.
+"""
+function newparticleslike(particles::Particles)
+   newparticles = Particles(length(particles))
+   for i in eachindex(particles)
+      newparticles[i] = Matrix{Float64}(size(particles[i]))
+   end
+   newparticles
 end
 
 
@@ -218,8 +245,9 @@ Computes the mean-field approximation for the data set `x` and
 returns a matrix of particles for the DBM.
 The number of particles is equal to the number of samples in `x`.
 `eps` is the convergence criterion for the fix-point iteration, default 0.001.
+It is assumed that all nodes in in-between-layers are Bernoulli distributed.
 """
-function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
+function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
    nlayers = length(dbm) + 1
    mu = Particles(nlayers)
@@ -232,29 +260,38 @@ function meanfield(dbm::BasicDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
    end
    mu[nlayers] = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
 
+   newmu = newparticleslike(mu)
+   newmu[1] = x
+   input2 = newparticleslike(mu)
+
    # mean-field updates until convergence criterion is met
    delta = 1.0
    while delta > eps
       delta = 0.0
 
-      for i=2:(nlayers-1)
-         newmu = mu[i+1]*dbm[i].weights' + mu[i-1]*dbm[i-1].weights
-         broadcast!(+, newmu, newmu, (dbm[i-1].hidbias + dbm[i].visbias)')
-         newmu = sigm(newmu)
-         newdelta = maximum(abs.(mu[i] - newmu))
-         if newdelta > delta
-            delta = newdelta
-         end
-         mu[i] = newmu
+      for i = 2:(nlayers-1)
+         # total input from layer below
+         hiddeninput!(newmu[i], rbm[i-1], mu[i-1])
+         # input from layer above
+         visibleinput!(input2[i], rbm[i], mu[i+1])
+         # combine input
+         newmu[i] .+= input2[i]
+         # By computing the potential,
+         # the assumption is used that all nodes in in-between-layers
+         # are Bernoulli-distributed:
+         sigm!(newmu[i])
+
+         delta = max(delta, maximum(abs.(mu[i] - newmu[i])))
       end
 
       # last layer
-      newmu = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
-      newdelta = maximum(abs.(mu[nlayers] - newmu))
-      if newdelta > delta
-         delta = newdelta
-      end
-      mu[nlayers] = newmu
+      newmu[nlayers] = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
+      delta = max(delta, maximum(abs.(mu[nlayers] - newmu[nlayers])))
+
+      # swap new and old mu
+      tmp = newmu
+      newmu = mu
+      mu = tmp
    end
 
    mu
