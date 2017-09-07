@@ -89,9 +89,10 @@ function testpotentials()
    BMs.visiblepotential!(vv, gbrbm, hh)
    @test sum(abs.(vv - BMs.visiblepotential(gbrbm, hh))) == 0
 
-   # Test activation potential of hidden nodes for PartitionedRBM
-   # consisting of BernoulliRBMs is the same as the activation potential
-   # of the BernoulliRBM resulting from joining the weights
+   # Test activation potential of hidden nodes for PartitionedRBM.
+   # For a PartitionedRBM consisting of BernoulliRBMs, the 
+   # activation potential has to be the same as the activation potential
+   # of the BernoulliRBM resulting from joining the RBMs.
    nvisible2 = 7
    nhidden2 = 4
    vv = rand(nsamples, nvisible + nvisible2)

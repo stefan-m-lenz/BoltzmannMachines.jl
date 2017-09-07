@@ -434,8 +434,8 @@ end
 function samplevisible(b2brbm::Binomial2BernoulliRBM, hh::M, 
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
    
-   v = sigm(factor * visibleinput(b2brbm, h))
-   bernoulli(v) + bernoulli(v)
+   vv = sigm(factor * visibleinput(b2brbm, hh))
+   binomial2!(vv)
 end
 
 function samplevisible(gbrbm::GaussianBernoulliRBM, h::Array{Float64,1}, factor::Float64 = 1.0)

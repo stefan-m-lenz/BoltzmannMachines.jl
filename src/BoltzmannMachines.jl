@@ -19,8 +19,13 @@ export
          GaussianBernoulliRBM,
          PartitionedRBM,
          fitrbm, freeenergy, initrbm, joinrbms,
-         trainrbm!, samplehidden, samplevisible,
-         hiddenpotential, hiddeninput, visiblepotential, visibleinput,
+         trainrbm!, 
+         samplehidden, samplehidden!,
+         samplevisible, samplevisible!,
+         hiddenpotential, hiddenpotential!,
+         hiddeninput, hiddeninput!,
+         visiblepotential, visiblepotenial!,
+         visibleinput, visibleinput!,
       AbstractDBM,
          BasicDBM,
          addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
@@ -81,7 +86,7 @@ end
 
 function sigm!(x::M) where{M <:AbstractArray{Float64}}
    for i in eachindex(x)
-      @inbounds x[i] = 1/(1.0 + exp(-x[i]))
+      @inbounds x[i] = 1.0/(1.0 + exp(-x[i]))
    end
    x
 end

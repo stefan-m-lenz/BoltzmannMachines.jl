@@ -5,6 +5,8 @@ const BMs = BoltzmannMachines
 
 include("BMTest.jl")
 
+BMTest.testpotentials()
+
 @test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
       BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
       atol = 0.002)

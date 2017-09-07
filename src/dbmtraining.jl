@@ -143,18 +143,18 @@ function gibbssample!(particles::Particles, dbm::AbstractDBM,
 
    for step in 1:nsteps
       # first layer gets input only from layer above
-      samplevisible!(input[1], dbm[1], particles[1])
+      samplevisible!(input[1], dbm[1], particles[2])
    
       # intermediate layers get input from layers above and below
       for i = 2:(length(particles) - 1)
-         visibleinput!(input[i], dbm[i], particles[i])
+         visibleinput!(input[i], dbm[i], particles[i+1])
          hiddeninput!(input2[i], dbm[i-1], particles[i-1])
          input[i] .+= input2[i]
          sigm_bernoulli!(input[i]) # Bernoulli-sample from total input
       end
    
       # last layer gets only input from layer below
-      samplehidden!(input[end], dbm[end], particles[i-1])
+      samplehidden!(input[end], dbm[end], particles[end-1])
 
       # swap input and particles
       tmp = particles
@@ -226,7 +226,7 @@ function initparticles(dbm::BasicDBM, nparticles::Int; biased::Bool = false)
    if biased
       biases = combinedbiases(dbm)
       for i in 1:nlayers
-         particles[i] = bernoulli(repmat(sigm(biases[i])', nparticles))
+         particles[i] = bernoulli!(repmat(sigm(biases[i])', nparticles))
       end
    else
       nunits = BMs.nunits(dbm)
@@ -271,9 +271,9 @@ function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
       for i = 2:(nlayers-1)
          # total input from layer below
-         hiddeninput!(newmu[i], rbm[i-1], mu[i-1])
+         hiddeninput!(newmu[i], dbm[i-1], mu[i-1])
          # input from layer above
-         visibleinput!(input2[i], rbm[i], mu[i+1])
+         visibleinput!(input2[i], dbm[i], mu[i+1])
          # combine input
          newmu[i] .+= input2[i]
          # By computing the potential,
@@ -282,16 +282,21 @@ function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
          sigm!(newmu[i])
 
          delta = max(delta, maximum(abs.(mu[i] - newmu[i])))
+
+         # swap new and old mu
+         tmp = newmu[i]
+         newmu[i] = mu[i]
+         mu[i] = tmp
       end
 
       # last layer
-      newmu[nlayers] = hiddenpotential(dbm[nlayers-1], mu[nlayers-1])
-      delta = max(delta, maximum(abs.(mu[nlayers] - newmu[nlayers])))
+      hiddenpotential!(newmu[end], dbm[end], mu[end-1])
+      delta = max(delta, maximum(abs.(mu[end] - newmu[end])))
 
       # swap new and old mu
-      tmp = newmu
-      newmu = mu
-      mu = tmp
+      tmp = newmu[end]
+      newmu[end] = mu[end]
+      mu[end] = tmp
    end
 
    mu
@@ -416,6 +421,7 @@ function traindbm!(dbm::AbstractDBM, x::Array{Float64,2};
 
    dbm
 end
+
 
 """
     traindbm!(dbm, x, particles, learningrate)
