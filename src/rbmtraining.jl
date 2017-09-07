@@ -473,20 +473,20 @@ function samplevisiblepotential!(v::M, rbm::BernoulliRBM
    bernoulli!(v)
 end
 
-function samplevisiblepotential!(v::M, rbm::BernoulliGaussianRBM
+function samplevisiblepotential!(v::M, bgrbm::BernoulliGaussianRBM
       ) where{M <: AbstractArray{Float64}}
    bernoulli!(v)
 end
 
-function samplevisiblepotential!(v::M, rbm::Binomial2BernoulliRBM
+function samplevisiblepotential!(v::M, b2brbm::Binomial2BernoulliRBM
       ) where{M <: AbstractArray{Float64}}
    v ./= 2
    binomial2!(v)
 end
 
-function samplevisiblepotential!(v::M, rbm::GaussianBernoulliRBM
+function samplevisiblepotential!(v::M, gbrbm::GaussianBernoulliRBM
       ) where{M <: AbstractArray{Float64}}
-   gaussiannoise = broadcast(*, randn(size(hh)), gbrbm.sd')
+   gaussiannoise = broadcast(*, randn(size(v)), gbrbm.sd')
    v .+= gaussiannoise
 end
 

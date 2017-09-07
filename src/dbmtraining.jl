@@ -12,12 +12,6 @@ const Particles = Array{Array{Float64,2},1}
 
 const Particle = Array{Array{Float64,1},1}
 
-"""
-Not implemented yet. Planned for future release.
-"""
-type MultimodalDBM
-end
-
 const AbstractDBM = Vector{<:AbstractRBM}
 
 
@@ -79,7 +73,8 @@ Returns a vector containing in the i'th element the bias vector for the i'th
 layer of the `dbm`. For intermediate layers, visible and hidden biases are
 combined to a single bias vector.
 """
-function combinedbiases(dbm::BasicDBM)
+function combinedbiases(dbm::AbstractDBM)
+   # TODO no visbias and hidbias for PartitionedRBM -> implement functions hiddenbias and visiblebias
    biases = Particle(length(dbm) + 1)
    # create copy to avoid accidental modification of dbm
    biases[1] = copy(dbm[1].visbias)
@@ -212,7 +207,8 @@ end
 
 """
     initparticles(dbm, nparticles)
-Creates particles for Gibbs sampling in a DBM and initializes them with random
+Creates particles for Gibbs sampling in a DBM.
+For Bernoulli distributed layers, the particles are initialized with 
 Bernoulli distributed (p=0.5) values.
 (See also: `Particles`)
 
@@ -220,7 +216,7 @@ Bernoulli distributed (p=0.5) values.
 If the boolean flag `biased` is set to true, the values will be sampled
 according to the biases of the `dbm`.
 """
-function initparticles(dbm::BasicDBM, nparticles::Int; biased::Bool = false)
+function initparticles(dbm::AbstractDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
    if biased
@@ -236,6 +232,31 @@ function initparticles(dbm::BasicDBM, nparticles::Int; biased::Bool = false)
    end
    particles
 end
+
+# function initvisiblenodes(rbm::BernoulliRBM, nparticles::Int, biased::Bool)
+#    if biased
+#       bernoulli!(repmat(sigm(biases[i])', nparticles))
+#    else
+#       rand([0.0 1.0], nparticles, nunits[i])
+#    end
+# end
+
+# function initvisiblenodes(rbm::BernoulliRBM, nparticles::Int, biased::Bool)
+#    if biased
+#       bernoulli!(repmat(sigm(lr)', nparticles))
+#    else
+#       rand([0.0 1.0], nparticles, length(rbm.visbias))
+#    end
+# end
+
+# function initvisiblenodes(rbm::GaussianBernoulliRBM, nparticles::Int, biased::Bool)
+#    if biased
+#    else
+#       randn(nparticles, )
+#    end
+# end
+
+# TODO implement other methods
 
 
 """
@@ -302,6 +323,31 @@ function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
    mu
 end
 
+"""
+Combined specification of parameters for training one layer.
+"""
+struct TrainLayer
+   epochs::Int
+   learningrate::Float64
+   sdlearningrate::Float64
+   sdlearningrates::Vector{Float64}
+   monitoring::Function
+   rbmtype::DataType
+   nhiddensparts::Vector{Int}
+   nhidden::Int
+end
+# Use keywords arguments for instantiating Layers
+TrainLayer(;
+      epochs::Int = 10,
+      learningrate::Float64 = 0.005,
+      sdlearningrate::Float64 = 0.0,
+      sdlearningrates::Vector{Float64} = Vector{Float64}(),
+      monitoring = ((rbm, epoch) -> nothing),
+      rbmtype::DataType = BernoulliRBM,
+      nhiddensparts::Vector{Int} = Vector{Int}(), # TODO use
+      nhidden::Int = 0) = 
+   TrainLayer(epochs, learningrate, sdlearningrate, sdlearningrates,
+   monitoring, rbmtype, nhiddensparts, nhidden)
 
 """
     stackrbms(x; ...)
@@ -316,28 +362,54 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    the i'th entry
 * `epochs`: number of training epochs
 * `learningrate`: learningrate, default 0.005
+* `trainlayers`: a vector of `TrainLayer` objects. With this argument it is possible
+   to specify the training parameters for each layer/RBM individually.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential,
    which is the default.
 """
 function stackrbms(x::Array{Float64,2};
-      nhiddens::Array{Int,1} = size(x,2)*ones(2),
+      nhiddens::Vector{Int} = Vector{Int}(),
       epochs::Int = 10,
       predbm::Bool = false,
       samplehidden::Bool = false,
-      learningrate::Float64 = 0.005)
+      learningrate::Float64 = 0.005,
+      trainlayers::Vector{TrainLayer} = Vector{TrainLayer}())
 
-   nrbms = length(nhiddens)
-   dbmn = Array{BernoulliRBM,1}(nrbms)
+   # construct default training specification for layers
+   function defaultlayer(nhidden::Int)
+      TrainLayer(epochs = epochs, learningrate = learningrate, nhidden = nhidden)
+   end
+
+   if isempty(trainlayers)     
+      if isempty(nhiddens)
+         nhiddens = size(x,2)*ones(2) # default value for nhiddens
+      end
+      trainlayers = map(defaultlayer, nhiddens)
+   elseif !isempty(nhiddens)
+      warn("Argument `nhiddens` not used.")
+   end
+
+   nrbms = length(trainlayers)
+   # If all layers are BernoulliRBMs, prepare a BasicDBM, ...
+   if all(map(t -> (t.rbmtype == BernoulliRBM), trainlayers))
+      dbmn = BasicDBM(nrbms)
+   else # ... else prepare an AbstractDBM
+      dbmn = Vector{AbstractRBM}(nrbms)
+   end
 
    upfactor = downfactor = 1.0
    if predbm
       upfactor = 2.0
    end
 
-   dbmn[1] = BMs.fitrbm(x, nhidden = nhiddens[1], epochs = epochs,
+   dbmn[1] = BMs.fitrbm(x; 
+         nhidden = trainlayers[1].nhidden, 
+         epochs = trainlayers[1].epochs,
          upfactor = upfactor, downfactor = downfactor, pcd = true,
-         learningrate = learningrate)
+         rbmtype = trainlayers[1].rbmtype,
+         learningrate = trainlayers[1].learningrate,
+         monitoring = trainlayers[1].monitoring)
 
    hiddenval = x
    for i=2:nrbms
@@ -353,9 +425,11 @@ function stackrbms(x::Array{Float64,2};
       else
          upfactor = downfactor = 1.0
       end
-      dbmn[i] = BMs.fitrbm(hiddenval, nhidden = nhiddens[i], epochs = epochs,
+      dbmn[i] = BMs.fitrbm(hiddenval; nhidden = trainlayers[i].nhidden, 
+            epochs = trainlayers[i].epochs, rbmtype = trainlayers[i].rbmtype,
             upfactor = upfactor, downfactor = downfactor, pcd = true,
-            learningrate = learningrate)
+            learningrate = trainlayers[i].learningrate,
+            monitoring = trainlayers[i].monitoring)
    end
 
    dbmn
@@ -427,7 +501,7 @@ end
     traindbm!(dbm, x, particles, learningrate)
 Trains the given `dbm` for one epoch.
 """
-function traindbm!(dbm::BasicDBM, x::Array{Float64,2}, particles::Particles,
+function traindbm!(dbm::AbstractDBM, x::Array{Float64,2}, particles::Particles,
       learningrate::Float64)
 
    gibbssample!(particles, dbm)
@@ -476,8 +550,8 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
 
    # For respecting standard deviation in update rule
    # see [Srivastava+Salakhutdinov, 2014], p. 2962
-   vmeanfield = broadcast(./, vmeanfield, dbmpart.sd')
-   vgibbs = broadcast(./, vgibbs, dbmpart.sd')
+   vmeanfield = broadcast(/, vmeanfield, dbmpart.sd')
+   vgibbs = broadcast(/, vgibbs, dbmpart.sd')
 
    updatedbmpartcore!(dbmpart, learningrate,
          vgibbs, hgibbs, vmeanfield, hmeanfield)

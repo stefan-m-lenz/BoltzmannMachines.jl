@@ -929,7 +929,7 @@ function nunits(rbm::AbstractRBM)
    [length(rbm.visbias); length(rbm.hidbias)]
 end
 
-function nunits(dbm::BasicDBM)
+function nunits(dbm::AbstractDBM)
    nrbms = length(dbm)
    if nrbms == 0
       error("Nodes and layers not defined in empty DBM")

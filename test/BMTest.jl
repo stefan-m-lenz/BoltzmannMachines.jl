@@ -1,6 +1,7 @@
 module BMTest
 
 using Base.Test
+using RDatasets # TODO remove
 import BoltzmannMachines
 const BMs = BoltzmannMachines
 
@@ -274,6 +275,20 @@ function testloglikelihood_b2brbm()
    exactloglik = BMs.exactloglikelihood(b2brbm, x1)
    @test abs((exactloglik - emploglik)/exactloglik) < 0.01
    @test abs((exactloglik - estloglik)/exactloglik) < 0.01
+end
+
+function testdbmwithgaussianvisiblenodes()
+
+   x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4]);
+   dbm = BMs.stackrbms(x, epochs = 50, predbm = true, learningrate = 0.001, 
+         trainlayers = [
+               BMs.TrainLayer(rbmtype = BMs.GaussianBernoulliRBM, nhidden = 4);
+               BMs.TrainLayer(nhidden = 4);
+               BMs.TrainLayer(nhidden = 4)
+         ]);
+   dbm = BMs.traindbm!(dbm, x,
+         learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
+         epochs = 30);
 end
 
 end # of module
