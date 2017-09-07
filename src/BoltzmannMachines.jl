@@ -79,11 +79,18 @@ function sigm(x::Array{Float64,2})
    1./(1 + exp.(-x))
 end
 
-function sigm!(x::Array{Float64,2})
+function sigm!(x::M) where{M <:AbstractArray{Float64}}
    for i in eachindex(x)
       @inbounds x[i] = 1/(1.0 + exp(-x[i]))
    end
    x
+end
+
+
+function bernoulli(x::M) where{M <:AbstractArray{Float64}}
+   ret = rand(size(x))
+   ret .= float.(ret .< x)
+   ret
 end
 
 function bernoulli!(x::M) where{M <:AbstractArray{Float64}}
@@ -93,10 +100,11 @@ function bernoulli!(x::M) where{M <:AbstractArray{Float64}}
    x
 end
 
-function bernoulli(x::M) where{M <:AbstractArray{Float64}}
-   ret = rand(size(x))
-   ret .= float.(ret .< x)
-   ret
+function binomial2!(x::M) where{M <:AbstractArray{Float64}}
+   for i in eachindex(x)
+      @inbounds x[i] = float(rand() < x[i]) + float(rand() < x[i])
+   end
+   x
 end
 
 

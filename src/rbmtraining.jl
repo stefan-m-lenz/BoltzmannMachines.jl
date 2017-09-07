@@ -218,8 +218,8 @@ end
 
 
 """
-    hiddeninput!(hh, rbm, vv)
-Like `hiddeninput`, but stores the returned result in `hh`.
+    hiddeninput!(h, rbm, v)
+Like `hiddeninput`, but stores the returned result in `h`.
 """
 function hiddeninput!(hh::M, rbm::Binomial2BernoulliRBM, vv::M, 
       ) where{M <: AbstractArray{Float64,2}}
@@ -243,7 +243,7 @@ function hiddeninput!(hh::M, prbm::PartitionedRBM, vv::M,
    for i in eachindex(pbrbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
-      hiddeninput!(hh[:, hidrange], prbm.rbms[i], vv[:, visrange])
+      hiddeninput!(view(hh, :, hidrange), prbm.rbms[i], view(vv, :, visrange))
    end
    hh
 end
@@ -308,7 +308,7 @@ function hiddenpotential!(hh::M, rbm::PartitionedRBM, vv::M,
    for i in eachindex(pbrbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
-      hiddenpotential!(hh[:, hidrange], prbm.rbms[i], vv[:, visrange])
+      hiddenpotential!(view(hh, :, hidrange), prbm.rbms[i], view(vv, :, visrange))
    end
    hh
 end
@@ -401,7 +401,9 @@ end
 
 
 """
-Samples the activation of the hidden nodes from the potential.
+    samplehiddenpotential!(h, rbm)
+Samples the activation of the hidden nodes from the potential `h` 
+and stores the returned result in `h`.
 """
 function samplehiddenpotential!(h::M, rbm::AbstractXBernoulliRBM
       ) where{M <: AbstractArray{Float64}}
@@ -414,6 +416,7 @@ function samplehiddenpotential!(h::M, rbm::BernoulliGaussianRBM
 
    h .+= randn(size(h))
 end
+
 
 """
     samplevisible(rbm, h)
@@ -443,6 +446,46 @@ function samplevisible(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor
    hh = visiblepotential(gbrbm, hh, factor)
    hh += broadcast(.*, randn(size(hh)), gbrbm.sd')
    hh
+end
+
+"""
+    samplevisible!(v, rbm, h)
+    samplevisible!(v, rbm, h, factor)
+Like `samplevisible`, but stores the returned result in `v`.
+"""
+function samplevisible!(v::M, rbm::AbstractRBM, h::M, 
+  factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
+
+      samplevisiblepotential!(visiblepotential!(v, rbm, h, factor), rbm)
+end
+
+# TODO specialize for Binomial2BernoulliRBM to avoid multiplication and division by 2
+
+"""
+    samplehiddenpotential!(v, rbm)
+Samples the activation of the visible nodes from the potential `v` 
+and stores the returned result in `v`.
+"""
+function samplevisiblepotential!(v::M, rbm::BernoulliRBM
+      ) where{M <: AbstractArray{Float64}}
+   bernoulli!(v)
+end
+
+function samplevisiblepotential!(v::M, rbm::BernoulliGaussianRBM
+      ) where{M <: AbstractArray{Float64}}
+   bernoulli!(v)
+end
+
+function samplevisiblepotential!(v::M, rbm::Binomial2BernoulliRBM
+      ) where{M <: AbstractArray{Float64}}
+   v ./= 2
+   binomial2!(v)
+end
+
+function samplevisiblepotential!(v::M, rbm::GaussianBernoulliRBM
+      ) where{M <: AbstractArray{Float64}}
+   gaussiannoise = broadcast(*, randn(size(hh)), gbrbm.sd')
+   v .+= gaussiannoise
 end
 
 
@@ -505,6 +548,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
    rbm
 end
 
+
 """
     visibleinput(rbm, h)
 Returns activations of the visible nodes in the AbstractXBernoulliRBM `rbm`,
@@ -538,42 +582,41 @@ function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    broadcast!(+, input, input, b2brbm.visbias')
 end
 
-# function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M, 
-#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
-#    A_mul_B!(hh, vv, rbm.weights)
-#    hh .*= factor
-#    broadcast!(+, hh, hh, rbm.hidbias')
-# end
+"""
+    visibleinput!(v, rbm, h)
+Like `visibleinput` but stores the returned result in `v`.
+"""
+function visibleinput!(v::M, rbm::BernoulliRBM, h::M
+      ) where {M <:AbstractArray{Float64,2}}
 
-# function hiddeninput!(hh::M, rbm::Binomial2BernoulliRBM, vv::M, 
-#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+   A_mul_Bt!(v, h, rbm.weights)
+   broadcast!(+, v, v, rbm.visbias')
+end
 
-#    # again same code for Binomial2BernoulliRBM as for BernoullitRBM
-#    A_mul_B!(hh, vv, rbm.weights)
-#    hh .*= factor
-#    broadcast!(+, hh, hh, rbm.hidbias')
-# end
+function visibleinput!(v::M, bgrbm::BernoulliGaussianRBM, h::M
+      ) where{M <: AbstractArray{Float64,2}}
 
-# function hiddeninput!(hh::M, gbrbm::GaussianBernoulliRBM, vv::M, 
-#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+   A_mul_Bt!(v, h, bgrbm.weights)
+   broadcast!(+, v, v, bgrbm.visbias')
+end
 
-#    scaledweights = broadcast(/, gbrbm.weights, gbrbm.sd)
-#    A_mul_B!(hh, vv, scaledweights)
-#    broadcast!(+, hh, hh, gbrbm.hidbias')
-#    hh
-# end
+function visibleinput!(v::M, b2brbm::Binomial2BernoulliRBM, h::M
+      ) where{M <: AbstractArray{Float64,2}}
+   A_mul_Bt!(v, h, b2brbm.weights)
+   broadcast!(+, v, v, b2brbm.visbias')
+end
 
-# function hiddeninput!(hh::M, prbm::PartitionedRBM, vv::M, 
-#    factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+function visibleinput!(v::M, prbm::PartitionedRBM, h::M
+      ) where{M <: AbstractArray{Float64,2}}
 
-#    for i in eachindex(pbrbm.rbms)
-#       visrange = prbm.visranges[i]
-#       hidrange = prbm.hidranges[i]
-#       visibleinput!(vv[:, visrange], prbm.rbms[i], hh[:, hidrange])
-#    end
-#    hh
-# end
+   for i in eachindex(pbrbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      visibleinput!(view(v, :, visrange), prbm.rbms[i], view(h, :, hidrange))
+   end
+   v
+end
 
 
 """
@@ -620,9 +663,58 @@ end
 function visiblepotential(gbrbm::GaussianBernoulliRBM, hh::Array{Float64,2}, factor::Float64 = 1.0)
    # factor is ignored, GaussianBernoulliRBMs should only be used in bottom layer of DBM
    mu = hh*gbrbm.weights'
-   broadcast!(.*, mu, mu, gbrbm.sd')
+   broadcast!(*, mu, mu, gbrbm.sd')
    broadcast!(+, mu, mu, gbrbm.visbias')
    mu
+end
+
+
+"""
+    visiblepotential!(v, rbm, h)
+Like `visiblepotential` but stores the returned result in `v`.
+"""
+function visiblepotential!(v::M, rbm::BernoulliRBM, h::M, 
+      factor::Float64 = 1.0) where {M <: AbstractArray{Float64}}
+   
+   visibleinput!(v, rbm, h)
+   v .*= factor
+   sigm!(v)
+end
+
+function visiblepotential!(v::M, rbm::BernoulliGaussianRBM, h::M, 
+      factor::Float64 = 1.0) where {M <: AbstractArray{Float64}}
+
+   visibleinput!(v, rbm, h)
+   v .*= factor
+   sigm!(v)
+end
+
+function visiblepotential!(v::M, rbm::Binomial2BernoulliRBM, h::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+   
+   visibleinput!(v, rbm, h)
+   v .*= factor
+   sigm!(v)
+   v .*= 2.0
+end
+
+function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM, h::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+   A_mul_Bt!(v, h, gbrbm.weights)
+   broadcast!(*, v, v, gbrbm.sd')
+   broadcast!(+, v, v, gbrbm.visbias')
+end
+
+function visiblepotential!(v::M, prbm::PartitionedRBM, h::M, 
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      visiblepotential!(view(v, :, visrange), prbm.rbms[i], view(h, :, hidrange))
+   end
+   v
 end
 
 
