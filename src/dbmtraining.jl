@@ -15,6 +15,47 @@ const Particle = Array{Array{Float64,1},1}
 const AbstractDBM = Vector{<:AbstractRBM}
 
 
+
+"""
+Combined specification of parameters for training one layer.
+# TODO more detailed documentation
+"""
+type TrainLayer
+   epochs::Int
+   usedefaultepochs::Bool
+   learningrate::Float64
+   usedefaultlearningrate::Bool
+   sdlearningrate::Float64
+   sdlearningrates::Vector{Float64}
+   monitoring::Function
+   rbmtype::DataType
+   nhiddensparts::Vector{Int}
+   nhidden::Int
+end
+
+# Use keywords arguments for instantiating Layers
+function TrainLayer(;
+      epochs::Nullable{Int} = Nullable{Int}(),
+      learningrate::Nullable{Float64} = Nullable{Float64}(),
+      sdlearningrate::Float64 = 0.0,
+      sdlearningrates::Vector{Float64} = Vector{Float64}(),
+      monitoring = ((rbm, epoch) -> nothing),
+      rbmtype::DataType = BernoulliRBM,
+      nhiddensparts::Vector{Int} = Vector{Int}(), # TODO use
+      nhidden::Int = 0)
+
+   usedefaultepochs = isnull(epochs)
+   usedefaultlearningrate = isnull(learningrate)
+   TrainLayer(
+         (usedefaultepochs ? 10 : get(epochs)),
+         usedefaultepochs,
+         (usedefaultlearningrate ? 0.005 : get(learningrate)),
+         usedefaultlearningrate,
+         sdlearningrate, sdlearningrates,
+         monitoring, rbmtype, nhiddensparts, nhidden)
+end
+
+
 """
     addlayer!(dbm, x)
 Adds a pretrained layer to the BasicDBM `dbm`, given the dataset `x` as input
@@ -105,18 +146,33 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    defaults to `learningrate`
 * `nparticles`: number of particles used for sampling during joint training of
    DBM, default 100
+* `pretraining`: The arguments for layerwise pretraining
+   can be specified for each layer individually.
+   This is done via a vector of `TrainLayer` objects.
+   (For a detailed description of the possible parameters,
+   see help for type `TrainLayer`).
+   If the number of training epochs and the learning rate are not specified
+   explicitly for a layer, the values of `epochspretraining` and
+   `learningratepretraining` are used.
 """
 function fitdbm(x::Matrix{Float64};
-      nhiddens::Vector{Int} = size(x,2)*ones(2),
+      nhiddens::Vector{Int} = Vector{Int}(),
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
       learningratepretraining::Float64 = learningrate,
-      epochspretraining::Int = epochs)
+      epochspretraining::Int = epochs,
+      pretraining::Vector{TrainLayer} = Vector{TrainLayer}())
+
+   if isempty(pretraining) && isempty(nhiddens)
+      # set default only if there is not any more detailed info
+      nhiddens = size(x,2)*ones(2)
+   end
 
    pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
-         learningrate = learningratepretraining)
+         learningrate = learningratepretraining,
+         trainlayers = pretraining)
 
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
       learningrate = learningrate)
@@ -139,7 +195,7 @@ function gibbssample!(particles::Particles, dbm::AbstractDBM,
    for step in 1:nsteps
       # first layer gets input only from layer above
       samplevisible!(input[1], dbm[1], particles[2])
-   
+
       # intermediate layers get input from layers above and below
       for i = 2:(length(particles) - 1)
          visibleinput!(input[i], dbm[i], particles[i+1])
@@ -147,7 +203,7 @@ function gibbssample!(particles::Particles, dbm::AbstractDBM,
          input[i] .+= input2[i]
          sigm_bernoulli!(input[i]) # Bernoulli-sample from total input
       end
-   
+
       # last layer gets only input from layer below
       samplehidden!(input[end], dbm[end], particles[end-1])
 
@@ -208,7 +264,7 @@ end
 """
     initparticles(dbm, nparticles)
 Creates particles for Gibbs sampling in a DBM.
-For Bernoulli distributed layers, the particles are initialized with 
+For Bernoulli distributed layers, the particles are initialized with
 Bernoulli distributed (p=0.5) values.
 (See also: `Particles`)
 
@@ -323,31 +379,6 @@ function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
    mu
 end
 
-"""
-Combined specification of parameters for training one layer.
-"""
-struct TrainLayer
-   epochs::Int
-   learningrate::Float64
-   sdlearningrate::Float64
-   sdlearningrates::Vector{Float64}
-   monitoring::Function
-   rbmtype::DataType
-   nhiddensparts::Vector{Int}
-   nhidden::Int
-end
-# Use keywords arguments for instantiating Layers
-TrainLayer(;
-      epochs::Int = 10,
-      learningrate::Float64 = 0.005,
-      sdlearningrate::Float64 = 0.0,
-      sdlearningrates::Vector{Float64} = Vector{Float64}(),
-      monitoring = ((rbm, epoch) -> nothing),
-      rbmtype::DataType = BernoulliRBM,
-      nhiddensparts::Vector{Int} = Vector{Int}(), # TODO use
-      nhidden::Int = 0) = 
-   TrainLayer(epochs, learningrate, sdlearningrate, sdlearningrates,
-   monitoring, rbmtype, nhiddensparts, nhidden)
 
 """
     stackrbms(x; ...)
@@ -364,6 +395,8 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
 * `learningrate`: learningrate, default 0.005
 * `trainlayers`: a vector of `TrainLayer` objects. With this argument it is possible
    to specify the training parameters for each layer/RBM individually.
+   If the number of training epochs and the learning rate are not specified
+   explicitly for a layer, the values of `epochs` and `learningrate` are used.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential,
    which is the default.
@@ -381,13 +414,25 @@ function stackrbms(x::Array{Float64,2};
       TrainLayer(epochs = epochs, learningrate = learningrate, nhidden = nhidden)
    end
 
-   if isempty(trainlayers)     
+   if isempty(trainlayers)
       if isempty(nhiddens)
          nhiddens = size(x,2)*ones(2) # default value for nhiddens
       end
       trainlayers = map(defaultlayer, nhiddens)
-   elseif !isempty(nhiddens)
-      warn("Argument `nhiddens` not used.")
+   else
+      if !isempty(nhiddens)
+         warn("Argument `nhiddens` not used.")
+      end
+      for trainlayer in trainlayers
+         # if no learningrate or epochs are specified in the TrainLayers object,
+         # use the values of the respective arguments
+         if trainlayer.usedefaultlearningrate
+            trainlayer.learningrate = learningrate
+         end
+         if trainlayer.usedefaultepochs
+            trainlayer.epochs = epochs
+         end
+      end
    end
 
    nrbms = length(trainlayers)
@@ -403,8 +448,8 @@ function stackrbms(x::Array{Float64,2};
       upfactor = 2.0
    end
 
-   dbmn[1] = BMs.fitrbm(x; 
-         nhidden = trainlayers[1].nhidden, 
+   dbmn[1] = BMs.fitrbm(x;
+         nhidden = trainlayers[1].nhidden,
          epochs = trainlayers[1].epochs,
          upfactor = upfactor, downfactor = downfactor, pcd = true,
          rbmtype = trainlayers[1].rbmtype,
@@ -425,7 +470,7 @@ function stackrbms(x::Array{Float64,2};
       else
          upfactor = downfactor = 1.0
       end
-      dbmn[i] = BMs.fitrbm(hiddenval; nhidden = trainlayers[i].nhidden, 
+      dbmn[i] = BMs.fitrbm(hiddenval; nhidden = trainlayers[i].nhidden,
             epochs = trainlayers[i].epochs, rbmtype = trainlayers[i].rbmtype,
             upfactor = upfactor, downfactor = downfactor, pcd = true,
             learningrate = trainlayers[i].learningrate,

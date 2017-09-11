@@ -63,8 +63,8 @@ function testpotentials()
    rbm = BMTest.randrbm(nvisible, nhidden)
    BMs.hiddenpotential!(hh, rbm, vv)
    @test sum(abs.(hh - BMs.hiddenpotential(rbm, vv))) == 0
-   
-   # Test that activation potential of hidden nodes of a 
+
+   # Test that activation potential of hidden nodes of a
    # Binomial2BernoulliRBM is the same as that of a BernoulliRBM
    b2brbm = BMs.Binomial2BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias)
    hh2 = BMs.hiddenpotential(b2brbm, vv)
@@ -80,18 +80,18 @@ function testpotentials()
    BMs.visiblepotential!(vv, b2brbm, hh)
    @test sum(abs.(vv- BMs.visiblepotential(b2brbm, hh))) == 0
 
-   # Test activation potential of hidden nodes for GBRBM 
+   # Test activation potential of hidden nodes for GBRBM
    hh = rand(nsamples, nhidden)
    gbrbm = BMTest.randgbrbm(nvisible, nhidden)
    BMs.hiddenpotential!(hh, gbrbm, vv)
    @test sum(abs.(hh - BMs.hiddenpotential(gbrbm, vv))) == 0
 
-   # Test activation potential of visible nodes for GBRBM 
+   # Test activation potential of visible nodes for GBRBM
    BMs.visiblepotential!(vv, gbrbm, hh)
    @test sum(abs.(vv - BMs.visiblepotential(gbrbm, hh))) == 0
 
    # Test activation potential of hidden nodes for PartitionedRBM.
-   # For a PartitionedRBM consisting of BernoulliRBMs, the 
+   # For a PartitionedRBM consisting of BernoulliRBMs, the
    # activation potential has to be the same as the activation potential
    # of the BernoulliRBM resulting from joining the RBMs.
    nvisible2 = 7
@@ -279,16 +279,20 @@ end
 
 function testdbmwithgaussianvisiblenodes()
 
+   trainlayers = [
+         BMs.TrainLayer(rbmtype = BMs.GaussianBernoulliRBM, nhidden = 4);
+         BMs.TrainLayer(nhidden = 4);
+         BMs.TrainLayer(nhidden = 4)]
+
    x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4]);
-   dbm = BMs.stackrbms(x, epochs = 50, predbm = true, learningrate = 0.001, 
-         trainlayers = [
-               BMs.TrainLayer(rbmtype = BMs.GaussianBernoulliRBM, nhidden = 4);
-               BMs.TrainLayer(nhidden = 4);
-               BMs.TrainLayer(nhidden = 4)
-         ]);
+   dbm = BMs.stackrbms(x, epochs = 50, predbm = true, learningrate = 0.001,
+         trainlayers = trainlayers)
    dbm = BMs.traindbm!(dbm, x,
          learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
          epochs = 30);
+
+   dbm2 = BMs.fitdbm(x, epochs = 20, pretraining = trainlayers)
+
 end
 
 end # of module
