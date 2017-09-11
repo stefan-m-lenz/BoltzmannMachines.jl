@@ -416,12 +416,15 @@ function stackrbms(x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       trainlayers::Vector{TrainLayer} = Vector{TrainLayer}())
 
-   # construct default training specification for layers
-   function defaultlayer(nhidden::Int)
-      TrainLayer(epochs = epochs, learningrate = learningrate, nhidden = nhidden)
-   end
-
+   # prepare layerwise training specifications
    if isempty(trainlayers)
+      # construct default training specification for layers
+      function defaultlayer(nhidden::Int)
+         TrainLayer(epochs = Nullable{Int}(epochs),
+               learningrate = Nullable{Float64}(learningrate),
+               nhidden = nhidden)
+      end
+
       if isempty(nhiddens)
          nhiddens = size(x,2)*ones(2) # default value for nhiddens
       end
@@ -461,6 +464,8 @@ function stackrbms(x::Array{Float64,2};
          upfactor = upfactor, downfactor = downfactor, pcd = true,
          rbmtype = trainlayers[1].rbmtype,
          learningrate = trainlayers[1].learningrate,
+         sdlearningrate = trainlayers[1].sdlearningrate,
+         sdlearningrates = trainlayers[1].sdlearningrates,
          monitoring = trainlayers[1].monitoring)
 
    hiddenval = x

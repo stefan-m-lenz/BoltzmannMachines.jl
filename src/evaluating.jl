@@ -821,7 +821,7 @@ end
 
 function logpartitionfunctionzeroweights(gbrbm::GaussianBernoulliRBM)
    nvisible = length(gbrbm.visbias)
-   logz0 = nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd)) + sum(log.(1 + exp(gbrbm.hidbias)))
+   logz0 = nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd)) + sum(log.(1 + exp.(gbrbm.hidbias)))
 end
 
 function logpartitionfunctionzeroweights(dbm::BasicDBM)

@@ -44,5 +44,7 @@ BMTest.testdbmjoining()
 
 BMTest.testloglikelihood_b2brbm()
 
+BMTest.testdbmwithgaussianvisiblenodes()
+
 # run examples
 include("examples.jl")

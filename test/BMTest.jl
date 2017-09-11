@@ -279,19 +279,28 @@ end
 
 function testdbmwithgaussianvisiblenodes()
 
+   x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4])
+
+   datadict = BMs.DataDict("x" => x)
+
+   monitor1 = BMs.Monitor()
    trainlayers = [
-         BMs.TrainLayer(rbmtype = BMs.GaussianBernoulliRBM, nhidden = 4);
+         BMs.TrainLayer(rbmtype = BMs.GaussianBernoulliRBM,
+               nhidden = 4,
+               sdlearningrate = 0.000001,
+               monitoring = (rbm, epoch) -> begin
+                  BMs.monitorexactloglikelihood!(monitor1, rbm, epoch, datadict)
+               end);
          BMs.TrainLayer(nhidden = 4);
          BMs.TrainLayer(nhidden = 4)]
 
    learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)]
 
-   x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4])
-
    seed = round(Int, rand()*typemax(Int), RoundDown)
    srand(seed)
    dbm1 = BMs.stackrbms(x, epochs = 20, predbm = true, learningrate = 0.001,
          trainlayers = trainlayers)
+   # BMs.BMPlots.plotevaluation(monitor1, BMs.monitorexactloglikelihood)
    dbm1 = BMs.traindbm!(dbm1, x,
          learningrates = learningrates,
          epochs = 30);
