@@ -284,14 +284,33 @@ function testdbmwithgaussianvisiblenodes()
          BMs.TrainLayer(nhidden = 4);
          BMs.TrainLayer(nhidden = 4)]
 
-   x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4]);
-   dbm = BMs.stackrbms(x, epochs = 50, predbm = true, learningrate = 0.001,
+   learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)]
+
+   x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4])
+
+   seed = round(Int, rand()*typemax(Int), RoundDown)
+   srand(seed)
+   dbm1 = BMs.stackrbms(x, epochs = 20, predbm = true, learningrate = 0.001,
          trainlayers = trainlayers)
-   dbm = BMs.traindbm!(dbm, x,
-         learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
+   dbm1 = BMs.traindbm!(dbm1, x,
+         learningrates = learningrates,
          epochs = 30);
 
-   dbm2 = BMs.fitdbm(x, epochs = 20, pretraining = trainlayers)
+   srand(seed)
+   dbm2 = BMs.fitdbm(x, epochs = 30,
+         epochspretraining = 20,
+         learningratepretraining = 0.001,
+         pretraining = trainlayers,
+         learningrates = learningrates)
+
+   # first and second dbm and dbm2 must be equal
+   @test length(dbm1) == length(dbm2)
+   @test isapprox(dbm1[1].sd, dbm2[1].sd)
+   for i in 1:length(dbm1)
+      @test isapprox(dbm1[i].weights, dbm2[i].weights)
+      @test isapprox(dbm1[i].visbias, dbm2[i].visbias)
+      @test isapprox(dbm1[i].hidbias, dbm2[i].hidbias)
+   end
 
 end
 

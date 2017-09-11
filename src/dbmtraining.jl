@@ -127,6 +127,11 @@ function combinedbiases(dbm::AbstractDBM)
 end
 
 
+function defaultfinetuninglearningrates(learningrate, epochs)
+   learningrate * 11.0 ./ (10.0 + (1:epochs))
+end
+
+
 """
     fitdbm(x; ...)
 Fits a BasicDBM model to the data set `x`. The procedure consists of two parts:
@@ -160,6 +165,8 @@ function fitdbm(x::Matrix{Float64};
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
+      learningrates::Vector{Float64} =
+            defaultfinetuninglearningrates(learningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
       pretraining::Vector{TrainLayer} = Vector{TrainLayer}())
@@ -175,7 +182,7 @@ function fitdbm(x::Matrix{Float64};
          trainlayers = pretraining)
 
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
-      learningrate = learningrate)
+         learningrate = learningrate, learningrates = learningrates)
 end
 
 
@@ -522,7 +529,8 @@ function traindbm!(dbm::AbstractDBM, x::Array{Float64,2};
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
-      learningrates::Array{Float64,1} = learningrate*11.0 ./ (10.0 + (1:epochs)),
+      learningrates::Array{Float64,1} =
+            defaultfinetuninglearningrates(learningrate, epochs),
       monitoring::Function = ((dbm, epoch) -> nothing))
 
    if length(learningrates) < epochs
