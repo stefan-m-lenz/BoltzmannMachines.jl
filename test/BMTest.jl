@@ -1,7 +1,7 @@
 module BMTest
 
 using Base.Test
-using RDatasets # TODO remove
+using RDatasets
 import BoltzmannMachines
 const BMs = BoltzmannMachines
 
@@ -312,7 +312,7 @@ function testdbmwithgaussianvisiblenodes()
          pretraining = trainlayers,
          learningrates = learningrates)
 
-   # first and second dbm and dbm2 must be equal
+   # first and second dbm must be equal
    @test length(dbm1) == length(dbm2)
    @test isapprox(dbm1[1].sd, dbm2[1].sd)
    for i in 1:length(dbm1)
@@ -323,4 +323,4 @@ function testdbmwithgaussianvisiblenodes()
 
 end
 
-end # of module
+end # of module BMTest

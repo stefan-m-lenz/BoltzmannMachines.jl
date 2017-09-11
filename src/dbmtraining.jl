@@ -15,11 +15,6 @@ const Particle = Array{Array{Float64,1},1}
 const AbstractDBM = Vector{<:AbstractRBM}
 
 
-
-"""
-Combined specification of parameters for training one layer.
-# TODO more detailed documentation
-"""
 type TrainLayer
    epochs::Int
    usedefaultepochs::Bool
@@ -33,7 +28,21 @@ type TrainLayer
    nhidden::Int
 end
 
-# Use keywords arguments for instantiating Layers
+"""
+Specify parameters for training one RBM-layer in a DBM.
+
+# Optional keyword arguments:
+* `rbmtype`: the type of the RBM that is to be trained.
+   This must be a subtype of AbstractRBM and defaults to `BernoulliRBM`.
+* `nhidden`: Number of hidden units in the RBM
+* `epochs`: number of training epochs
+* `learningrate`: learning rate
+* `sdlearningrate`/`sdlearningrates`: learning rate / learning rates for each epoch
+   for learning the standard deviation. Only used for GaussianBernoulliRBMs.
+* `monitoring`:  a function that is executed after each training epoch.
+   It takes an RBM and the epoch as arguments.
+* `nhiddensparts`: TODO
+"""
 function TrainLayer(;
       epochs::Nullable{Int} = Nullable{Int}(),
       learningrate::Nullable{Float64} = Nullable{Float64}(),
@@ -155,7 +164,7 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    can be specified for each layer individually.
    This is done via a vector of `TrainLayer` objects.
    (For a detailed description of the possible parameters,
-   see help for type `TrainLayer`).
+   see help for `TrainLayer`).
    If the number of training epochs and the learning rate are not specified
    explicitly for a layer, the values of `epochspretraining` and
    `learningratepretraining` are used.
