@@ -289,7 +289,6 @@ end
 
 
 """
-    initparticles(dbm, nparticles)
     initparticles(dbm, nparticles; biased = false)
 Creates particles for Gibbs sampling in a DBM. (See also: `Particles`)
 
@@ -303,7 +302,7 @@ are used as values for the nodes' individual p's.
 
 Gaussian nodes are sampled from a normal distribution if `biased == false`.
 If `biased == true` the mean of the Gaussian distribution is shifted by the
-bias vector.
+bias vector and the standard deviation of the nodes is used.
 """
 function initparticles(dbm::MultimodalDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
@@ -345,6 +344,7 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64}}
    randn!(v)
    if biased
+      broadcast!(*, v, v, rbm.sd')
       broadcast!(+, v, v, rbm.visbias')
    end
 end
