@@ -12,7 +12,7 @@ const Particles = Array{Array{Float64,2},1}
 
 const Particle = Array{Array{Float64,1},1}
 
-const AbstractDBM = Vector{<:AbstractRBM}
+const MultimodalDBM = Vector{<:AbstractRBM}
 
 
 type TrainLayer
@@ -123,7 +123,7 @@ Returns a vector containing in the i'th element the bias vector for the i'th
 layer of the `dbm`. For intermediate layers, visible and hidden biases are
 combined to a single bias vector.
 """
-function combinedbiases(dbm::AbstractDBM)
+function combinedbiases(dbm::MultimodalDBM)
    # TODO no visbias and hidbias for PartitionedRBM -> implement functions hiddenbias and visiblebias
    biases = Particle(length(dbm) + 1)
    # create copy to avoid accidental modification of dbm
@@ -201,7 +201,7 @@ Performs Gibbs sampling on the `particles` in the DBM `dbm` for `nsteps` steps.
 (See also: `Particles`.)
 In-between layers are assumed to contain only Bernoulli-distributed nodes.
 """
-function gibbssample!(particles::Particles, dbm::AbstractDBM,
+function gibbssample!(particles::Particles, dbm::MultimodalDBM,
       nsteps::Int = 5,
       biases::Particle = BMs.combinedbiases(dbm))
 
@@ -288,7 +288,7 @@ Bernoulli distributed (p=0.5) values.
 If the boolean flag `biased` is set to true, the values will be sampled
 according to the biases of the `dbm`.
 """
-function initparticles(dbm::AbstractDBM, nparticles::Int; biased::Bool = false)
+function initparticles(dbm::MultimodalDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
    if biased
@@ -340,7 +340,7 @@ The number of particles is equal to the number of samples in `x`.
 `eps` is the convergence criterion for the fix-point iteration, default 0.001.
 It is assumed that all nodes in in-between-layers are Bernoulli distributed.
 """
-function meanfield(dbm::AbstractDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
+function meanfield(dbm::MultimodalDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
    nlayers = length(dbm) + 1
    mu = Particles(nlayers)
@@ -458,7 +458,7 @@ function stackrbms(x::Array{Float64,2};
    # If all layers are BernoulliRBMs, prepare a BasicDBM, ...
    if all(map(t -> (t.rbmtype == BernoulliRBM), trainlayers))
       dbmn = BasicDBM(nrbms)
-   else # ... else prepare an AbstractDBM
+   else # ... else prepare a MultimodalDBM
       dbmn = Vector{AbstractRBM}(nrbms)
    end
 
@@ -523,8 +523,9 @@ end
 
 """
     traindbm!(dbm, x; ...)
-Trains the `dbm` (an `AbstractDBM`) using the learning procedure for a
-general Boltzmann Machine with the training data set `x`.
+Trains the `dbm` (a `BasicDBM` or a more general `MultimodalDBM`) using
+the learning procedure for a general Boltzmann Machine with the
+training data set `x`.
 A learning step consists of mean-field inference (positive phase),
 stochastic approximation by Gibbs Sampling (negative phase) and the parameter
 updates.
@@ -537,9 +538,9 @@ updates.
    `learningrate`, `a` and `b` are 11.0 and 10.0, respectively.
 * `nparticles`: number of particles used for sampling, default 100
 * `monitoring`: A function that is executed after each training epoch.
-   It has to take the trained DBM and the current epoch as arguments.
+   It has to accept the trained DBM and the current epoch as arguments.
 """
-function traindbm!(dbm::AbstractDBM, x::Array{Float64,2};
+function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
@@ -568,7 +569,7 @@ end
     traindbm!(dbm, x, particles, learningrate)
 Trains the given `dbm` for one epoch.
 """
-function traindbm!(dbm::AbstractDBM, x::Array{Float64,2}, particles::Particles,
+function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2}, particles::Particles,
       learningrate::Float64)
 
    gibbssample!(particles, dbm)

@@ -277,6 +277,9 @@ function testloglikelihood_b2brbm()
    @test abs((exactloglik - estloglik)/exactloglik) < 0.01
 end
 
+"""
+Test DBMs with Gaussian visible nodes.
+"""
 function testdbmwithgaussianvisiblenodes()
 
    x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4])

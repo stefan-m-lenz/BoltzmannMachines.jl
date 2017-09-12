@@ -681,7 +681,7 @@ end
 Creates and zero-initializes a particle for layers with odd indexes
 in the `dbm`.
 "
-function initcombinationoddlayersonly(dbm)
+function initcombinationoddlayersonly(dbm::BasicDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
    uodd = Particle(round(Int, nlayers/2, RoundUp))
@@ -929,7 +929,7 @@ function nunits(rbm::AbstractRBM)
    [length(rbm.visbias); length(rbm.hidbias)]
 end
 
-function nunits(dbm::AbstractDBM)
+function nunits(dbm::MultimodalDBM)
    nrbms = length(dbm)
    if nrbms == 0
       error("Nodes and layers not defined in empty DBM")
@@ -1033,7 +1033,7 @@ randomly initialized Gibbs chains for `burnin` steps.
 Returns particles containing `nparticles` generated samples.
 See also: `Particles`.
 """
-function sampleparticles(dbm::AbstractDBM, nparticles::Int, burnin::Int = 10)
+function sampleparticles(dbm::MultimodalDBM, nparticles::Int, burnin::Int = 10)
    particles = initparticles(dbm, nparticles)
    gibbssample!(particles, dbm, burnin)
    particles

@@ -26,7 +26,7 @@ export
          hiddeninput, hiddeninput!,
          visiblepotential, visiblepotenial!,
          visibleinput, visibleinput!,
-      AbstractDBM,
+      MultimodalDBM,
          BasicDBM,
          TrainLayer,
          addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
@@ -46,7 +46,7 @@ export
 include("rbmtraining.jl")
 include("dbmtraining.jl")
 
-const AbstractBM = Union{AbstractDBM,AbstractRBM}
+const AbstractBM = Union{MultimodalDBM, AbstractRBM}
 
 
 """
