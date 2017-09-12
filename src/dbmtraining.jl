@@ -124,14 +124,16 @@ layer of the `dbm`. For intermediate layers, visible and hidden biases are
 combined to a single bias vector.
 """
 function combinedbiases(dbm::MultimodalDBM)
-   # TODO no visbias and hidbias for PartitionedRBM -> implement functions hiddenbias and visiblebias
    biases = Particle(length(dbm) + 1)
-   # create copy to avoid accidental modification of dbm
-   biases[1] = copy(dbm[1].visbias)
+   # Create copy to avoid accidental modification of dbm.
+   # Use functions `visiblebias` and `hiddenbias` instead of
+   # fields `visbias` and `hidbias` of RBMs to be able to
+   # also respect PartitionedRBMs on an abstract level.
+   biases[1] = copy(visiblebias(dbm[1]))
    for i = 2:length(dbm)
-      biases[i] = dbm[i].visbias + dbm[i-1].hidbias
+      biases[i] = visiblebias(dbm[i]) + hiddenbias(dbm[i-1])
    end
-   biases[end] = copy(dbm[end].hidbias)
+   biases[end] = copy(hiddenbias(dbm[end]))
    biases
 end
 
@@ -233,6 +235,15 @@ function gibbssample!(particles::Particles, dbm::MultimodalDBM,
 end
 
 
+function hiddenbias(rbm::AbstractRBM)
+   rbm.hidbias
+end
+
+function hiddenbias(prbm::PartitionedRBM)
+   vcat(map(rbm -> rbm.hidbias, prbm.rbms)...)
+end
+
+
 """
     newparticleslike(particles)
 Creates new and uninitialized particles of the same dimensions as the given
@@ -279,56 +290,73 @@ end
 
 """
     initparticles(dbm, nparticles)
-Creates particles for Gibbs sampling in a DBM.
-For Bernoulli distributed layers, the particles are initialized with
-Bernoulli distributed (p=0.5) values.
-(See also: `Particles`)
+    initparticles(dbm, nparticles; biased = false)
+Creates particles for Gibbs sampling in a DBM. (See also: `Particles`)
 
-# Optional keyword arguments:
-If the boolean flag `biased` is set to true, the values will be sampled
-according to the biases of the `dbm`.
+The hidden layers of the `dbm` are assumed to be Bernoulli-distributed,
+the first `rbm` may have visible nodes of other types.
+
+For Bernoulli distributed layers, the particles are initialized with
+Bernoulli(p) distributed values. If `biased == false`, p is 0.5,
+otherwise the results of applying the sigmoid function to the bias values
+are used as values for the nodes' individual p's.
+
+Gaussian nodes are sampled from a normal distribution if `biased == false`.
+If `biased == true` the mean of the Gaussian distribution is shifted by the
+bias vector.
 """
 function initparticles(dbm::MultimodalDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
    particles = Particles(nlayers)
+
+   # initialize visible nodes
+   particles[1] = Matrix{Float64}(nparticles, length(visiblebias(dbm[1])))
+   initvisiblenodes!(particles[1], dbm[1], biased)
+
+   # initialize hidden nodes
    if biased
       biases = combinedbiases(dbm)
-      for i in 1:nlayers
+      for i in 2:nlayers
          particles[i] = bernoulli!(repmat(sigm(biases[i])', nparticles))
       end
    else
       nunits = BMs.nunits(dbm)
-      for i in 1:nlayers
+      for i in 2:nlayers
          particles[i] = rand([0.0 1.0], nparticles, nunits[i])
       end
    end
    particles
 end
 
-# function initvisiblenodes(rbm::BernoulliRBM, nparticles::Int, biased::Bool)
-#    if biased
-#       bernoulli!(repmat(sigm(biases[i])', nparticles))
-#    else
-#       rand([0.0 1.0], nparticles, nunits[i])
-#    end
-# end
+function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
+      ) where{M <: AbstractArray{Float64}}
 
-# function initvisiblenodes(rbm::BernoulliRBM, nparticles::Int, biased::Bool)
-#    if biased
-#       bernoulli!(repmat(sigm(lr)', nparticles))
-#    else
-#       rand([0.0 1.0], nparticles, length(rbm.visbias))
-#    end
-# end
+   if biased
+      for k in size(v,2)
+         v[:,k] .= sigm(rbm.visbias[k])
+      end
+      bernoulli!(v)
+   else
+      rand!([0.0 1.0], v)
+   end
+end
 
-# function initvisiblenodes(rbm::GaussianBernoulliRBM, nparticles::Int, biased::Bool)
-#    if biased
-#    else
-#       randn(nparticles, )
-#    end
-# end
+function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
+      ) where{M <: AbstractArray{Float64}}
+   randn!(v)
+   if biased
+      broadcast!(+, v, v, rbm.visbias')
+   end
+end
 
-# TODO implement other methods
+function initvisiblenodes!(v::M, prbm::PartitionedRBM, biased::Bool
+      ) where{M <: AbstractArray{Float64}}
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      initvisiblenodes!(view(v, :, visrange), prbm.rbms[i], biased)
+   end
+   v
+end
 
 
 """
@@ -647,4 +675,13 @@ function updatedbmpartcore!(dbmpart::AbstractRBM,
    dbmpart.visbias += learningrate*(lefta - righta)
    dbmpart.hidbias += learningrate*(leftb - rightb)
    nothing
+end
+
+
+function visiblebias(rbm::AbstractRBM)
+   rbm.visbias
+end
+
+function visiblebias(prbm::PartitionedRBM)
+   vcat(map(rbm -> rbm.visbias, prbm.rbms)...)
 end
