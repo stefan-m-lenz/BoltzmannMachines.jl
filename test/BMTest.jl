@@ -324,6 +324,9 @@ function testdbmwithgaussianvisiblenodes()
       @test isapprox(dbm1[i].hidbias, dbm2[i].hidbias)
    end
 
+   # Test exact likelihood # TODO compare with AIS
+   BMs.exactloglikelihood(dbm1, x)
+
 end
 
 end # of module BMTest

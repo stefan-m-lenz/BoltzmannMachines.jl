@@ -213,11 +213,10 @@ function hiddeninput(gbrbm::GaussianBernoulliRBM, vv::Array{Float64,2})
    hh
 end
 
-function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M
-      ) where{M <: AbstractArray{Float64,2}}
-
-   A_mul_B!(hh, vv, rbm.weights)
-   broadcast!(+, hh, hh, rbm.hidbias')
+function hiddeninput(prbm::PartitionedRBM, v::Vector{Float64})
+   nhidden = prbm.hidranges[end][end]
+   h = Matrix{Float64}(1, nhidden)
+   vec(hiddeninput!(h, pbrbm, v))
 end
 
 
@@ -225,6 +224,13 @@ end
     hiddeninput!(h, rbm, v)
 Like `hiddeninput`, but stores the returned result in `h`.
 """
+function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M
+      ) where{M <: AbstractArray{Float64,2}}
+
+   A_mul_B!(hh, vv, rbm.weights)
+   broadcast!(+, hh, hh, rbm.hidbias')
+end
+
 function hiddeninput!(hh::M, rbm::Binomial2BernoulliRBM, vv::M,
       ) where{M <: AbstractArray{Float64,2}}
 
@@ -371,6 +377,7 @@ function initvisiblebias(x::Array{Float64,2})
    end
    initbias
 end
+
 
 """
     samplehidden(rbm, v)
@@ -586,6 +593,12 @@ end
 function visibleinput(b2brbm::Binomial2BernoulliRBM, hh::Matrix{Float64})
    input = hh * b2brbm.weights'
    broadcast!(+, input, input, b2brbm.visbias')
+end
+
+function visibleinput(prbm::PartitionedRBM, h::Vector{Float64})
+   nvisible = prbm.visranges[end][end]
+   v = Matrix{Float64}(1, nvisible)
+   vec(visibleinput!(v, pbrbm, h))
 end
 
 

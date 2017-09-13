@@ -1,4 +1,8 @@
-const BasicDBM = Array{BernoulliRBM,1}
+const BasicDBM = Vector{BernoulliRBM}
+
+"A DBM with only Bernoulli distributed nodes which may contain partitioned layers."
+const PartitionedBernoulliDBM =
+      Vector{Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}
 
 """
 `Particles` are an array of matrices.

@@ -417,6 +417,16 @@ function energy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64}, h::Vector{Float
          dot(gbrbm.weights*h, v ./ gbrbm.sd)
 end
 
+function energy(prbm::PartitionedRBM, v::Vector{Float64}, h::Vector{Float64})
+   ret = 0.0
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      ret += energy(prbm.rmbs[i], v[visrange], h[hidrange])
+   end
+   ret
+end
+
 
 """
     exactloglikelihood(rbm, x)
@@ -440,7 +450,7 @@ exactly.
 If the value of the log of the partition function of the `dbm` is not supplied
 as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
 """
-function exactloglikelihood(dbm::BasicDBM, x::Matrix{Float64},
+function exactloglikelihood(dbm::PartitionedBernoulliDBM, x::Matrix{Float64},
       logz = exactlogpartitionfunction(dbm))
 
    nsamples = size(x, 1)
@@ -465,6 +475,37 @@ function exactloglikelihood(dbm::BasicDBM, x::Matrix{Float64},
    logp /= nsamples
    logp -= logz
    logp
+end
+
+function exactloglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64},
+      logz = exactlogpartitionfunction(mdbm))
+
+   nsamples = size(x, 1)
+   hiddbm = PartitionedBernoulliDBM(mdbm[2:end])
+   combinedbiases = BMs.combinedbiases(hiddbm)
+
+   # combinations of hidden layers with odd index (i. e. h1, h3, ...)
+   hodd = initcombinationoddlayersonly(hiddbm)
+
+   logpx = 0.0
+   for j = 1:nsamples
+      v = vec(x[j,:])
+      px = 0.0
+      while true
+         pun = unnormalizedproboddlayers(hiddbm, hodd, combinedbiases)
+         pun *= exp(-energy(mdbm[1], v, hodd[1]))
+         px += pun
+
+         # next combination of hidden nodes' activations
+         next!(hodd) || break
+      end
+
+      logpx += log(px)
+   end
+
+   logpx /= nsamples
+   logpx -= logz
+   logpx
 end
 
 
@@ -546,7 +587,7 @@ with the minimum of
 (number of nodes in layers with even index,
 number of nodes in layers with odd index).
 """
-function exactlogpartitionfunction(dbm::BasicDBM)
+function exactlogpartitionfunction(dbm::PartitionedBernoulliDBM)
    nunits = BMs.nunits(dbm)
    nhiddenlayers = length(dbm)
 
@@ -587,6 +628,29 @@ function exactlogpartitionfunction(dbm::BasicDBM)
       z += pun
 
       # next combination of odd hidden layers' nodes
+      next!(hodd) || break
+   end
+   log(z)
+end
+
+
+"""
+    exactlogpartitionfunction(mdbm)
+Calculates the log of the partition function of the MultimodalDBM `mdbm`
+exactly.
+The execution time grows exponentially with the total number of nodes in hidden
+layers with odd indexes (i. e. h1, h3, ...).
+"""
+function exactlogpartitionfunction(mdbm::MultimodalDBM)
+
+   hodd = initcombinationoddlayersonly(mdbm[2:end])
+   hiddbm = PartitionedBernoulliDBM(mdbm[2:end])
+   biases = combinedbiases(mdbm)
+   z = 0.0
+   while true
+      pun = unnormalizedproboddlayers(hiddbm, hodd, biases)
+      pun *= unnormalizedprobhidden(mdbm[1], hodd[1])
+      z += pun
       next!(hodd) || break
    end
    log(z)
@@ -681,7 +745,7 @@ end
 Creates and zero-initializes a particle for layers with odd indexes
 in the `dbm`.
 "
-function initcombinationoddlayersonly(dbm::BasicDBM)
+function initcombinationoddlayersonly(dbm::MultimodalDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
    uodd = Particle(round(Int, nlayers/2, RoundUp))
@@ -937,9 +1001,9 @@ function nunits(dbm::MultimodalDBM)
    nlayers = length(dbm) + 1
    nu = Array{Int,1}(nlayers)
    for i = 1:nrbms
-      nu[i] = length(dbm[i].visbias)
+      nu[i] = length(visiblebias(dbm[i]))
    end
-   nu[nlayers] = length(dbm[nlayers-1].hidbias)
+   nu[nlayers] = length(hiddenbias(dbm[nlayers-1]))
    nu
 end
 
@@ -962,6 +1026,7 @@ function nmodelparameters(gbrbm::GaussianBernoulliRBM)
    invoke(nmodelparameters, (AbstractRBM,), gbrbm) + length(gbrbm.sd)
 end
 
+# TODO respect model parameters for MultimodalDBM with Gaussian nodes
 
 """
     reconstructionerror(rbm, x)
@@ -999,7 +1064,12 @@ function reversedrbm(rbm::BernoulliRBM)
    BernoulliRBM(rbm.weights', rbm.hidbias, rbm.visbias)
 end
 
-function reverseddbm(dbm::BasicDBM)
+function reversedrbm(prbm::PartitionedRBM{BernoulliRBM})
+   PartitionedRBM{BernoulliRBM}(map(reversedrbm, prbm.rbms))
+end
+
+
+function reverseddbm(dbm::PartitionedBernoulliDBM)
    revdbm = reverse(dbm)
    map!(reversedrbm, revdbm, revdbm)
 end
@@ -1062,7 +1132,7 @@ end
 Computes the unnormalized probability of the nodes in layers with odd indexes,
 i. e. p*(v, h2, h4, ...).
 "
-function unnormalizedproboddlayers(dbm::BasicDBM, uodd::Particle,
+function unnormalizedproboddlayers(dbm::PartitionedBernoulliDBM, uodd::Particle,
       combinedbiases = BMs.combinedbiases(dbm))
 
    nlayers = length(dbm) + 1
@@ -1104,6 +1174,15 @@ function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM, h::Vector{Float64})
    wh = gbrbm.weights * h
    exp(dot(gbrbm.hidbias, h) + sum(0.5*wh.^2 + gbrbm.visbias ./ gbrbm.sd .* wh)) *
          prod(gbrbm.sd) * sqrt2pi^nvisible
+end
+
+function unnormalizedprobhidden(prbm::PartitionedRBM, h::Vector{Float64})
+   prob = 1.0
+   for i in eachindex(prbm.rbms)
+      hidrange = prbm.hidranges[i]
+      prob *= unnormalizedprobhidden(pbrbm.rbms[i], h[hidrange])
+   end
+   prob
 end
 
 ################################################################################
