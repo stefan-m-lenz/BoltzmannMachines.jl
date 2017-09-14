@@ -601,36 +601,7 @@ function exactlogpartitionfunction(dbm::PartitionedBernoulliDBM)
       end
    end
 
-   # Initialize particles for hidden layers with odd indexes
-   hodd = Particle(round(Int, nhiddenlayers / 2, RoundUp))
-   for i = eachindex(hodd)
-      hodd[i] = zeros(nunits[2i])
-   end
-
-   # Calculate the unnormalized probabilities for all combinations of nodes
-   # in the hidden layers with odd indexes
-   z = 0.0
-   biases = combinedbiases(dbm)
-   nintermediatelayerstobesummedout = div(nhiddenlayers - 1, 2)
-   while true
-      pun = prod(1 + exp.(visibleinput(dbm[1], hodd[1])))
-      for i = 1:nintermediatelayerstobesummedout
-         pun *= prod(1 + exp.(
-               hiddeninput(dbm[2i], hodd[i]) + visibleinput(dbm[2i+1], hodd[i+1])))
-      end
-      if nhiddenlayers % 2 == 0
-         pun *= prod(1 + exp.(hiddeninput(dbm[end], hodd[end])))
-      end
-      for i = 1:length(hodd)
-         pun *= exp.(dot(biases[2i], hodd[i]))
-      end
-
-      z += pun
-
-      # next combination of odd hidden layers' nodes
-      next!(hodd) || break
-   end
-   log(z)
+   invoke(exactlogpartitionfunction, Tuple{MultimodalDBM,}, dbm)
 end
 
 
@@ -642,13 +613,12 @@ The execution time grows exponentially with the total number of nodes in hidden
 layers with odd indexes (i. e. h1, h3, ...).
 """
 function exactlogpartitionfunction(mdbm::MultimodalDBM)
-
    hodd = initcombinationoddlayersonly(mdbm[2:end])
    hiddbm = PartitionedBernoulliDBM(mdbm[2:end])
-   biases = combinedbiases(mdbm)
+   hiddbmbiases = combinedbiases(hiddbm)
    z = 0.0
    while true
-      pun = unnormalizedproboddlayers(hiddbm, hodd, biases)
+      pun = unnormalizedproboddlayers(hiddbm, hodd, hiddbmbiases)
       pun *= unnormalizedprobhidden(mdbm[1], hodd[1])
       z += pun
       next!(hodd) || break
