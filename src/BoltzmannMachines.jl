@@ -50,6 +50,19 @@ const AbstractBM = Union{MultimodalDBM, AbstractRBM}
 
 
 """
+Converts a vector to a vector of the most specific type that all
+elements share as common supertype.
+"""
+function convertomostspecifictype(v::Vector)
+   mostspecifictype = typeof(v[1])
+   for i in 2:length(v)
+      mostspecifictype = typejoin(mostspecifictype, typeof(v[i]))
+   end
+   Vector{mostspecifictype}(v)
+end
+
+
+"""
     barsandstripes(nsamples, nvariables)
 Generates a test data set. To see the structure in the data set, run e. g.
 `reshape(barsandstripes(1, 16), 4,4)` a few times.

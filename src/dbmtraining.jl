@@ -487,12 +487,7 @@ function stackrbms(x::Array{Float64,2};
    end
 
    nrbms = length(trainlayers)
-   # If all layers are BernoulliRBMs, prepare a BasicDBM, ...
-   if all(map(t -> (t.rbmtype == BernoulliRBM), trainlayers))
-      dbmn = BasicDBM(nrbms)
-   else # ... else prepare a MultimodalDBM
-      dbmn = Vector{AbstractRBM}(nrbms)
-   end
+   dbmn = Vector{AbstractRBM}(nrbms)
 
    upfactor = downfactor = 1.0
    if predbm
@@ -530,6 +525,7 @@ function stackrbms(x::Array{Float64,2};
             monitoring = trainlayers[i].monitoring)
    end
 
+   dbmn = convertomostspecifictype(dbmn)
    dbmn
 end
 
