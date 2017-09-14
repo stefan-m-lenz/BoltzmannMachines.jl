@@ -450,33 +450,6 @@ exactly.
 If the value of the log of the partition function of the `dbm` is not supplied
 as argument `logz`, it will be computed by `exactlogpartitionfunction(dbm)`.
 """
-function exactloglikelihood(dbm::PartitionedBernoulliDBM, x::Matrix{Float64},
-      logz = exactlogpartitionfunction(dbm))
-
-   nsamples = size(x, 1)
-   combinedbiases = BMs.combinedbiases(dbm)
-   uodd = initcombinationoddlayersonly(dbm)
-
-   logp = 0.0
-   for j = 1:nsamples
-      uodd[1] = vec(x[j,:])
-
-      p = 0.0
-      while true
-         p += unnormalizedproboddlayers(dbm, uodd, combinedbiases)
-
-         # next combination of hidden nodes' activations
-         next!(uodd[2:end]) || break
-      end
-
-      logp += log(p)
-   end
-
-   logp /= nsamples
-   logp -= logz
-   logp
-end
-
 function exactloglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64},
       logz = exactlogpartitionfunction(mdbm))
 
