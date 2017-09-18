@@ -140,42 +140,25 @@ function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
 end
 
 
-"
-Calculates the exact value for the partition function and an estimate with AIS
-and return the difference between the logs of the two values
-for a given RBM.
-"
-function aisvsexact(rbm::BMs.AbstractRBM, ntemperatures::Int = 100,
-      nparticles::Int = 100)
+"""
+    testaisvsexact(bm, percentalloweddiff)
+Tests whether the exact log partition function is approximated by the value
+estimated by AIS for the given Boltzmann Machine.
+The test is successful, if the difference in percent of the log of the exact value
+between the exact log partition function and AIS-estimated one is less than
+`percentalloweddiff`.
+"""
+function testaisvsexact(bm::BMs.AbstractBM, percentalloweddiff::Float64;
+      ntemperatures = 100, nparticles = 100)
 
-   # Test log partition funtion estimation vs exact calculation
-   exact = BMs.exactlogpartitionfunction(rbm)
-   impweights = BMs.aisimportanceweights(rbm,
-         ntemperatures = ntemperatures, nparticles = nparticles)
-   r = mean(impweights)
-   estimated = BMs.logpartitionfunction(rbm, r)
-   println("Range of 2 * sd aroung AIS-estimated log partition function")
-   println(BMs.aisprecision(impweights, 2.0))
-   println("Difference between exact log partition function and AIS-estimated one")
-   println("in percent of log of exact value")
-   println((exact - estimated)/exact*100)
-end
-
-function aisvsexact(dbm::BMs.BasicDBM, ntemperatures = 100, nparticles = 100)
-   nrbms = length(dbm)
-
-   impweights = BMs.aisimportanceweights(dbm, ntemperatures = ntemperatures,
+   impweights = BMs.aisimportanceweights(bm, ntemperatures = ntemperatures,
       nparticles = nparticles)
 
    r = mean(impweights)
-   println("Range of 2 * sd aroung AIS-estimated log partition function")
-   println(BMs.aisprecision(impweights, 2.0))
-   exact = BMs.exactlogpartitionfunction(dbm)
-   estimated = BMs.logpartitionfunction(dbm, r)
-   println("Difference between exact log partition function and AIS-estimated one")
-   println("in percent of log of exact value")
-   println((exact - estimated)/exact*100)
-   # TODO loglikelihood base-rate vs loglikelihood dbm
+   exact = BMs.exactlogpartitionfunction(bm)
+   estimated = BMs.logpartitionfunction(bm, r)
+
+   @test abs((exact - estimated)/exact) < percentalloweddiff / 100
 end
 
 function exactlogpartitionfunctionwithoutsummingout(dbm::BMs.BasicDBM)
@@ -324,10 +307,11 @@ function testdbmwithgaussianvisiblenodes()
       @test isapprox(dbm1[i].hidbias, dbm2[i].hidbias)
    end
 
-   # Test exact likelihood # TODO compare with AIS
+   # Test exact likelihood
    BMs.exactloglikelihood(dbm1, x)
 
-   BMs.logpartitionfunction(dbm1) # TODO compute likelihood
+   # Test AIS
+   BMTest.testaisvsexact(dbm1, 0.5)
    nothing
 end
 
