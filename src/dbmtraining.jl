@@ -2,7 +2,7 @@ const BasicDBM = Vector{BernoulliRBM}
 
 "A DBM with only Bernoulli distributed nodes which may contain partitioned layers."
 const PartitionedBernoulliDBM =
-      Vector{Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}
+      Vector{<:Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}
 
 """
 `Particles` are an array of matrices.
@@ -272,8 +272,9 @@ The state of the `particles` and the `dbm` is not altered.
 For performance reasons, `input2` is used as preallocated space for storing
 intermediate results.
 """
-function weightsinput!(input::Particles, input2::Particles, dbm::BasicDBM,
-      particles::Particles)
+function weightsinput!(input::Particles, input2::Particles,
+      dbm::PartitionedBernoulliDBM, particles::Particles)
+   # TODO respect partitioning
 
    # first layer gets input only from layer above
    A_mul_B!(input[1], particles[2], dbm[1].weights')
@@ -525,7 +526,7 @@ function stackrbms(x::Array{Float64,2};
             monitoring = trainlayers[i].monitoring)
    end
 
-   dbmn = convertomostspecifictype(dbmn)
+   dbmn = converttomostspecifictype(dbmn)
    dbmn
 end
 

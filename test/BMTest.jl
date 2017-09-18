@@ -327,6 +327,8 @@ function testdbmwithgaussianvisiblenodes()
    # Test exact likelihood # TODO compare with AIS
    BMs.exactloglikelihood(dbm1, x)
 
+   BMs.logpartitionfunction(dbm1) # TODO compute likelihood
+   nothing
 end
 
 end # of module BMTest

@@ -182,35 +182,97 @@ end
 """
     aisimportanceweights(dbm; ...)
 Computes the importance weights in the Annealed Importance Sampling algorithm
-for estimating the ratio of the partition functions of the given `dbm` to the
+for estimating the ratio of the partition functions of the given DBM `dbm` to the
 base-rate DBM with all weights being zero and all biases equal to the biases of
 the `dbm`.
+
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
+For DBMs with Bernoulli-distributed nodes only
+(i. e. here DBMs of type `PartitionedBernoulliDBM`),
+it is possible to calculate the importance weights by summing out either
+the even layers (h1, h3, ...) or the odd layers (v, h2, h4, ...).
+In the first case, the nodes' activations in the odd layers are used to
+calculate the probability ratios, in the second case the even layer are used.
+If `dbm` is of type `PartitionedBernoulliDBM`, the optional keyword argument
+`sumout` can be used to choose by specifying the values `:odd` (default) or
+`:even`.
+In the case of `MultimodalDBM`s, it is not possible to choose and
+the second case applies there.
 """
-function aisimportanceweights(dbm::BasicDBM;
+function aisimportanceweights(dbm::PartitionedBernoulliDBM;
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 5,
+      sumout::Symbol = :even)
+
+   if sumout == :odd
+      # summing out even layers is done in the implementation for
+      # MultimodalDBMs
+      return invoke(aisimportanceweights, Tuple{MultimodalDBM, }, dbm;
+            ntemperatures = ntemperatures,
+            beta = beta,
+            nparticles = nparticles,
+            burnin = burnin)
+   elseif sumout != :even
+      error("Invalid value for argument `sumout`.")
+   end
+   # in the following implementation, the even layers are summed out
+
+   impweights = ones(nparticles)
+      # Todo: sample from null model, which has changed
+   particles = initparticles(dbm, nparticles, biased = true)
+   nlayers = length(particles)
+
+   # for performance reasons: preallocate input and combine biases
+   input1 = newparticleslike(particles)
+   input2 = newparticleslike(particles)
+   biases = combinedbiases(dbm)
+   mixdbm = deepcopy(dbm)
+
+   for k = 2:length(beta)
+      # Calculate probability ratios for importance weights
+      # according to activation of odd layers (v, h2, h4, ...)
+      aisupdateimportanceweights!(impweights, input1, input2,
+            beta[k], beta[k-1], dbm, biases, particles)
+
+      # Gibbs transition
+      copyannealed!(mixdbm, dbm, beta[k])
+      gibbssample!(particles, mixdbm, burnin)
+   end
+
+   impweights
+end
+
+function aisimportanceweights(mdbm::MultimodalDBM;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    impweights = ones(nparticles)
-   # Todo: sample from null model, which has changed
-   particles = initparticles(dbm, nparticles, biased = true)
+      # Todo: sample from null model, which has changed
+   particles = initparticles(mdbm, nparticles, biased = true)
    nlayers = length(particles)
 
    # for performance reasons: preallocate input and combine biases
-   input1 = deepcopy(particles)
-   input2 = deepcopy(particles)
-   biases = combinedbiases(dbm)
-   mixdbm = deepcopy(dbm)
+   hiddbminput1 = newparticleslike(particles[2:end])
+   hiddbminput2 = newparticleslike(particles[2:end])
+
+   mixdbm = deepcopy(mdbm)
+   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
+   hidbiases = combinedbiases(hiddbm)
 
    for k = 2:length(beta)
-      # calculate importance weights
-      aisupdateimportanceweights!(impweights, input1, input2,
-            beta[k], beta[k-1], dbm, biases, particles)
+      # Calculate probability ratios for importance weights
+      # according to activation of odd hidden layers (h1, h3, ...)
+      impweights .*= aisunnormalizedprobratios(mdbm[1],
+            particles[2], beta[k], beta[k-1])
+      aisupdateimportanceweights!(impweights, hiddbminput1, hiddbminput2,
+            beta[k], beta[k-1], hiddbm, hidbiases, particles[2:end])
 
       # Gibbs transition
-      copyannealed!(mixdbm, dbm, beta[k])
+      copyannealed!(mixdbm, mdbm, beta[k])
       gibbssample!(particles, mixdbm, burnin)
    end
 
@@ -283,7 +345,17 @@ function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
 
    wht = hh * gbrbm.weights'
    vec(exp.((temperature1 - temperature2) * sum(
-         0.5 * wht.^2 + broadcast(.*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2)))
+         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2)))
+end
+
+function aisunnormalizedprobratios(prbm::PartitionedRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   mapreduce(
+         rbm -> aisunnormalizedprobratios(rbm, hh, temperature1, temperature2),
+         *, prbm.rbms)
 end
 
 
@@ -296,7 +368,7 @@ For performance reasons, the biases are specified separately
 function aisupdateimportanceweights!(impweights,
       input1::Particles, input2::Particles,
       temperature1::Float64, temperature2::Float64,
-      dbm::BasicDBM,
+      dbm::PartitionedBernoulliDBM,
       biases::Particle,
       particles::Particles)
 
@@ -331,6 +403,7 @@ function copyannealed!(annealedrbm::AbstractRBM,
 
    annealedrbm.weights .= rbm.weights
    annealedrbm.weights .*= temperature
+   nothing
 end
 
 function copyannealed!(annealedrbm::GaussianBernoulliRBM,
@@ -340,6 +413,16 @@ function copyannealed!(annealedrbm::GaussianBernoulliRBM,
    annealedrbm.sd .= gbrbm.sd
    annealedrbm.weights .*= sqrt(temperature)
    annealedrbm.sd ./= sqrt(temperature)
+   nothing
+end
+
+function copyannealed!(annealedrbm::PartitionedRBM,
+      prbm::PartitionedRBM, temperature::Float64)
+
+   for i in eachindex(annealedrbm.rbms)
+      copyannealed!(annealedrbm.rbms[i], prbm.rbms[i], temperature)
+   end
+   nothing
 end
 
 function copyannealed!{T<:AbstractRBM}(annealedrbms::Vector{T}, rbms::Vector{T},
@@ -348,6 +431,7 @@ function copyannealed!{T<:AbstractRBM}(annealedrbms::Vector{T}, rbms::Vector{T},
    for i in eachindex(rbms)
       copyannealed!(annealedrbms[i], rbms[i], temperature)
    end
+   nothing
 end
 
 
@@ -454,7 +538,7 @@ function exactloglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64},
       logz = exactlogpartitionfunction(mdbm))
 
    nsamples = size(x, 1)
-   hiddbm = PartitionedBernoulliDBM(mdbm[2:end])
+   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
    combinedbiases = BMs.combinedbiases(hiddbm)
 
    # combinations of hidden layers with odd index (i. e. h1, h3, ...)
@@ -587,7 +671,7 @@ layers with odd indexes (i. e. h1, h3, ...).
 """
 function exactlogpartitionfunction(mdbm::MultimodalDBM)
    hodd = initcombinationoddlayersonly(mdbm[2:end])
-   hiddbm = PartitionedBernoulliDBM(mdbm[2:end])
+   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
    hiddbmbiases = combinedbiases(hiddbm)
    z = 0.0
    while true
@@ -813,31 +897,56 @@ Returns the value of the log of the partition function of the Boltzmann Machine
 that results when one sets the weights of `bm` to zero,
 and leaves the other parameters (biases) unchanged.
 """
-function logpartitionfunctionzeroweights(rbm::BernoulliRBM)
-   sum(log.(1 + exp.(rbm.visbias))) + sum(log.(1 + exp.(rbm.hidbias)))
+function logpartitionfunctionzeroweights(rbm::AbstractRBM)
+   logpartitionfunctionzeroweights_visterm(rbm) +
+         logpartitionfunctionzeroweights_hidterm(rbm)
 end
 
-function logpartitionfunctionzeroweights(bgrbm::BernoulliGaussianRBM)
-   nhidden = length(bgrbm.hidbias)
-   nhidden / 2 * log(2pi) + sum(log.(1 + exp.(bgrbm.visbias)))
+function logpartitionfunctionzeroweights(prbm::PartitionedRBM)
+   mapreduce(rbm -> logpartitionfunctionzeroweights(rbm), +, prbm.rbms)
 end
 
-function logpartitionfunctionzeroweights(b2brbm::Binomial2BernoulliRBM)
-   2*sum(log.(1 + exp.(b2brbm.visbias))) + sum(log.(1 + exp.(b2brbm.hidbias)))
-end
-
-function logpartitionfunctionzeroweights(gbrbm::GaussianBernoulliRBM)
-   nvisible = length(gbrbm.visbias)
-   logz0 = nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd)) + sum(log.(1 + exp.(gbrbm.hidbias)))
-end
-
-function logpartitionfunctionzeroweights(dbm::BasicDBM)
+function logpartitionfunctionzeroweights(dbm::PartitionedBernoulliDBM)
    logz0 = 0.0
    biases = combinedbiases(dbm)
    for i in eachindex(biases)
       logz0 += sum(log.(1 + exp.(biases[i])))
    end
    logz0
+end
+
+function logpartitionfunctionzeroweights(mdbm::MultimodalDBM)
+   logpartitionfunctionzeroweights_visterm(mdbm[1]) +
+         invoke(logpartitionfunctionzeroweights,
+               Tuple{PartitionedBernoulliDBM,},
+               converttomostspecifictype(mdbm[2:end]))
+end
+
+
+function logpartitionfunctionzeroweights_visterm(rbm::BernoulliRBM)
+   sum(log.(1 + exp.(rbm.visbias)))
+end
+
+function logpartitionfunctionzeroweights_visterm(bgrbm::BernoulliGaussianRBM)
+   sum(log.(1 + exp.(bgrbm.visbias)))
+end
+
+function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
+   2*sum(log.(1 + exp.(b2brbm.visbias)))
+end
+
+function logpartitionfunctionzeroweights_visterm(gbrbm::GaussianBernoulliRBM)
+   nvisible = length(gbrbm.visbias)
+   nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd))
+end
+
+function logpartitionfunctionzeroweights_hidterm(rbm::AbstractXBernoulliRBM)
+   sum(log.(1 + exp.(rbm.hidbias)))
+end
+
+function logpartitionfunctionzeroweights_hidterm(bgrbm::BernoulliGaussianRBM)
+   nhidden = length(bgrbm.hidbias)
+   nhidden / 2 * log(2pi)
 end
 
 

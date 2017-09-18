@@ -53,7 +53,7 @@ const AbstractBM = Union{MultimodalDBM, AbstractRBM}
 Converts a vector to a vector of the most specific type that all
 elements share as common supertype.
 """
-function convertomostspecifictype(v::Vector)
+function converttomostspecifictype(v::Vector)
    mostspecifictype = typeof(v[1])
    for i in 2:length(v)
       mostspecifictype = typejoin(mostspecifictype, typeof(v[i]))
