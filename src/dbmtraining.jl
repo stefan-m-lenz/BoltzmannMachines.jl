@@ -19,7 +19,9 @@ const Particle = Array{Array{Float64,1},1}
 const MultimodalDBM = Vector{<:AbstractRBM}
 
 
-type TrainLayer
+@compat abstract type AbstractTrainLayer end
+
+type TrainLayer <: AbstractTrainLayer
    epochs::Int
    usedefaultepochs::Bool
    learningrate::Float64
@@ -28,9 +30,10 @@ type TrainLayer
    sdlearningrates::Vector{Float64}
    monitoring::Function
    rbmtype::DataType
-   nhiddensparts::Vector{Int}
    nhidden::Int
+   nvisible::Int
 end
+
 
 """
 Specify parameters for training one RBM-layer in a DBM.
@@ -38,35 +41,43 @@ Specify parameters for training one RBM-layer in a DBM.
 # Optional keyword arguments:
 * `rbmtype`: the type of the RBM that is to be trained.
    This must be a subtype of AbstractRBM and defaults to `BernoulliRBM`.
-* `nhidden`: Number of hidden units in the RBM
-* `epochs`: number of training epochs
-* `learningrate`: learning rate
+* `nhidden`: Number of hidden units in the RBM.
+* `nvisible`: Number of visible units in the RBM. Only relevant for partitioning.
+* `epochs`: number of training epochs.
+   A negative value indicates that a default value should be used.
+* `learningrate`: learning rate.
+   A negative value indicates that a default value should be used.
 * `sdlearningrate`/`sdlearningrates`: learning rate / learning rates for each epoch
    for learning the standard deviation. Only used for GaussianBernoulliRBMs.
 * `monitoring`:  a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
-* `nhiddensparts`: TODO
 """
 function TrainLayer(;
-      epochs::Nullable{Int} = Nullable{Int}(),
-      learningrate::Nullable{Float64} = Nullable{Float64}(),
+      epochs::Int = -1,
+      learningrate::Float64 = -Inf,
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
       monitoring = ((rbm, epoch) -> nothing),
       rbmtype::DataType = BernoulliRBM,
-      nhiddensparts::Vector{Int} = Vector{Int}(), # TODO use
-      nhidden::Int = 0)
+      nhidden::Int = -1,
+      nvisible::Int = -1)
 
-   usedefaultepochs = isnull(epochs)
-   usedefaultlearningrate = isnull(learningrate)
+   usedefaultepochs = (epochs < 0)
+   usedefaultlearningrate = (learningrate < 0)
    TrainLayer(
-         (usedefaultepochs ? 10 : get(epochs)),
+         (usedefaultepochs ? 10 : epochs),
          usedefaultepochs,
-         (usedefaultlearningrate ? 0.005 : get(learningrate)),
+         (usedefaultlearningrate ? 0.005 : learningrate),
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
-         monitoring, rbmtype, nhiddensparts, nhidden)
+         monitoring, rbmtype, nhidden, nvisible)
 end
+
+type TrainPartitionedLayer <: AbstractTrainLayer
+   parts::Vector{TrainLayer}
+end
+
+const AbstractTrainLayers = Vector{<:AbstractTrainLayer}
 
 
 """
@@ -184,14 +195,14 @@ function fitdbm(x::Matrix{Float64};
             defaultfinetuninglearningrates(learningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
-      pretraining::Vector{TrainLayer} = Vector{TrainLayer}())
+      pretraining::AbstractTrainLayers = Vector{TrainLayer}())
 
    if isempty(pretraining) && isempty(nhiddens)
       # set default only if there is not any more detailed info
       nhiddens = size(x,2)*ones(2)
    end
 
-   pretraineddbm = BMs.stackrbms(x, nhiddens = nhiddens,
+   pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
          learningrate = learningratepretraining,
          trainlayers = pretraining)
@@ -345,6 +356,19 @@ function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
    end
 end
 
+function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
+   ) where{M <: AbstractArray{Float64}}
+
+   if biased
+      for k in size(v,2)
+         v[:,k] .= sigm(b2brbm.visbias[k])
+      end
+      binomial2!(v)
+   else
+      rand!([0.0 1.0 1.0 2.0], v)
+   end
+end
+
 function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64}}
    randn!(v)
@@ -456,36 +480,10 @@ function stackrbms(x::Array{Float64,2};
       predbm::Bool = false,
       samplehidden::Bool = false,
       learningrate::Float64 = 0.005,
-      trainlayers::Vector{TrainLayer} = Vector{TrainLayer}())
+      trainlayers::AbstractTrainLayers = Vector{TrainLayer}())
 
-   # prepare layerwise training specifications
-   if isempty(trainlayers)
-      # construct default training specification for layers
-      function defaultlayer(nhidden::Int)
-         TrainLayer(epochs = Nullable{Int}(epochs),
-               learningrate = Nullable{Float64}(learningrate),
-               nhidden = nhidden)
-      end
-
-      if isempty(nhiddens)
-         nhiddens = size(x,2)*ones(2) # default value for nhiddens
-      end
-      trainlayers = map(defaultlayer, nhiddens)
-   else
-      if !isempty(nhiddens)
-         warn("Argument `nhiddens` not used.")
-      end
-      for trainlayer in trainlayers
-         # if no learningrate or epochs are specified in the TrainLayers object,
-         # use the values of the respective arguments
-         if trainlayer.usedefaultlearningrate
-            trainlayer.learningrate = learningrate
-         end
-         if trainlayer.usedefaultepochs
-            trainlayer.epochs = epochs
-         end
-      end
-   end
+   trainlayer = stackrbms_preparetrainlayer(trainlayers, x, epochs,
+         learningrate, nhiddens)
 
    nrbms = length(trainlayers)
    dbmn = Vector{AbstractRBM}(nrbms)
@@ -495,19 +493,12 @@ function stackrbms(x::Array{Float64,2};
       upfactor = 2.0
    end
 
-   dbmn[1] = BMs.fitrbm(x;
-         nhidden = trainlayers[1].nhidden,
-         epochs = trainlayers[1].epochs,
-         upfactor = upfactor, downfactor = downfactor, pcd = true,
-         rbmtype = trainlayers[1].rbmtype,
-         learningrate = trainlayers[1].learningrate,
-         sdlearningrate = trainlayers[1].sdlearningrate,
-         sdlearningrates = trainlayers[1].sdlearningrates,
-         monitoring = trainlayers[1].monitoring)
+   dbmn[1] = stackrbms_trainlayer(x, trainlayers[1];
+         upfactor = upfactor, downfactor = downfactor)
 
    hiddenval = x
-   for i=2:nrbms
-      hiddenval = BMs.hiddenpotential(dbmn[i-1], hiddenval, upfactor)
+   for i = 2:nrbms
+      hiddenval = hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
          hiddenval = bernoulli(hiddenval)
       end
@@ -519,15 +510,126 @@ function stackrbms(x::Array{Float64,2};
       else
          upfactor = downfactor = 1.0
       end
-      dbmn[i] = BMs.fitrbm(hiddenval; nhidden = trainlayers[i].nhidden,
-            epochs = trainlayers[i].epochs, rbmtype = trainlayers[i].rbmtype,
-            upfactor = upfactor, downfactor = downfactor, pcd = true,
-            learningrate = trainlayers[i].learningrate,
-            monitoring = trainlayers[i].monitoring)
+      dbmn[i] = stackrbms_trainlayer(hiddenval, trainlayers[i];
+            upfactor = upfactor, downfactor = downfactor)
    end
 
    dbmn = converttomostspecifictype(dbmn)
    dbmn
+end
+
+""" Prepares the layerwise training specifications for `stackrbms` """
+function stackrbms_preparetrainlayer(
+      trainlayers::AbstractTrainLayers,
+      x::Matrix{Float64},
+      epochs::Int,
+      learningrate::Float64,
+      nhiddens::Vector{Int})
+
+
+   if isempty(trainlayers)
+      # construct default "trainlayers"
+      if isempty(nhiddens)
+         nhiddens = size(x,2)*ones(2) # default value for nhiddens
+      end
+      trainlayers = map(n -> TrainLayer(nhidden = n), nhiddens)
+      return trainlayers
+   end
+   # We are here, Argument "trainlayers" has been specified
+   # --> check for correct specification
+
+   if !isempty(nhiddens)
+      warn("Argument `nhiddens` not used.")
+   end
+
+   function setdefaultsforunspecified(trainlayer::TrainLayer)
+      if trainlayer.usedefaultlearningrate
+         trainlayer.learningrate = learningrate
+      end
+      if trainlayer.usedefaultepochs
+         trainlayer.epochs = epochs
+      end
+   end
+
+   function setdefaultsforunspecified(trainpartitionedlayer::TrainPartitionedLayer)
+      for trainlayer in trainpartitionedlayer.parts
+         setdefaultsforunspecified(trainlayer)
+      end
+   end
+
+   for trainlayer in trainlayers
+      setdefaultsforunspecified(trainlayer)
+   end
+
+   function derive_nvisibles!(layer::AbstractTrainLayer,
+         prevlayer::AbstractTrainLayer)
+      # do nothing
+   end
+
+   function derive_nvisibles!(layer::TrainPartitionedLayer,
+         prevlayer::TrainPartitionedLayer)
+
+      if length(layer.parts) == length(prevlayer.parts)
+         for j in eachindex(layer.parts)
+            if layer.parts[j].nvisible < 0
+               layer.parts[j].nvisible = prevlayer.parts[j].nhidden
+            end
+         end
+      end
+      if any(map(t -> t.nvisible < 0, layer.parts))
+         error("Parameter `nvisible` could not be derived.")
+      end
+   end
+
+   for i = 2:length(trainlayers)
+      derive_nvisibles!(trainlayers[i], trainlayers[i-1])
+   end
+
+   if isa(trainlayers[1], TrainPartitionedLayer)
+      nvisiblestotal = mapreduce(t -> t.nvisible, +, trainlayers[1].parts)
+      if nvisiblestotal != size(x,2)
+         error("Number of visible nodes for first layer " *
+               "($nvisiblestotal) is not of same length as " *
+               "number of columns in `x` ($(size(x,2))).")
+      end
+   end
+
+   trainlayers
+end
+
+
+""" Trains a layer without partitioning for `stackrbms`. """
+function stackrbms_trainlayer(x::Matrix{Float64},
+      trainlayer::TrainLayer;
+      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+
+   BMs.fitrbm(x;
+         upfactor = upfactor, downfactor = downfactor, pcd = true,
+         nhidden = trainlayer.nhidden,
+         epochs = trainlayer.epochs,
+         rbmtype = trainlayer.rbmtype,
+         learningrate = trainlayer.learningrate,
+         sdlearningrate = trainlayer.sdlearningrate,
+         sdlearningrates = trainlayer.sdlearningrates,
+         monitoring = trainlayer.monitoring)
+end
+
+""" Trains a partitioned layer for `stackrbms`. """
+function stackrbms_trainlayer(x::Matrix{Float64},
+      trainpartitionedlayer::TrainPartitionedLayer;
+      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+
+   visranges = ranges(map(t -> t.nvisible, trainpartitionedlayer.parts))
+
+   rbms = Vector{AbstractRBM}(length(trainpartitionedlayer.parts))
+   for i in eachindex(trainpartitionedlayer.parts)
+      visrange = visranges[i]
+      rbms[i] = stackrbms_trainlayer(x[:, visrange],
+            trainpartitionedlayer.parts[i];
+            upfactor = upfactor, downfactor = downfactor)
+   end
+   commontype = mostspecifictype(rbms)
+   PartitionedRBM{commontype}(Vector{commontype}(rbms))
 end
 
 
@@ -604,7 +706,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2}, particles::Particles
    gibbssample!(particles, dbm)
    mu = meanfield(dbm, x)
 
-   for i = eachindex(dbm)
+   for i in eachindex(dbm)
       updatedbmpart!(dbm[i], learningrate,
             particles[i], particles[i+1], mu[i], mu[i+1])
    end
@@ -615,10 +717,8 @@ end
 
 function updatedbmpart!(dbmpart::BernoulliRBM,
       learningrate::Float64,
-      vgibbs::Matrix{Float64},
-      hgibbs::Matrix{Float64},
-      vmeanfield::Matrix{Float64},
-      hmeanfield::Matrix{Float64})
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
 
    updatedbmpartcore!(dbmpart, learningrate,
          vgibbs, hgibbs, vmeanfield, hmeanfield)
@@ -626,10 +726,8 @@ end
 
 function updatedbmpart!(dbmpart::Binomial2BernoulliRBM,
       learningrate::Float64,
-      vgibbs::Matrix{Float64},
-      hgibbs::Matrix{Float64},
-      vmeanfield::Matrix{Float64},
-      hmeanfield::Matrix{Float64})
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
 
    vmeanfield /= 2
    vgibbs /= 2
@@ -640,10 +738,8 @@ end
 
 function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
       learningrate::Float64,
-      vgibbs::Matrix{Float64},
-      hgibbs::Matrix{Float64},
-      vmeanfield::Matrix{Float64},
-      hmeanfield::Matrix{Float64})
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
 
    # For respecting standard deviation in update rule
    # see [Srivastava+Salakhutdinov, 2014], p. 2962
@@ -654,12 +750,25 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
          vgibbs, hgibbs, vmeanfield, hmeanfield)
 end
 
+function updatedbmpart!(dbmpart::PartitionedRBM,
+   learningrate::Float64,
+   vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+   ) where {M<:AbstractArray{Float64,2}}
+
+   for i in eachindex(dbmpart.rbms)
+      visrange = dbmpart.visranges[i]
+      hidrange = dbmpart.hidranges[i]
+      # TODO does not work with views
+      updatedbmpart!(dbmpart.rbms[i], learningrate,
+            vgibbs[:, visrange], hgibbs[:, hidrange],
+            vmeanfield[:, visrange], hmeanfield[:, hidrange])
+   end
+end
+
 function updatedbmpartcore!(dbmpart::AbstractRBM,
       learningrate::Float64,
-      vgibbs::Matrix{Float64},
-      hgibbs::Matrix{Float64},
-      vmeanfield::Matrix{Float64},
-      hmeanfield::Matrix{Float64})
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
 
    nsamples = size(vmeanfield, 1)
    nparticles = size(vgibbs, 1)

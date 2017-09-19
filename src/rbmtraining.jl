@@ -284,7 +284,7 @@ end
 function hiddeninput!(hh::M, prbm::PartitionedRBM, vv::M,
       ) where{M <: AbstractArray{Float64,2}}
 
-   for i in eachindex(pbrbm.rbms)
+   for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
       hiddeninput!(view(hh, :, hidrange), prbm.rbms[i], view(vv, :, visrange))
@@ -324,6 +324,12 @@ function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, fact
    broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
 end
 
+function hiddenpotential(prbm::PartitionedRBM, vv::Array{Float64,2}, factor::Float64)
+   nsamples = size(vv, 1)
+   nhidden = prbm.hidranges[end][end]
+   hh = Matrix{Float64}(nsamples, nhidden)
+   hiddenpotential!(hh, prbm, vv, factor)
+end
 
 """
     hiddenpotential!(hh, rbm, vv)
@@ -346,13 +352,14 @@ function hiddenpotential!(hh::M, bgrbm::BernoulliGaussianRBM, vv::M,
    hh .*= factor
 end
 
-function hiddenpotential!(hh::M, rbm::PartitionedRBM, vv::M,
+function hiddenpotential!(hh::M, prbm::PartitionedRBM, vv::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
-   for i in eachindex(pbrbm.rbms)
+   for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
-      hiddenpotential!(view(hh, :, hidrange), prbm.rbms[i], view(vv, :, visrange))
+      hiddenpotential!(view(hh, :, hidrange), prbm.rbms[i], view(vv, :, visrange),
+         factor)
    end
    hh
 end
@@ -533,6 +540,15 @@ function samplevisiblepotential!(v::M, gbrbm::GaussianBernoulliRBM
       ) where{M <: AbstractArray{Float64}}
    gaussiannoise = broadcast(*, randn(size(v)), gbrbm.sd')
    v .+= gaussiannoise
+end
+
+function samplevisiblepotential!(vv::M, prbm::PartitionedRBM
+      ) where{M <: AbstractArray{Float64,2}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      samplevisiblepotential!(view(vv, :, visrange), prbm.rbms[i])
+   end
 end
 
 

@@ -353,9 +353,11 @@ function aisunnormalizedprobratios(prbm::PartitionedRBM,
       temperature1::Float64,
       temperature2::Float64)
 
+   # TODO does not work with views
    mapreduce(
-         rbm -> aisunnormalizedprobratios(rbm, hh, temperature1, temperature2),
-         *, prbm.rbms)
+         i -> aisunnormalizedprobratios(prbm.rbms[i],
+               hh[:, prbm.hidranges[i]], temperature1, temperature2),
+         .*, eachindex(prbm.rbms))
 end
 
 
@@ -507,6 +509,34 @@ function energy(prbm::PartitionedRBM, v::Vector{Float64}, h::Vector{Float64})
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
       ret += energy(prbm.rmbs[i], v[visrange], h[hidrange])
+   end
+   ret
+end
+
+
+"""
+    energyzerohiddens(rbm, v)
+Computes the energy for the visible activations `v` in the RBM `rbm`, if all
+hidden nodes have zero activation, i. e. yields the same as
+`energy´(rbm, v, zeros(rbm.hidbias))`.
+"""
+function energyzerohiddens(rbm::BernoulliRBM, v::Vector{Float64})
+   - dot(rbm.visbias, v)
+end
+
+function energyzerohiddens(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
+   - sum(v .== 1.0) * log(2) - dot(b2brbm.visbias, v)
+end
+
+function energyzerohiddens(gbrbm::GaussianBernoulliRBM, v::Vector{Float64})
+   sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2
+end
+
+function energyzerohiddens(prbm::PartitionedRBM, v::Vector{Float64})
+   ret = 0.0
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      ret += energyzerohiddens(prbm.rmbs[i], v[visrange])
    end
    ret
 end
@@ -803,25 +833,38 @@ Estimates the mean log-likelihood of the DBM on the data set `x`
 with Annealed Importance Sampling.
 This requires a separate run of AIS for each sample.
 """
-function loglikelihood(dbm::BasicDBM, x::Matrix{Float64};
+function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz = -Inf;
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    nsamples = size(x,1)
-
-   r = mean(aisimportanceweights(dbm; ntemperatures = ntemperatures,
-         beta = beta, nparticles = nparticles, burnin = burnin))
-   logz = logpartitionfunction(dbm, r)
-
-   hiddbm = deepcopy(dbm[2:end])
+   if logz == -Inf
+      r = mean(aisimportanceweights(mdbm; ntemperatures = ntemperatures,
+            beta = beta, nparticles = nparticles, burnin = burnin))
+      logz = logpartitionfunction(mdbm, r)
+   end
 
    logp = 0.0
+   hiddbm = deepcopy(mdbm[2:end])
+   h1 = Vector{Float64}(length(hiddenbias(mdbm[1])))
+   visbias2 = visiblebias(mdbm[2]) # visible bias of second RBM
+
    for j = 1:nsamples
       v = vec(x[j,:])
-      logp += dot(dbm[1].visbias, v)
-      hiddbm[1].visbias = hiddeninput(dbm[1], v) + dbm[2].visbias
+      setvisiblebias!(hiddbm[1], visbias2) # reset to original bias
+
+      logp -= energyzerohiddens(mdbm[1], v)
+
+      # Integrate the energy of the sample v
+      # into the visible bias of the first hidden layer.
+      hiddeninput!(h1, mdbm[1], v)
+      h1 .+= visbias2
+      setvisiblebias!(hiddbm[1], h1)
+
+      # Then compute the log partition function of the new DBM consisting
+      # only of the hidden layer RBMs (with the first layer modified).
       r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
             beta = beta, nparticles = nparticles, burnin = burnin))
       logp += logpartitionfunction(hiddbm, r)
@@ -1177,6 +1220,18 @@ function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::I
    # do not sample in last step to avoid that the noise dominates the data
    particles[1] = visiblepotential(gbrbm, particles[2])
    particles
+end
+
+
+function setvisiblebias!(rbm::BernoulliRBM, v::Vector{Float64})
+   rbm.visbias .= v
+end
+
+function setvisiblebias!(pbrbm::PartitionedRBM{BernoulliRBM}, v::Vector{Float64})
+   for i in eachindex(pbrbm.rbms)
+      visrange = pbrbm.visranges[i]
+      view(pbrbm.rbms[i].visbias, visrange) .= v[visrange]
+   end
 end
 
 

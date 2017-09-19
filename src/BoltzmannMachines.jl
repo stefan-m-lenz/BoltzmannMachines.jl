@@ -54,11 +54,11 @@ Converts a vector to a vector of the most specific type that all
 elements share as common supertype.
 """
 function converttomostspecifictype(v::Vector)
-   mostspecifictype = typeof(v[1])
-   for i in 2:length(v)
-      mostspecifictype = typejoin(mostspecifictype, typeof(v[i]))
-   end
-   Vector{mostspecifictype}(v)
+   Vector{mostspecifictype(v)}(v)
+end
+
+function mostspecifictype(v::Vector)
+   mapreduce(typeof, typejoin, v)
 end
 
 

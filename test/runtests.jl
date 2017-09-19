@@ -42,9 +42,10 @@ end
 
 BMTest.testdbmjoining()
 
-BMTest.testloglikelihood_b2brbm()
-
-BMTest.testdbmwithgaussianvisiblenodes()
+BMTest.test_rbm()
+BMTest.test_b2brbm()
+BMTest.test_mdbm_rbm_b2brbm()
+BMTest.test_mdbm_gaussianvisibles()
 
 # run examples
 include("examples.jl")
