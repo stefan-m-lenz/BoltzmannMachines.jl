@@ -329,17 +329,17 @@ end
 
 
 function test_mdbm_rbm_b2brbm()
-   x1 = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4)
-   x2 = BMTest.createsamples(100, 4)
-   x = hcat(x1, x2)
+   x1 = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4);
+   x2 = BMTest.createsamples(100, 4);
+   x = hcat(x1, x2);
    trainlayers1 = [
          BMs.TrainPartitionedLayer([
             BMs.TrainLayer(rbmtype = BMs.Binomial2BernoulliRBM,
                   nvisible = 4, nhidden = 3);
             BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
                   nvisible = 4, nhidden = 4)
-         ]),
-         BMs.TrainLayer(nhidden = 4),
+         ]);
+         BMs.TrainLayer(nhidden = 4);
          BMs.TrainLayer(nhidden = 4)]
 
    dbm1 = BMs.fitdbm(x, epochs = 15,
@@ -347,9 +347,24 @@ function test_mdbm_rbm_b2brbm()
          learningratepretraining = 0.001,
          pretraining = trainlayers1)
 
-   # TODO second rbm with partitioned second hidden layer
    BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 3.0,
          ntemperatures = 300, nparticles = 250)
+
+   # partitioned second layer
+   trainlayers2 = [
+         trainlayers1[1],
+         BMs.TrainPartitionedLayer([
+            BMs.TrainLayer(nhidden = 3);
+            BMs.TrainLayer(nhidden = 2)
+         ]),
+         BMs.TrainLayer(nhidden = 4),
+         BMs.TrainLayer(nhidden = 3)
+   ]
+
+   dbm2 = BMs.fitdbm(x, pretraining = trainlayers2)
+   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 3.0,
+         ntemperatures = 300, nparticles = 250)
+
 end
 
 function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};

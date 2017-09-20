@@ -18,6 +18,10 @@ const Particle = Array{Array{Float64,1},1}
 
 const MultimodalDBM = Vector{<:AbstractRBM}
 
+function converttopartitionedbernoullidbm(mdbm::MultimodalDBM)
+   Vector{Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}(mdbm)
+end
+
 
 @compat abstract type AbstractTrainLayer end
 
@@ -285,22 +289,56 @@ intermediate results.
 """
 function weightsinput!(input::Particles, input2::Particles,
       dbm::PartitionedBernoulliDBM, particles::Particles)
-   # TODO respect partitioning
 
    # first layer gets input only from layer above
-   A_mul_B!(input[1], particles[2], dbm[1].weights')
+   weightsvisibleinput!(input[1], dbm[1], particles[2])
 
    # intermediate layers get input from layers above and below
    for i = 2:(length(particles) - 1)
-      A_mul_B!(input2[i], particles[i+1], dbm[i].weights')
-      A_mul_B!(input[i], particles[i-1], dbm[i-1].weights)
+      weightsvisibleinput!(input2[i], dbm[i], particles[i+1])
+      weightshiddeninput!(input[i], dbm[i-1], particles[i-1])
       input[i] .+= input2[i]
    end
 
    # last layer gets only input from layer below
-   A_mul_B!(input[end], particles[end-1], dbm[end].weights)
-
+   weightshiddeninput!(input[end], dbm[end], particles[end-1])
    input
+end
+
+function weightshiddeninput!(hh::M, rbm::BernoulliRBM,
+      vv::M) where {M<:AbstractArray{Float64}}
+
+   A_mul_B!(hh, vv, rbm.weights)
+end
+
+function weightshiddeninput!(hh::M, prbm::PartitionedRBM{BernoulliRBM},
+      vv::M) where {M<:AbstractArray{Float64}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      weightshiddeninput!(
+            view(hh, :, hidrange), prbm.rbms[i], view(vv,:, visrange))
+   end
+   hh
+end
+
+function weightsvisibleinput!(vv::M, rbm::BernoulliRBM,
+      hh::M) where {M<:AbstractArray{Float64}}
+
+   A_mul_Bt!(vv, hh, rbm.weights)
+end
+
+function weightsvisibleinput!(vv::M, prbm::PartitionedRBM{BernoulliRBM},
+      hh::M) where {M<:AbstractArray{Float64}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      weightsvisibleinput!(
+            view(vv, :, visrange), prbm.rbms[i], view(hh,:, hidrange))
+   end
+   vv
 end
 
 

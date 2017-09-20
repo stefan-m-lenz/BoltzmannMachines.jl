@@ -260,7 +260,7 @@ function aisimportanceweights(mdbm::MultimodalDBM;
    hiddbminput2 = newparticleslike(particles[2:end])
 
    mixdbm = deepcopy(mdbm)
-   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
+   hiddbm = converttopartitionedbernoullidbm(mdbm[2:end])
    hidbiases = combinedbiases(hiddbm)
 
    for k = 2:length(beta)
@@ -568,7 +568,8 @@ function exactloglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64},
       logz = exactlogpartitionfunction(mdbm))
 
    nsamples = size(x, 1)
-   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
+   hiddbm::PartitionedBernoulliDBM =
+         converttopartitionedbernoullidbm(mdbm[2:end])
    combinedbiases = BMs.combinedbiases(hiddbm)
 
    # combinations of hidden layers with odd index (i. e. h1, h3, ...)
@@ -701,7 +702,8 @@ layers with odd indexes (i. e. h1, h3, ...).
 """
 function exactlogpartitionfunction(mdbm::MultimodalDBM)
    hodd = initcombinationoddlayersonly(mdbm[2:end])
-   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(mdbm[2:end])
+   hiddbm::PartitionedBernoulliDBM =
+         converttopartitionedbernoullidbm(mdbm[2:end])
    hiddbmbiases = combinedbiases(hiddbm)
    z = 0.0
    while true
@@ -962,7 +964,7 @@ function logpartitionfunctionzeroweights(mdbm::MultimodalDBM)
    logpartitionfunctionzeroweights_visterm(mdbm[1]) +
          invoke(logpartitionfunctionzeroweights,
                Tuple{PartitionedBernoulliDBM,},
-               converttomostspecifictype(mdbm[2:end]))
+               converttopartitionedbernoullidbm(mdbm[2:end]))
 end
 
 
@@ -1235,10 +1237,10 @@ function setvisiblebias!(rbm::BernoulliRBM, v::Vector{Float64})
    rbm.visbias .= v
 end
 
-function setvisiblebias!(pbrbm::PartitionedRBM{BernoulliRBM}, v::Vector{Float64})
-   for i in eachindex(pbrbm.rbms)
-      visrange = pbrbm.visranges[i]
-      view(pbrbm.rbms[i].visbias, visrange) .= v[visrange]
+function setvisiblebias!(prbm::PartitionedRBM, v::Vector{Float64})
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      prbm.rbms[i].visbias .= v[visrange]
    end
 end
 

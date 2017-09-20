@@ -215,8 +215,8 @@ end
 
 function hiddeninput(prbm::PartitionedRBM, v::Vector{Float64})
    nhidden = prbm.hidranges[end][end]
-   h = Matrix{Float64}(1, nhidden)
-   vec(hiddeninput!(h, pbrbm, v))
+   h = Vector{Float64}(nhidden)
+   hiddeninput!(h, prbm, v)
 end
 
 
@@ -684,7 +684,7 @@ end
 function visibleinput!(v::M, prbm::PartitionedRBM, h::M
       ) where{M <: AbstractArray{Float64,2}}
 
-   for i in eachindex(pbrbm.rbms)
+   for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
       visibleinput!(view(v, :, visrange), prbm.rbms[i], view(h, :, hidrange))
