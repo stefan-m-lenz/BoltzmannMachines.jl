@@ -28,7 +28,7 @@ export
          visibleinput, visibleinput!,
       MultimodalDBM,
          BasicDBM,
-         TrainLayer,
+         TrainLayer, TrainPartitionedLayer,
          addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
    Particle, Particles,
    Monitor, MonitoringItem, DataDict,
@@ -44,6 +44,7 @@ export
 
 
 include("rbmtraining.jl")
+include("rbmstacking.jl")
 include("dbmtraining.jl")
 
 const AbstractBM = Union{MultimodalDBM, AbstractRBM}
