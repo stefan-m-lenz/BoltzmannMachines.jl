@@ -357,7 +357,7 @@ function aisunnormalizedprobratios(prbm::PartitionedRBM,
    mapreduce(
          i -> aisunnormalizedprobratios(prbm.rbms[i],
                hh[:, prbm.hidranges[i]], temperature1, temperature2),
-         .*, eachindex(prbm.rbms))
+         (x,y) -> broadcast(*,x,y) , eachindex(prbm.rbms))
 end
 
 
@@ -508,7 +508,7 @@ function energy(prbm::PartitionedRBM, v::Vector{Float64}, h::Vector{Float64})
    for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
-      ret += energy(prbm.rmbs[i], v[visrange], h[hidrange])
+      ret += energy(prbm.rbms[i], v[visrange], h[hidrange])
    end
    ret
 end
@@ -536,7 +536,7 @@ function energyzerohiddens(prbm::PartitionedRBM, v::Vector{Float64})
    ret = 0.0
    for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
-      ret += energyzerohiddens(prbm.rmbs[i], v[visrange])
+      ret += energyzerohiddens(prbm.rbms[i], v[visrange])
    end
    ret
 end
@@ -983,6 +983,10 @@ function logpartitionfunctionzeroweights_visterm(gbrbm::GaussianBernoulliRBM)
    nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd))
 end
 
+function logpartitionfunctionzeroweights_visterm(prbm::PartitionedRBM)
+   mapreduce(logpartitionfunctionzeroweights_visterm, +, prbm.rbms)
+end
+
 function logpartitionfunctionzeroweights_hidterm(rbm::AbstractXBernoulliRBM)
    sum(log.(1 + exp.(rbm.hidbias)))
 end
@@ -990,6 +994,10 @@ end
 function logpartitionfunctionzeroweights_hidterm(bgrbm::BernoulliGaussianRBM)
    nhidden = length(bgrbm.hidbias)
    nhidden / 2 * log(2pi)
+end
+
+function logpartitionfunctionzeroweights_hidterm(prbm::PartitionedRBM)
+   mapreduce(logpartitionfunctionzeroweights_hidterm, +, prbm.rbms)
 end
 
 
@@ -1287,7 +1295,7 @@ function unnormalizedprobhidden(prbm::PartitionedRBM, h::Vector{Float64})
    prob = 1.0
    for i in eachindex(prbm.rbms)
       hidrange = prbm.hidranges[i]
-      prob *= unnormalizedprobhidden(pbrbm.rbms[i], h[hidrange])
+      prob *= unnormalizedprobhidden(prbm.rbms[i], h[hidrange])
    end
    prob
 end

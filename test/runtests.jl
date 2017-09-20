@@ -40,6 +40,8 @@ for nunits in Array[[10;5;4], [20;5;4;2], [4;2;2;3;2]]
    BMTest.testsummingoutforexactloglikelihood(nunits)
 end
 
+BMTest.test_stackrbms_preparetrainlayers()
+
 BMTest.testdbmjoining()
 
 BMTest.test_rbm()

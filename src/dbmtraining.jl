@@ -482,7 +482,7 @@ function stackrbms(x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       trainlayers::AbstractTrainLayers = Vector{TrainLayer}())
 
-   trainlayer = stackrbms_preparetrainlayer(trainlayers, x, epochs,
+   trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
          learningrate, nhiddens)
 
    nrbms = length(trainlayers)
@@ -519,7 +519,7 @@ function stackrbms(x::Array{Float64,2};
 end
 
 """ Prepares the layerwise training specifications for `stackrbms` """
-function stackrbms_preparetrainlayer(
+function stackrbms_preparetrainlayers(
       trainlayers::AbstractTrainLayers,
       x::Matrix{Float64},
       epochs::Int,
@@ -532,7 +532,8 @@ function stackrbms_preparetrainlayer(
       if isempty(nhiddens)
          nhiddens = size(x,2)*ones(2) # default value for nhiddens
       end
-      trainlayers = map(n -> TrainLayer(nhidden = n), nhiddens)
+      trainlayers = map(n -> TrainLayer(nhidden = n,
+            learningrate = learningrate, epochs = epochs), nhiddens)
       return trainlayers
    end
    # We are here, Argument "trainlayers" has been specified

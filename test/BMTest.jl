@@ -138,6 +138,75 @@ function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
    baserate - exactloglik
 end
 
+function test_stackrbms_preparetrainlayers()
+   x = Matrix{Float64}(22, 10);
+   epochs = 17
+   learningrate = 0.007
+   nhiddens = [7;6;5]
+   learningrate1 = 0.007
+   learningrate2 = 0.017
+   epochs1 = 27
+   epochs2 = 17
+
+   # no layer-specific instructions
+   trainlayers = Vector{BMs.TrainLayer}()
+   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
+         learningrate, nhiddens)
+   @test length(trainlayers) == length(nhiddens)
+   @test all(map(t -> t.learningrate == learningrate, trainlayers))
+   @test all(map(t -> t.epochs == epochs, trainlayers))
+   @test map(t-> t.nhidden, trainlayers) == nhiddens
+
+   # layer-specific instructions without partitioning
+   trainlayers = [
+         BMs.TrainLayer(learningrate = learningrate1, epochs = epochs1,
+               nhidden = nhiddens[1]);
+         BMs.TrainLayer(learningrate = learningrate2, epochs = epochs2,
+               nhidden = nhiddens[2]);
+         BMs.TrainLayer(nhidden = nhiddens[3])
+   ]
+   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
+         learningrate, Vector{Int}())
+   @test length(trainlayers) == length(nhiddens)
+   @test trainlayers[1].learningrate == learningrate1
+   @test trainlayers[2].learningrate == learningrate2
+   @test trainlayers[3].learningrate == learningrate
+   @test trainlayers[1].epochs == epochs1
+   @test trainlayers[2].epochs == epochs2
+   @test trainlayers[3].epochs == epochs
+   @test map(t-> t.nhidden, trainlayers) == nhiddens
+
+   # partitioning
+   trainlayers = [
+         BMs.TrainPartitionedLayer([
+            BMs.TrainLayer(learningrate = learningrate1, epochs = epochs1,
+                  rbmtype = BMs.GaussianBernoulliRBM, nhidden = 3,
+                  nvisible = 3);
+            BMs.TrainLayer(nhidden = 4, nvisible = 7)
+         ]);
+         BMs.TrainLayer(nhidden = 6);
+         BMs.TrainLayer(nhidden = 5)
+   ]
+   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
+         learningrate, Vector{Int}())
+   @test length(trainlayers) == length(nhiddens)
+   @test trainlayers[1].parts[1].learningrate == learningrate1
+   @test trainlayers[1].parts[2].learningrate == learningrate
+   @test trainlayers[3].learningrate == learningrate
+   @test trainlayers[1].parts[1].epochs == epochs1
+   @test trainlayers[1].parts[2].epochs == epochs
+   @test trainlayers[2].epochs == epochs
+   @test trainlayers[3].epochs == epochs
+   @test [trainlayers[1].parts[1].nhidden + trainlayers[1].parts[2].nhidden;
+         trainlayers[2].nhidden; trainlayers[3].nhidden] == nhiddens
+
+   # incorrect partitioning must not be allowed
+   trainlayers[1].parts[1].nvisible = 20
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+         x, epochs, learningrate, Vector{Int}())
+
+   nothing
+end
 
 """
     testaisvsexact(bm, percentalloweddiff)
@@ -247,7 +316,7 @@ function test_b2brbm()
    x = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4)
    b2brbm = BMs.fitrbm(x, rbmtype = BMs.Binomial2BernoulliRBM, epochs = 30,
          nhidden = 4, learningrate = 0.001)
-   testlikelihoodempirically(b2brbm, x)
+   testlikelihoodempirically(b2brbm, x; percentalloweddiff = 1.0)
 end
 
 
@@ -280,18 +349,31 @@ function test_mdbm_rbm_b2brbm()
 
    # TODO second rbm with partitioned second hidden layer
    BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 3.0,
-         ntemperatures = 300, nparticles = 200)
+         ntemperatures = 300, nparticles = 250)
 end
 
-
-function testlikelihoodempirically(bm::BMs.AbstractBM, x::Matrix{Float64};
+function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
-   emploglik = BMs.empiricalloglikelihood(bm, x, 1000000)
-   estloglik = BMs.loglikelihood(bm, x)
-   exactloglik = BMs.exactloglikelihood(bm, x)
-   @test abs((exactloglik - emploglik)/exactloglik) < percentalloweddiff / 100
-   @test abs((exactloglik - estloglik)/exactloglik) < percentalloweddiff / 100
+   emploglik = BMs.empiricalloglikelihood(rbm, x, 1000000)
+   r = BMs.aisimportanceweights(rbm;
+         nparticles = nparticles, ntemperatures = ntemperatures)
+   logz = BMs.logpartitionfunction(rbm, mean(r))
+   estloglik = BMs.loglikelihood(rbm, x, logz)
+   exactloglik = BMs.exactloglikelihood(rbm, x)
+   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
+   @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
+end
+
+function testlikelihoodempirically(dbm::BMs.MultimodalDBM, x::Matrix{Float64};
+      percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
+
+   emploglik = BMs.empiricalloglikelihood(dbm, x, 1000000)
+   estloglik = BMs.loglikelihood(dbm, x;
+         ntemperatures = ntemperatures, nparticles = nparticles)
+   exactloglik = BMs.exactloglikelihood(dbm, x)
+   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
+   @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
 end
 
 
@@ -346,9 +428,9 @@ function test_mdbm_gaussianvisibles()
    BMTest.testaisvsexact(dbm1, 0.5)
 
    # Test exact likelihood vs estimated likelihood
-   estloglik = BMs.loglikelihood(dbm1, x)
+   estloglik = BMs.loglikelihood(dbm1, x; nparticles = 200, ntemperatures = 200)
    exactloglik = BMs.exactloglikelihood(dbm1, x)
-   @test abs((exactloglik - estloglik)/exactloglik) < 2 / 100
+   @test abs((exactloglik - estloglik) / exactloglik) < 2 / 100
 
    nothing
 end

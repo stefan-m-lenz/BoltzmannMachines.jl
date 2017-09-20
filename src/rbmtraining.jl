@@ -273,7 +273,7 @@ end
 function hiddeninput!(h::M, prbm::PartitionedRBM, v::M,
       ) where{M <: AbstractArray{Float64,1}}
 
-   for i in eachindex(pbrbm.rbms)
+   for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       hidrange = prbm.hidranges[i]
       hiddeninput!(view(h, hidrange), prbm.rbms[i], view(v, visrange))
