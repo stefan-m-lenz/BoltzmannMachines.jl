@@ -280,6 +280,34 @@ function aisimportanceweights(mdbm::MultimodalDBM;
 end
 
 
+function aisimportanceweights_batchparallelized(bm::AbstractBM;
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 5)
+
+   # split batches most evenly among workers
+   nbatches = nworkers()
+
+   minparticlesperbatch, nbatcheswithplus1 = divrem(nparticles, nbatches)
+   batches = Vector{Int}(nbatches)
+   for i = 1:nbatches
+      if i <= nbatcheswithplus1
+         batches[i] = minparticlesperbatch + 1
+      else
+         batches[i] = minparticlesperbatch
+      end
+   end
+
+   return @sync @parallel (vcat) for batch in batches
+      aisimportanceweights(bm;
+            ntemperatures = ntemperatures,
+            beta = beta, nparticles = batch,
+            burnin = burnin, parallelized = false)
+   end
+end
+
+
 """
     aisprecision(r, aissd, sdrange)
 Returns the differences of the estimated logratio `r` to the lower

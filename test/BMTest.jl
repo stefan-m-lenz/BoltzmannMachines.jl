@@ -340,7 +340,7 @@ function test_mdbm_rbm_b2brbm()
                   nvisible = 4, nhidden = 4)
          ]);
          BMs.TrainLayer(nhidden = 4);
-         BMs.TrainLayer(nhidden = 4)]
+         BMs.TrainLayer(nhidden = 3)]
 
    dbm1 = BMs.fitdbm(x, epochs = 15,
          epochspretraining = 15,
@@ -440,7 +440,7 @@ function test_mdbm_gaussianvisibles()
    end
 
    # Test AIS
-   BMTest.testaisvsexact(dbm1, 0.5)
+   BMTest.testaisvsexact(dbm1, 0.6)
 
    # Test exact likelihood vs estimated likelihood
    estloglik = BMs.loglikelihood(dbm1, x; nparticles = 200, ntemperatures = 200)
