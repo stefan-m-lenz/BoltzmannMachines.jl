@@ -28,14 +28,16 @@ function aisimportanceweights(rbm::BernoulliRBM;
    hh = repmat(rbm.hidbias', nparticles)
    sigm_bernoulli!(hh)
 
+   vv = Matrix{Float64}(nparticles, length(rbm.visbias))
+
    for k = 2:length(beta)
       impweights .*= aisunnormalizedprobratios(rbm, hh, beta[k], beta[k-1])
 
       # Gibbs transition
       mixrbm.weights = rbm.weights * beta[k]
       for burn = 1:burnin
-         vv = samplevisible(mixrbm, hh)
-         hh = samplehidden(mixrbm, vv)
+         samplevisible!(vv, mixrbm, hh)
+         samplehidden!(hh, mixrbm, vv)
       end
    end
 
