@@ -34,7 +34,7 @@ Specify parameters for training one RBM-layer in a DBM.
    A negative value indicates that a default value should be used.
 * `sdlearningrate`/`sdlearningrates`: learning rate / learning rates for each epoch
    for learning the standard deviation. Only used for GaussianBernoulliRBMs.
-* `monitoring`:  a function that is executed after each training epoch.
+* `monitoring`: a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
 """
 function TrainLayer(;
@@ -65,6 +65,7 @@ type TrainPartitionedLayer <: AbstractTrainLayer
    parts::Vector{TrainLayer}
 end
 
+
 const AbstractTrainLayers = Vector{<:AbstractTrainLayer}
 
 
@@ -85,6 +86,7 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    to specify the training parameters for each layer/RBM individually.
    If the number of training epochs and the learning rate are not specified
    explicitly for a layer, the values of `epochs` and `learningrate` are used.
+   For more information see help of `TrainLayer`.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential,
    which is the default.
@@ -141,7 +143,6 @@ function stackrbms_preparetrainlayers(
       epochs::Int,
       learningrate::Float64,
       nhiddens::Vector{Int})
-
 
    if isempty(trainlayers)
       # construct default "trainlayers"
