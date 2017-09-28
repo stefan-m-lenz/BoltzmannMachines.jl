@@ -52,6 +52,44 @@ const AbstractBM = Union{MultimodalDBM, AbstractRBM}
 
 
 """
+    batchparallelized(f, n, op)
+Distributes the work for executing the function `f` `n` times
+on all the available workers and reduces the results with the operator `op`.
+`f` is a function that gets a number (of tasks) to execute the tasks.
+
+# Example:
+    batchparallelized(n -> aisimportanceweights(dbm; nparticles = n), 100, vcat)
+"""
+function batchparallelized(f::Function, n::Int, op::Function)
+   @sync @parallel (op) for batch in mostevenbatches(n)
+      f(batch)
+   end
+end
+
+
+"""
+    mostevenbatches(ntasks)
+    mostevenbatches(ntasks, nbatches)
+Splits a number of tasks `ntasks` into a number of batches `nbatches`.
+The number of batches is by default equal to the number of workers.
+The returned result is a vector containing the numbers of tasks for each batch.
+"""
+function mostevenbatches(ntasks::Int, nbatches::Int = nworkers())
+
+   minparticlesperbatch, nbatcheswithplus1 = divrem(ntasks, nbatches)
+   batches = Vector{Int}(nbatches)
+   for i = 1:nbatches
+      if i <= nbatcheswithplus1
+         batches[i] = minparticlesperbatch + 1
+      else
+         batches[i] = minparticlesperbatch
+      end
+   end
+   batches
+end
+
+
+"""
 Converts a vector to a vector of the most specific type that all
 elements share as common supertype.
 """
