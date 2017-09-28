@@ -393,8 +393,8 @@ end
 
 """
 Updates the importance weights `impweights` in AIS by multiplying the ratio of
-unnormalized probabilities of the states of the odd layers in the BasicDBM
-`dbm`. The activation states of the DBM's nodes are given by the `particles`.
+unnormalized probabilities of the states of the odd layers in the
+PartitionedBernoulliDBM `dbm`. The activation states of the DBM's nodes are given by the `particles`.
 For performance reasons, the biases are specified separately
 """
 function aisupdateimportanceweights!(impweights,

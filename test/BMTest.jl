@@ -348,7 +348,7 @@ function test_mdbm_rbm_b2brbm()
          pretraining = trainlayers1)
 
    BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 3.0,
-         ntemperatures = 300, nparticles = 250)
+         ntemperatures = 300, nparticles = 300)
 
    # partitioned second layer
    trainlayers2 = [
@@ -363,21 +363,22 @@ function test_mdbm_rbm_b2brbm()
 
    dbm2 = BMs.fitdbm(x, pretraining = trainlayers2)
    BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 3.0,
-         ntemperatures = 300, nparticles = 250)
+         ntemperatures = 300, nparticles = 300)
 
 end
 
 function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
-   emploglik = BMs.empiricalloglikelihood(rbm, x, 1000000)
    r = BMs.aisimportanceweights(rbm;
          nparticles = nparticles, ntemperatures = ntemperatures)
    logz = BMs.logpartitionfunction(rbm, mean(r))
    estloglik = BMs.loglikelihood(rbm, x, logz)
    exactloglik = BMs.exactloglikelihood(rbm, x)
-   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
    @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
+
+   emploglik = BMs.empiricalloglikelihood(rbm, x, 1000000)
+   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
 end
 
 function testlikelihoodempirically(dbm::BMs.MultimodalDBM, x::Matrix{Float64};
