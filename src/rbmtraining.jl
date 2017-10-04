@@ -469,6 +469,26 @@ function samplehiddenpotential!(h::M, rbm::BernoulliGaussianRBM
    h .+= randn(size(h))
 end
 
+function samplehiddenpotential!(h::M, prbm::PartitionedRBM
+      ) where{M <: AbstractArray{Float64,1}}
+
+   for i in eachindex(prbm.rbms)
+      hidrange = prbm.hidranges[i]
+      samplehiddenpotential!(view(h, hidrange), prbm.rbms[i])
+   end
+   h
+end
+
+function samplehiddenpotential!(hh::M, prbm::PartitionedRBM
+      ) where{M <: AbstractArray{Float64,2}}
+
+   for i in eachindex(prbm.rbms)
+      hidrange = prbm.hidranges[i]
+      samplehiddenpotential!(view(hh, :, hidrange), prbm.rbms[i])
+   end
+   hh
+end
+
 
 """
     samplevisible(rbm, h)
@@ -805,12 +825,32 @@ function updateparameters!(rbm::AbstractRBM,
    nothing
 end
 
-# See bottom of page 15 in [Krizhevsky, 2009].
+function updateparameters!(rbm::Binomial2BernoulliRBM,
+      v::Vector{Float64}, vmodel::Vector{Float64},
+      h::Vector{Float64}, hmodel::Vector{Float64},
+      learningrate::Float64,
+      sdlearningrate::Float64)
+
+   # To train a Binomial2BernoulliRBM exactly like
+   # training a BernoulliRBM where each two nodes share the weights,
+   # use half the learning rate in the visible nodes.
+   learningratehidden = learningrate
+   learningrate /= 2.0
+
+   deltaw = v*h' - vmodel*hmodel'
+   rbm.weights += deltaw * learningrate
+   rbm.visbias += (v - vmodel) * learningrate
+   rbm.hidbias += (h - hmodel) * learningratehidden
+   nothing
+end
+
 function updateparameters!(gbrbm::GaussianBernoulliRBM,
       v::Vector{Float64}, vmodel::Vector{Float64},
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
       sdlearningrate::Float64)
+
+   # See bottom of page 15 in [Krizhevsky, 2009].
 
    sd = gbrbm.sd
 

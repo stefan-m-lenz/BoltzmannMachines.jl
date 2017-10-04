@@ -314,7 +314,7 @@ the partition function estimated by AIS is near the exact value.
 "
 function test_b2brbm()
    x = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4)
-   b2brbm = BMs.fitrbm(x, rbmtype = BMs.Binomial2BernoulliRBM, epochs = 30,
+   b2brbm = BMs.fitrbm(x, rbmtype = BMs.Binomial2BernoulliRBM, epochs = 150,
          nhidden = 4, learningrate = 0.001)
    testlikelihoodempirically(b2brbm, x; percentalloweddiff = 1.0)
 end

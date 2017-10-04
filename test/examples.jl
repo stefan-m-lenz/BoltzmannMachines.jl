@@ -134,7 +134,7 @@ datadict = DataDict("Training data" => x, "Test data" => xtest);
 # Fit Binomial2BernoulliRBM.
 monitor = Monitor();
 rbm = fitrbm(x, rbmtype = Binomial2BernoulliRBM,
-      nhidden = 10, epochs = 90, learningrate = 0.002,
+      nhidden = 10, epochs = 100, learningrates = [0.003*ones(60); 0.001*ones(40)],
       monitoring = (rbm, epoch) ->
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict));
 
