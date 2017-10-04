@@ -1128,6 +1128,13 @@ function nunits(rbm::AbstractRBM)
    [length(rbm.visbias); length(rbm.hidbias)]
 end
 
+function nunits(prbm::PartitionedRBM)
+   [
+      sum(map(rbm -> length(rbm.visbias), prbm.rbms));
+      sum(map(rbm -> length(rbm.hidbias), prbm.rbms))
+   ]
+end
+
 function nunits(dbm::MultimodalDBM)
    nrbms = length(dbm)
    if nrbms == 0
@@ -1246,14 +1253,17 @@ end
 
 function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
    particles = Particles(2)
-   particles[2] = rand([0.0 1.0], nparticles, length(rbm.hidbias))
+   nunits = BMs.nunits(rbm)
+   particles[2] = rand([0.0 1.0], nparticles, nunits[2])
+   particles[1] = Matrix{Float64}(nparticles, nunits[1])
 
    for i=1:burnin
-      particles[1] = samplevisible(rbm, particles[2])
-      particles[2] = samplehidden(rbm, particles[1])
+      samplevisible!(particles[1], rbm, particles[2])
+      samplehidden!(particles[2], rbm, particles[1])
    end
    particles
 end
+
 
 function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
    particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
