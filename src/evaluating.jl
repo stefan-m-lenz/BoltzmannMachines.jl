@@ -67,10 +67,10 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
 
    visbiasdiff = rbm2.visbias - rbm1.visbias
 
-   for j=1:nparticles # TODO parallelize
+   for j = 1:nparticles
       v = rand(nvisible)
 
-      for k=2:length(beta)
+      for k = 2:length(beta)
 
          # Sample next value for v using Gibbs Sampling in the RBM
          for burn=1:burnin

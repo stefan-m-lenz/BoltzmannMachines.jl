@@ -61,8 +61,13 @@ on all the available workers and reduces the results with the operator `op`.
     batchparallelized(n -> aisimportanceweights(dbm; nparticles = n), 100, vcat)
 """
 function batchparallelized(f::Function, n::Int, op::Function)
-   @sync @parallel (op) for batch in mostevenbatches(n)
-      f(batch)
+   batches = mostevenbatches(n)
+   if length(batches) > 1
+      return @sync @parallel (op) for batch in batches
+         f(batch)
+      end
+   else
+      return f(n)
    end
 end
 

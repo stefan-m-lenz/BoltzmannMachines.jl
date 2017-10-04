@@ -102,20 +102,34 @@ Estimates the log-likelihood of the `datadict`'s data sets in the RBM model
 `rbm` with AIS and stores the values, together with information about the
 variance of the estimator, in the `monitor`.
 
+If there is more than one worker available, the computation is parallelized
+by default. Parallelization can be turned on or off with the optional
+boolean argument `parallelized`.
+
+For the other optional keyword arguments, see `aisimportanceweights`.
+
 See also: `loglikelihood`.
-For the optional keyword arguments, see `aisimportanceweights`.
 """
 function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
       epoch::Int, datadict::DataDict;
+      parallelized::Bool = nworkers() > 1,
       # optional arguments for AIS:
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
-   impweights = BMs.aisimportanceweights(rbm;
-         ntemperatures = ntemperatures, beta = beta,
-         nparticles = nparticles, burnin = burnin)
+   if parallelized
+      impweights = BMs.batchparallelized(
+            n -> BMs.aisimportanceweights(rbm;
+                  ntemperatures = ntemperatures, beta = beta,
+                  nparticles = n, burnin = burnin),
+            nparticles, vcat)
+   else
+      impweights = BMs.aisimportanceweights(rbm;
+            ntemperatures = ntemperatures, beta = beta,
+            nparticles = nparticles, burnin = burnin)
+   end
 
    r = mean(impweights)
    sd = BMs.aisstandarddeviation(impweights)
@@ -136,20 +150,34 @@ Estimates the lower bound of the log probability of the `datadict`'s data sets
 in the DBM `dbm` with AIS and stores the values, together with information about
 the variance of the estimator, in the `monitor`.
 
+If there is more than one worker available, the computation is parallelized
+by default. Parallelization can be turned on or off with the optional
+boolean argument `parallelized`.
+
+For the other optional keyword arguments, see `aisimportanceweights`.
+
 See also: `logproblowerbound`.
-For the optional keyword arguments, see `aisimportanceweights`.
 """
 function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       epoch::Int, datadict::DataDict;
+      parallelized::Bool = nworkers() > 1,
       # optional arguments for AIS:
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
-   impweights = BMs.aisimportanceweights(dbm;
-         ntemperatures = ntemperatures, beta = beta,
-         nparticles = nparticles, burnin = burnin)
+   if parallelized
+      impweights = BMs.batchparallelized(
+            n -> BMs.aisimportanceweights(dbm;
+                  ntemperatures = ntemperatures, beta = beta,
+                  nparticles = n, burnin = burnin),
+            nparticles, vcat)
+   else
+      impweights = BMs.aisimportanceweights(dbm;
+            ntemperatures = ntemperatures, beta = beta,
+            nparticles = nparticles, burnin = burnin)
+   end
 
    r = mean(impweights)
    sd = BMs.aisstandarddeviation(impweights)
