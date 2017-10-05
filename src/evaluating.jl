@@ -282,34 +282,6 @@ function aisimportanceweights(mdbm::MultimodalDBM;
 end
 
 
-function aisimportanceweights_batchparallelized(bm::AbstractBM;
-      ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   # split batches most evenly among workers
-   nbatches = nworkers()
-
-   minparticlesperbatch, nbatcheswithplus1 = divrem(nparticles, nbatches)
-   batches = Vector{Int}(nbatches)
-   for i = 1:nbatches
-      if i <= nbatcheswithplus1
-         batches[i] = minparticlesperbatch + 1
-      else
-         batches[i] = minparticlesperbatch
-      end
-   end
-
-   return @sync @parallel (vcat) for batch in batches
-      aisimportanceweights(bm;
-            ntemperatures = ntemperatures,
-            beta = beta, nparticles = batch,
-            burnin = burnin, parallelized = false)
-   end
-end
-
-
 """
     aisprecision(r, aissd, sdrange)
 Returns the differences of the estimated logratio `r` to the lower
@@ -944,25 +916,51 @@ end
 
 
 """
-    logpartitionfunction(bm)
+    logpartitionfunction(bm; ...)
     logpartitionfunction(bm, r)
 Calculates the log of the partition function of the Boltzmann Machine `bm`
 from the estimator `r`.
+
 `r` is an estimator of the ratio of the `bm`'s partition function Z to the
 partition function Z_0 of the reference BM with zero weights but same biases
 as the given `bm`. In case of a GaussianBernoulliRBM, the reference model
 also has the same standard deviation parameter.
-If the estimator `r` is not given as argument, Annealed Importance Sampling
-is performed (with default parameters) to get a value for it.
 The estimated partition function of the Boltzmann Machine is Z = r * Z_0
 with `r` being the mean of the importance weights.
 Therefore, the log of the estimated partition function is
 log(Z) = log(r) + log(Z_0)
-"""
-function logpartitionfunction(bm::AbstractBM,
-      r::Float64 = mean(aisimportanceweights(bm)))
 
-   logz = log(r) + logpartitionfunctionzeroweights(bm)
+If the estimator `r` is not given as argument, Annealed Importance Sampling
+(AIS) is performed to get a value for it. In this case,
+the optional arguments for AIS can be specified (see `aisimportanceweights`),
+and the optional boolean argument `parallelized` can
+be used to turn on batch-parallelized computing of the importance weights.
+"""
+function logpartitionfunction(bm::AbstractBM, r::Float64)
+   log(r) + logpartitionfunctionzeroweights(bm)
+end
+
+function logpartitionfunction(bm::AbstractBM;
+      parallelized::Bool = false,
+      # optional arguments for AIS:
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 5)
+
+   if parallelized
+      impweights = BMs.batchparallelized(
+            n -> BMs.aisimportanceweights(bm;
+                  ntemperatures = ntemperatures, beta = beta,
+                  nparticles = n, burnin = burnin),
+            nparticles, vcat)
+   else
+      impweights = BMs.aisimportanceweights(bm;
+            ntemperatures = ntemperatures, beta = beta,
+            nparticles = nparticles, burnin = burnin)
+   end
+
+   logpartitionfunction(bm, mean(impweights))
 end
 
 

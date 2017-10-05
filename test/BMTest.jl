@@ -335,7 +335,7 @@ function test_mdbm_rbm_b2brbm()
    trainlayers1 = [
          BMs.TrainPartitionedLayer([
             BMs.TrainLayer(rbmtype = BMs.Binomial2BernoulliRBM,
-                  nvisible = 4, nhidden = 3);
+                  nvisible = 4, nhidden = 3, learningrate = 0.0015);
             BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
                   nvisible = 4, nhidden = 4)
          ]);
@@ -370,9 +370,8 @@ end
 function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
-   r = BMs.aisimportanceweights(rbm;
-         nparticles = nparticles, ntemperatures = ntemperatures)
-   logz = BMs.logpartitionfunction(rbm, mean(r))
+   logz = BMs.logpartitionfunction(rbm;
+      nparticles = nparticles, ntemperatures = ntemperatures)
    estloglik = BMs.loglikelihood(rbm, x, logz)
    exactloglik = BMs.exactloglikelihood(rbm, x)
    @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
