@@ -1,9 +1,15 @@
-using Base.Test
+if nprocs() == 1
+   addprocs(4) # test with multiple processes
+end
 
+using Base.Test
 import BoltzmannMachines
+
 const BMs = BoltzmannMachines
 
-include("BMTest.jl")
+push!(LOAD_PATH, "../test/")
+import BMTest
+pop!(LOAD_PATH)
 
 BMTest.testpotentials()
 
@@ -44,10 +50,12 @@ BMTest.test_stackrbms_preparetrainlayers()
 
 BMTest.testdbmjoining()
 
+BMTest.test_likelihoodconsistency()
+
 BMTest.test_rbm()
 BMTest.test_b2brbm()
 BMTest.test_mdbm_rbm_b2brbm()
 BMTest.test_mdbm_gaussianvisibles()
 
 # run examples
-include("examples.jl")
+include("../test/examples.jl")

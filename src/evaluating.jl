@@ -837,44 +837,36 @@ Estimates the mean log-likelihood of the DBM on the data set `x`
 with Annealed Importance Sampling.
 This requires a separate run of AIS for each sample.
 """
-function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz = -Inf;
+function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = -Inf;
+      parallelized = false,
       ntemperatures::Int = 100,
       beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
-   nsamples = size(x,1)
+   nsamples = size(x, 1)
+
    if logz == -Inf
-      r = mean(aisimportanceweights(mdbm; ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin))
-      logz = logpartitionfunction(mdbm, r)
+      logz = logpartitionfunction(mdbm;
+            parallelized = parallelized, ntemperatures = ntemperatures,
+            beta = beta, nparticles = nparticles, burnin = burnin)
    end
 
-   logp = 0.0
-   hiddbm = deepcopy(mdbm[2:end])
-   h1 = Vector{Float64}(length(hiddenbias(mdbm[1])))
-   visbias2 = visiblebias(mdbm[2]) # visible bias of second RBM
-
-   for j = 1:nsamples
-      v = vec(x[j,:])
-      setvisiblebias!(hiddbm[1], visbias2) # reset to original bias
-
-      logp -= energyzerohiddens(mdbm[1], v)
-
-      # Integrate the energy of the sample v
-      # into the visible bias of the first hidden layer.
-      hiddeninput!(h1, mdbm[1], v)
-      h1 .+= visbias2
-      setvisiblebias!(hiddbm[1], h1)
-
-      # Then compute the log partition function of the new DBM consisting
-      # only of the hidden layer RBMs (with the first layer modified).
-      r = mean(aisimportanceweights(hiddbm; ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin))
-      logp += logpartitionfunction(hiddbm, r)
+   if parallelized
+      # divide data set x into batches and compute unnormalized probabilties
+      batches = mostevenbatches(nsamples)
+      batchranges = ranges(batches)
+      logp = @sync @parallel (+) for i in 1:length(batches)
+         (batches[i] / nsamples) * # (weighted mean)
+            unnormalizedlogprob(mdbm, x[batchranges[i], :];
+                  ntemperatures = ntemperatures,
+                  beta = beta, nparticles = nparticles, burnin = burnin)
+      end
+   else
+      logp = unnormalizedlogprob(mdbm, x;
+            ntemperatures = ntemperatures,
+            beta = beta, nparticles = nparticles, burnin = burnin)
    end
-
-   logp /= nsamples
    logp -= logz
    logp
 end
@@ -1280,6 +1272,52 @@ function setvisiblebias!(prbm::PartitionedRBM, v::Vector{Float64})
       visrange = prbm.visranges[i]
       prbm.rbms[i].visbias .= v[visrange]
    end
+end
+
+
+"""
+    unnormalizedlogprob(mdbm, x; ...)
+Estimates the mean unnormalized log probability of the samples (rows in `x`)
+in the MultimodalDBM `mdbm` by running the Annealed Importance Sampling (AIS)
+in a smaller modified DBM for each sample.
+
+The named optional arguments for AIS can be specified here.
+(See `aisimportanceweights`)
+"""
+function unnormalizedlogprob(mdbm, x::Matrix{Float64};
+      ntemperatures::Int = 100,
+      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 5)
+
+   nsamples = size(x, 1)
+   logp = 0.0
+   hiddbm = deepcopy(mdbm[2:end])
+   h1 = Vector{Float64}(length(hiddenbias(mdbm[1])))
+   visbias2 = visiblebias(mdbm[2]) # visible bias of second RBM
+
+   for j = 1:nsamples
+      v = vec(x[j,:])
+
+      setvisiblebias!(hiddbm[1], visbias2) # reset to original bias
+
+      logp -= energyzerohiddens(mdbm[1], v)
+
+      # Integrate the energy of the sample v
+      # into the visible bias of the first hidden layer.
+      hiddeninput!(h1, mdbm[1], v)
+      h1 .+= visbias2
+      setvisiblebias!(hiddbm[1], h1)
+
+      # Then compute the log partition function of the new DBM consisting
+      # only of the hidden layer RBMs (with the first layer modified).
+      logp += logpartitionfunction(hiddbm;
+            ntemperatures = ntemperatures,
+            beta = beta, nparticles = nparticles, burnin = burnin)
+   end
+
+   logp /= nsamples
+   logp
 end
 
 
