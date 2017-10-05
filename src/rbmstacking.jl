@@ -153,8 +153,12 @@ function stackrbms_preparetrainlayers(
             learningrate = learningrate, epochs = epochs), nhiddens)
       return trainlayers
    end
+
    # We are here, Argument "trainlayers" has been specified
-   # --> check for correct specification
+   # --> check for correct specification and derive/set some parameters
+
+   # avoid modification of given object
+   trainlayers = deepcopy(trainlayers)
 
    if !isempty(nhiddens)
       warn("Argument `nhiddens` not used.")
