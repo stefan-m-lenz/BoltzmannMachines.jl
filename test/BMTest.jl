@@ -353,17 +353,22 @@ end
 
 
 function test_mdbm_rbm_b2brbm()
-   x1 = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4);
-   x2 = BMTest.createsamples(100, 4);
+   nsamples = 100
+   nvariables = 4
+
+   x1 = BMTest.createsamples(nsamples, nvariables) +
+         BMTest.createsamples(nsamples, nvariables);
+   x2 = BMTest.createsamples(nsamples, nvariables);
    x = hcat(x1, x2);
    trainlayers1 = [
          BMs.TrainPartitionedLayer([
             BMs.TrainLayer(rbmtype = BMs.Binomial2BernoulliRBM,
-                  nvisible = 4, nhidden = 3, learningrate = 0.0015);
-            BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
-                  nvisible = 4, nhidden = 4)
+                  nvisible = nvariables, nhidden = nvariables - 1,
+                  learningrate = 0.0015);
+               BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
+                  nvisible = nvariables, nhidden = nvariables)
          ]);
-         BMs.TrainLayer(nhidden = 4);
+         BMs.TrainLayer(nhidden = nvariables);
          BMs.TrainLayer(nhidden = 3)]
 
    dbm1 = BMs.fitdbm(x, epochs = 15,

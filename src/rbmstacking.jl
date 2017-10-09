@@ -243,13 +243,20 @@ function stackrbms_trainlayer(x::Matrix{Float64},
 
    visranges = ranges(map(t -> t.nvisible, trainpartitionedlayer.parts))
 
-   rbms = Vector{AbstractRBM}(length(trainpartitionedlayer.parts))
-   for i in eachindex(trainpartitionedlayer.parts)
-      visrange = visranges[i]
-      rbms[i] = stackrbms_trainlayer(x[:, visrange],
-            trainpartitionedlayer.parts[i];
+   # prepare the arguments before the for-loop for each call
+   # to avoid unnecessary copying
+   trainingargs = map(
+         i -> (
+               x[:, visranges[i]],
+               trainpartitionedlayer.parts[i]
+         ),
+         eachindex(trainpartitionedlayer.parts))
+
+   rbms = @parallel (vcat) for arg in trainingargs
+      stackrbms_trainlayer(arg[1], arg[2];
             upfactor = upfactor, downfactor = downfactor)
    end
+
    commontype = mostspecifictype(rbms)
    PartitionedRBM{commontype}(Vector{commontype}(rbms))
 end
