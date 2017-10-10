@@ -1,7 +1,7 @@
 """
-    aisimportanceweights(rbm; ...)
-Computes the importance weights for estimating the ratio of the partition
-functions of the given `rbm` to the RBM with zero weights,
+    aislogimpweights(rbm; ...)
+Computes the logarithmised importance weights for estimating the ratio of the
+partition functions of the given `rbm` to the RBM with zero weights,
 but same visible and hidden bias as the `rbm`.
 This function implements the Annealed Importance Sampling algorithm (AIS)
 like described in section 4.1.3 of [Salakhutdinov, 2008].
@@ -9,19 +9,19 @@ like described in section 4.1.3 of [Salakhutdinov, 2008].
 # Optional keyword arguments (for all types of Boltzmann Machines):
 * `ntemperatures`: Number of temperatures for annealing from the starting model
   to the target model, defaults to 100
-* `beta`: Vector of temperatures. By default `ntemperatures` ascending
+* `temperatures`: Vector of temperatures. By default `ntemperatures` ascending
   numbers, equally spaced from 0.0 to 1.0
 * `nparticles`: Number of parallel chains and calculated weights, defaults to
    100
 * `burnin`: Number of steps to sample for the Gibbs transition between models
 """
-function aisimportanceweights(rbm::BernoulliRBM;
+function aislogimpweights(rbm::BernoulliRBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
-   impweights = ones(nparticles)
+   logimpweights = zeros(nparticles)
    mixrbm = deepcopy(rbm)
 
    # start with samples from model with zero weights
@@ -30,30 +30,31 @@ function aisimportanceweights(rbm::BernoulliRBM;
 
    vv = Matrix{Float64}(nparticles, length(rbm.visbias))
 
-   for k = 2:length(beta)
-      impweights .*= aisunnormalizedprobratios(rbm, hh, beta[k], beta[k-1])
+   for k = 2:length(temperatures)
+      logimpweights .+= aisunnormalizedproblogratios(rbm, hh,
+            temperatures[k], temperatures[k-1])
 
       # Gibbs transition
-      mixrbm.weights = rbm.weights * beta[k]
+      mixrbm.weights = rbm.weights * temperatures[k]
       for burn = 1:burnin
          samplevisible!(vv, mixrbm, hh)
          samplehidden!(hh, mixrbm, vv)
       end
    end
 
-   impweights
+   logimpweights
 end
 
 
 """
-    aisimportanceweights(rbm1, rbm2; ...)
-Computes the importance weights for estimating the ratio Z2/Z1 of the partition
-functions of the two given RBMs.
+    aislogimpweights(rbm1, rbm2; ...)
+Computes the logarithmised importance weights for estimating the ratio Z2/Z1
+of the partition functions of the two given RBMs.
 Implements the procedure described in section 4.1.2 of [Salakhutdinov, 2008].
 """
-function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
+function aislogimpweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
@@ -63,69 +64,70 @@ function aisimportanceweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
       error("The two RBMs must have the same numer of visible units.")
    end
 
-   impweights = ones(nparticles)
+   logimpweights = zeros(nparticles)
 
    visbiasdiff = rbm2.visbias - rbm1.visbias
 
    for j = 1:nparticles
       v = rand(nvisible)
 
-      for k = 2:length(beta)
+      for k = 2:length(temperatures)
 
          # Sample next value for v using Gibbs Sampling in the RBM
-         for burn=1:burnin
-            h1 = bernoulli!(hiddenpotential(rbm1, v, 1 - beta[k]));
-            h2 = bernoulli!(hiddenpotential(rbm2, v,     beta[k]));
+         for burn = 1:burnin
+            h1 = bernoulli!(hiddenpotential(rbm1, v, 1 - temperatures[k]));
+            h2 = bernoulli!(hiddenpotential(rbm2, v,     temperatures[k]));
 
             v = bernoulli!(sigm(
-                (1-beta[k]) * visibleinput(rbm1, h1) +
-                   beta[k]  * visibleinput(rbm2, h2)))
+                (1-temperatures[k]) * visibleinput(rbm1, h1) +
+                   temperatures[k]  * visibleinput(rbm2, h2)))
          end
 
          # Multiply ratios of unnormalized probabilities
          hinput1 = hiddeninput(rbm1, v)
          hinput2 = hiddeninput(rbm2, v)
-         impweights[j] *= exp.((beta[k]-beta[k-1]) * dot(visbiasdiff, v)) *
-               prod((1 + exp.( (1-beta[k])  * hinput1 )) ./
-                    (1 + exp.( (1-beta[k-1])* hinput1 ))) *
-               prod((1 + exp.(  beta[k]     * hinput2 )) ./
-                    (1 + exp.(  beta[k-1]   * hinput2 )))
+         logimpweights[j] += (
+               (temperatures[k] - temperatures[k-1]) * dot(visbiasdiff, v)) +
+               sum(log((1 + exp.( (1 - temperatures[k])   * hinput1 )) ./
+                       (1 + exp.( (1 - temperatures[k-1]) * hinput1 )))) *
+               sum(log((1 + exp.(      temperatures[k]    * hinput2 )) ./
+                       (1 + exp.(      temperatures[k-1]  * hinput2 ))))
       end
    end
 
-   impweights
+   logimpweights
 end
 
 
 """
-    aisimportanceweights(bgrbm; ...)
-Computes the importance weights in the Annealed Importance Sampling algorithm
-for estimating the ratio of the partition functions of the given
+    aislogimpweights(bgrbm; ...)
+Computes the logarithmised importance weights in the Annealed Importance Sampling
+algorithm (AIS) for estimating the ratio of the partition functions of the given
 BernoulliGaussianRBM `bgrbm` to the BernoulliGaussianRBM with the same visible
 bias and hidden bias but zero weights.
 """
-function aisimportanceweights(bgrbm::BernoulliGaussianRBM;
+function aislogimpweights(bgrbm::BernoulliGaussianRBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    # reversed RBM has the same partition function
-   aisimportanceweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
-         beta = beta, nparticles = nparticles, burnin = burnin)
+   aislogimpweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
+         temperatures = temperatures, nparticles = nparticles, burnin = burnin)
 end
 
 
 """
-    aisimportanceweights(b2brbm; ...)
-Computes the importance weights in the Annealed Importance Sampling algorithm
-for estimating the ratio of the partition functions of the given
+    aislogimpweights(b2brbm; ...)
+Computes the logarithmised importance weights in the Annealed Importance Sampling
+algorithm (AIS) for estimating the ratio of the partition functions of the given
 Binomial2BernoulliRBM `b2brbm` to the Binomial2BernoulliRBM with same visible
 and hidden bias.
 """
-function aisimportanceweights(b2brbm::Binomial2BernoulliRBM;
+function aislogimpweights(b2brbm::Binomial2BernoulliRBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
@@ -134,22 +136,22 @@ function aisimportanceweights(b2brbm::Binomial2BernoulliRBM;
    rbm = BernoulliRBM(vcat(b2brbm.weights, b2brbm.weights),
          vcat(b2brbm.visbias, b2brbm.visbias), b2brbm.hidbias)
 
-   aisimportanceweights(rbm;
-         ntemperatures = ntemperatures, beta = beta,
+   aislogimpweights(rbm;
+         ntemperatures = ntemperatures, temperatures = temperatures,
          nparticles = nparticles, burnin = burnin)
 end
 
 
 """
-    aisimportanceweights(gbrbm; ...)
+    aislogimpweights(gbrbm; ...)
 Computes the importance weights in the Annealed Importance Sampling algorithm
 for estimating the ratio of the partition functions of the given
 GaussianBernoulliRBM `gbrbm` to the GaussianBernoulliRBM with same hidden and
 visible biases and same standard deviation but with zero weights.
 """
-function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
+function aislogimpweights(gbrbm::GaussianBernoulliRBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
@@ -163,12 +165,12 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
       for k=2:(ntemperatures + 1)
 
          wh = gbrbm.weights*h
-         logimpweights[j] += (beta[k] - beta[k-1]) *
+         logimpweights[j] += (temperatures[k] - temperatures[k-1]) *
                sum(0.5 * wh.^2 + gbrbm.visbias ./gbrbm.sd .* wh)
 
          # Gibbs transition
-         mixrbm.weights = gbrbm.weights * sqrt(beta[k])
-         mixrbm.sd = gbrbm.sd / sqrt(beta[k])
+         mixrbm.weights = gbrbm.weights * sqrt(temperatures[k])
+         mixrbm.sd = gbrbm.sd / sqrt(temperatures[k])
          for burn = 1:burnin
             v = samplevisible(mixrbm, h)
             h = samplehidden(mixrbm, v)
@@ -177,16 +179,16 @@ function aisimportanceweights(gbrbm::GaussianBernoulliRBM;
       end
    end
 
-   exp.(logimpweights)
+   logimpweights
 end
 
 
 """
-    aisimportanceweights(dbm; ...)
-Computes the importance weights in the Annealed Importance Sampling algorithm
-for estimating the ratio of the partition functions of the given DBM `dbm` to the
-base-rate DBM with all weights being zero and all biases equal to the biases of
-the `dbm`.
+    aislogimpweights(dbm; ...)
+Computes the logarithmised importance weights in the Annealed Importance Sampling
+algorithm (AIS) for estimating the ratio of the partition functions of the given
+DBM `dbm` to the base-rate DBM with all weights being zero and all biases equal
+to the biases of the `dbm`.
 
 Implements algorithm 4 in [Salakhutdinov+Hinton, 2012].
 For DBMs with Bernoulli-distributed nodes only
@@ -201,9 +203,9 @@ If `dbm` is of type `PartitionedBernoulliDBM`, the optional keyword argument
 In the case of `MultimodalDBM`s, it is not possible to choose and
 the second case applies there.
 """
-function aisimportanceweights(dbm::PartitionedBernoulliDBM;
+function aislogimpweights(dbm::PartitionedBernoulliDBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5,
       sumout::Symbol = :even)
@@ -211,9 +213,9 @@ function aisimportanceweights(dbm::PartitionedBernoulliDBM;
    if sumout == :odd
       # summing out even layers is done in the implementation for
       # MultimodalDBMs
-      return invoke(aisimportanceweights, Tuple{MultimodalDBM, }, dbm;
+      return invoke(aislogimpweights, Tuple{MultimodalDBM, }, dbm;
             ntemperatures = ntemperatures,
-            beta = beta,
+            temperatures = temperatures,
             nparticles = nparticles,
             burnin = burnin)
    elseif sumout != :even
@@ -221,7 +223,7 @@ function aisimportanceweights(dbm::PartitionedBernoulliDBM;
    end
    # in the following implementation, the even layers are summed out
 
-   impweights = ones(nparticles)
+   logimpweights = zeros(nparticles)
       # Todo: sample from null model, which has changed
    particles = initparticles(dbm, nparticles, biased = true)
    nlayers = length(particles)
@@ -232,27 +234,27 @@ function aisimportanceweights(dbm::PartitionedBernoulliDBM;
    biases = combinedbiases(dbm)
    mixdbm = deepcopy(dbm)
 
-   for k = 2:length(beta)
+   for k = 2:length(temperatures)
       # Calculate probability ratios for importance weights
       # according to activation of odd layers (v, h2, h4, ...)
-      aisupdateimportanceweights!(impweights, input1, input2,
-            beta[k], beta[k-1], dbm, biases, particles)
+      aisupdatelogimpweights!(logimpweights, input1, input2,
+            temperatures[k], temperatures[k-1], dbm, biases, particles)
 
       # Gibbs transition
-      copyannealed!(mixdbm, dbm, beta[k])
+      copyannealed!(mixdbm, dbm, temperatures[k])
       gibbssample!(particles, mixdbm, burnin)
    end
 
-   impweights
+   logimpweights
 end
 
-function aisimportanceweights(mdbm::MultimodalDBM;
+function aislogimpweights(mdbm::MultimodalDBM;
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
-   impweights = ones(nparticles)
+   logimpweights = zeros(nparticles)
       # Todo: sample from null model, which has changed
    particles = initparticles(mdbm, nparticles, biased = true)
    nlayers = length(particles)
@@ -265,111 +267,125 @@ function aisimportanceweights(mdbm::MultimodalDBM;
    hiddbm = converttopartitionedbernoullidbm(mdbm[2:end])
    hidbiases = combinedbiases(hiddbm)
 
-   for k = 2:length(beta)
+   for k = 2:length(temperatures)
       # Calculate probability ratios for importance weights
       # according to activation of odd hidden layers (h1, h3, ...)
-      impweights .*= aisunnormalizedprobratios(mdbm[1],
-            particles[2], beta[k], beta[k-1])
-      aisupdateimportanceweights!(impweights, hiddbminput1, hiddbminput2,
-            beta[k], beta[k-1], hiddbm, hidbiases, particles[2:end])
+      logimpweights += aisunnormalizedproblogratios(mdbm[1],
+            particles[2], temperatures[k], temperatures[k-1])
+      aisupdatelogimpweights!(logimpweights, hiddbminput1, hiddbminput2,
+            temperatures[k], temperatures[k-1], hiddbm, hidbiases, particles[2:end])
 
       # Gibbs transition
-      copyannealed!(mixdbm, mdbm, beta[k])
+      copyannealed!(mixdbm, mdbm, temperatures[k])
       gibbssample!(particles, mixdbm, burnin)
    end
 
-   impweights
+   logimpweights
 end
 
 
 """
-    aisprecision(r, aissd, sdrange)
+    aisprecision(logr, aissd, sdrange)
 Returns the differences of the estimated logratio `r` to the lower
 and upper bound of the range defined by the multiple `sdrange`
 of the standard deviation of the ratio's estimator `aissd`.
 """
-function aisprecision(r::Float64, aissd::Float64, sdrange::Float64 = 1.0)
+function aisprecision(logr::Float64, aissd::Float64, sdrange::Float64 = 1.0)
 
-   if r - sdrange*aissd <= 0 # prevent domainerror
+   t = sdrange * aissd * exp(-logr)
+
+   if 1 - t <= 0 # prevent domainerror
       diffbottom = -Inf
    else
-      diffbottom = log(r - sdrange*aissd) - log(r)
+      diffbottom = log(1 - t)
    end
 
-   difftop = log(r + sdrange*aissd) - log(r)
+   difftop = log(1 + t)
 
    diffbottom, difftop
 end
 
-
 """
-    aisprecision(impweights, sdrange)
+    aisprecision(logimpweights, sdrange)
 """
-function aisprecision(impweights::Array{Float64,1}, sdrange::Float64 = 1.0)
-   aisprecision(mean(impweights), aisstandarddeviation(impweights), sdrange)
-end
-
-"
-Computes the standard deviation of the AIS estimator
-(eq 4.10 in [Salakhutdinov+Hinton, 2012]) given the importance weights.
-"
-function aisstandarddeviation(impweights::Array{Float64,1})
-   aissd = sqrt(var(impweights) / length(impweights))
+function aisprecision(logimpweights::Array{Float64,1}, sdrange::Float64 = 1.0)
+   aisprecision(
+         logmeanexp(logimpweights),
+         aisstandarddeviation(logimpweights),
+         sdrange)
 end
 
 
-function aisunnormalizedprobratios(rbm::BernoulliRBM,
+"""
+Computes the standard deviation of the AIS estimator (not logarithmised)
+(eq 4.10 in [Salakhutdinov+Hinton, 2012]) given the logarithmised
+importance weights.
+"""
+function aisstandarddeviation(logimpweights::Array{Float64,1})
+   # Explanation: var(exp(x)) =
+   #    = mean(exp(x)^3) - (mean(exp(x))^2)
+   #    = exp(logmeanexp(2x)) - exp(2*logmeanexp(x))
+
+   varimpweights =
+         exp(logmeanexp(2 * logimpweights)) -
+         exp(2 * logmeanexp(logimpweights))
+   aissd = sqrt(varimpweights / length(logimpweights))
+end
+
+
+function aisunnormalizedproblogratios(rbm::BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    weightsinput = hh * rbm.weights'
-   vec(prod(
+   vec(sum(log.(
          (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2))
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2))
 end
 
-function aisunnormalizedprobratios(rbm::Binomial2BernoulliRBM,
+function aisunnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    weightsinput = hh * rbm.weights'
-   vec(prod(
+   vec(sum(log.(
          (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias'))), 2).^2)
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2) * 2)
 end
 
-function aisunnormalizedprobratios(gbrbm::GaussianBernoulliRBM,
+function aisunnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    wht = hh * gbrbm.weights'
-   vec(exp.((temperature1 - temperature2) * sum(
-         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2)))
+   vec((temperature1 - temperature2) * sum(
+         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
 end
 
-function aisunnormalizedprobratios(prbm::PartitionedRBM,
+function aisunnormalizedproblogratios(prbm::PartitionedRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    # TODO does not work with views
    mapreduce(
-         i -> aisunnormalizedprobratios(prbm.rbms[i],
+         i -> aisunnormalizedproblogratios(prbm.rbms[i],
                hh[:, prbm.hidranges[i]], temperature1, temperature2),
-         (x,y) -> broadcast(*,x,y) , eachindex(prbm.rbms))
+         (x,y) -> broadcast(+, x, y) , eachindex(prbm.rbms))
 end
 
 
 """
-Updates the importance weights `impweights` in AIS by multiplying the ratio of
-unnormalized probabilities of the states of the odd layers in the
-PartitionedBernoulliDBM `dbm`. The activation states of the DBM's nodes are given by the `particles`.
-For performance reasons, the biases are specified separately
+Updates the logarithmized importance weights `logimpweights` in AIS
+by adding the log ratio of unnormalized probabilities of the states
+of the odd layers in the PartitionedBernoulliDBM `dbm`.
+The activation states of the DBM's nodes are given by the `particles`.
+For performance reasons, the biases are specified separately.
 """
-function aisupdateimportanceweights!(impweights,
+function aisupdatelogimpweights!(logimpweights,
       input1::Particles, input2::Particles,
       temperature1::Float64, temperature2::Float64,
       dbm::PartitionedBernoulliDBM,
@@ -388,9 +404,9 @@ function aisupdateimportanceweights!(impweights,
       broadcast!(+, input1[i], input1[i], biases[i]')
 
       for n = 1:size(input1[i],2)
-         for j in eachindex(impweights)
-            impweights[j] *=
-                  (1 + exp.(input1[i][j,n])) / (1 + exp.(input2[i][j,n]))
+         for j in eachindex(logimpweights)
+            logimpweights[j] +=
+                  log((1 + exp.(input1[i][j,n])) / (1 + exp.(input2[i][j,n])))
          end
       end
    end
@@ -840,7 +856,7 @@ This requires a separate run of AIS for each sample.
 function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = -Inf;
       parallelized = false,
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
@@ -849,7 +865,7 @@ function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = 
    if logz == -Inf
       logz = logpartitionfunction(mdbm;
             parallelized = parallelized, ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin)
+            temperatures = temperatures, nparticles = nparticles, burnin = burnin)
    end
 
    if parallelized
@@ -859,13 +875,13 @@ function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = 
       logp = @sync @parallel (+) for i in 1:length(batches)
          (batches[i] / nsamples) * # (weighted mean)
             unnormalizedlogprob(mdbm, x[batchranges[i], :];
-                  ntemperatures = ntemperatures,
-                  beta = beta, nparticles = nparticles, burnin = burnin)
+                  ntemperatures = ntemperatures, temperatures = temperatures,
+                  nparticles = nparticles, burnin = burnin)
       end
    else
       logp = unnormalizedlogprob(mdbm, x;
             ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin)
+            temperatures = temperatures, nparticles = nparticles, burnin = burnin)
    end
    logp -= logz
    logp
@@ -883,17 +899,17 @@ The first model is better than the second if the returned value is positive.
 """
 function loglikelihooddiff(rbm1::BernoulliRBM, rbm2::BernoulliRBM,
       x::Array{Float64,2},
-      impweights::Array{Float64,1} = aisimportanceweights(rbm1, rbm2))
+      logimpweights::Array{Float64,1} = aislogimpweights(rbm1, rbm2))
 
-   nsamples = size(x,1)
+   nsamples = size(x, 1)
 
    lldiff = 0.0
 
    visbiasdiff = rbm1.visbias - rbm2.visbias
 
    # calculate difference of sum of unnormalized log probabilities
-   for j=1:nsamples
-      v = vec(x[j,:])
+   for j = 1:nsamples
+      v = vec(x[j, :])
       lldiff += dot(visbiasdiff, v) +
             sum(log.(1 + exp.(hiddeninput(rbm1, v)))) -
             sum(log.(1 + exp.(hiddeninput(rbm2, v))))
@@ -901,17 +917,28 @@ function loglikelihooddiff(rbm1::BernoulliRBM, rbm2::BernoulliRBM,
 
    # average over samples
    lldiff /= nsamples
-   r = mean(impweights) # estimator for Z2/Z1
-   lldiff += log(r)
+   lldiff += logmeanexp(logimpweights) # estimator for Z2/Z1
    lldiff
+end
+
+
+""" Performs numerically stable computation of the mean on log-scale. """
+function logmeanexp(v::Vector{Float64})
+   logsumexp(v) - log(length(v))
+end
+
+""" Performs numerically stable summation on log-scale. """
+function logsumexp(v::Vector{Float64})
+   vmax = maximum(v)
+   vmax + log(sum(exp.(v - vmax)))
 end
 
 
 """
     logpartitionfunction(bm; ...)
-    logpartitionfunction(bm, r)
-Calculates the log of the partition function of the Boltzmann Machine `bm`
-from the estimator `r`.
+    logpartitionfunction(bm, logr)
+Calculates or estimates the log of the partition function
+of the Boltzmann Machine `bm`.
 
 `r` is an estimator of the ratio of the `bm`'s partition function Z to the
 partition function Z_0 of the reference BM with zero weights but same biases
@@ -922,37 +949,37 @@ with `r` being the mean of the importance weights.
 Therefore, the log of the estimated partition function is
 log(Z) = log(r) + log(Z_0)
 
-If the estimator `r` is not given as argument, Annealed Importance Sampling
+If the log of `r` is not given as argument `logr`, Annealed Importance Sampling
 (AIS) is performed to get a value for it. In this case,
-the optional arguments for AIS can be specified (see `aisimportanceweights`),
+the optional arguments for AIS can be specified (see `aislogimpweights`),
 and the optional boolean argument `parallelized` can
 be used to turn on batch-parallelized computing of the importance weights.
 """
-function logpartitionfunction(bm::AbstractBM, r::Float64)
-   log(r) + logpartitionfunctionzeroweights(bm)
+function logpartitionfunction(bm::AbstractBM, logr::Float64)
+   logr + logpartitionfunctionzeroweights(bm)
 end
 
 function logpartitionfunction(bm::AbstractBM;
       parallelized::Bool = false,
       # optional arguments for AIS:
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    if parallelized
-      impweights = BMs.batchparallelized(
-            n -> BMs.aisimportanceweights(bm;
-                  ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.batchparallelized(
+            n -> BMs.aislogimpweights(bm;
+                  ntemperatures = ntemperatures, temperatures = temperatures,
                   nparticles = n, burnin = burnin),
             nparticles, vcat)
    else
-      impweights = BMs.aisimportanceweights(bm;
-            ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.aislogimpweights(bm;
+            ntemperatures = ntemperatures, temperatures = temperatures,
             nparticles = nparticles, burnin = burnin)
    end
 
-   logpartitionfunction(bm, mean(impweights))
+   logpartitionfunction(bm, logmeanexp(logimpweights))
 end
 
 
@@ -1037,13 +1064,14 @@ in [Salakhutdinov, 2015].
 * The approximate posterior distribution may be given as argument `mu`
   or is calculated by the mean-field method.
 * The `logpartitionfunction` can be specified directly
-  or is calculated using the `impweights`.
+  or is calculated using the `logimpweights`.
 """
 function logproblowerbound(dbm::BasicDBM,
       x::Array{Float64};
-      impweights::Array{Float64,1} = aisimportanceweights(dbm),
+      logimpweights::Array{Float64,1} = aislogimpweights(dbm),
       mu::Particles = meanfield(dbm, x),
-      logpartitionfunction::Float64 = BMs.logpartitionfunction(dbm, mean(impweights)))
+      logpartitionfunction::Float64 = logpartitionfunction(dbm,
+            logmeanexp(logimpweights)))
 
    nsamples = size(mu[1], 1)
    nrbms  = length(dbm)
@@ -1282,11 +1310,11 @@ in the MultimodalDBM `mdbm` by running the Annealed Importance Sampling (AIS)
 in a smaller modified DBM for each sample.
 
 The named optional arguments for AIS can be specified here.
-(See `aisimportanceweights`)
+(See `aislogimpweights`)
 """
 function unnormalizedlogprob(mdbm, x::Matrix{Float64};
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
@@ -1312,8 +1340,8 @@ function unnormalizedlogprob(mdbm, x::Matrix{Float64};
       # Then compute the log partition function of the new DBM consisting
       # only of the hidden layer RBMs (with the first layer modified).
       logp += logpartitionfunction(hiddbm;
-            ntemperatures = ntemperatures,
-            beta = beta, nparticles = nparticles, burnin = burnin)
+            ntemperatures = ntemperatures, temperatures = temperatures,
+             nparticles = nparticles, burnin = burnin)
    end
 
    logp /= nsamples

@@ -219,12 +219,9 @@ between the exact log partition function and AIS-estimated one is less than
 function testaisvsexact(bm::BMs.AbstractBM, percentalloweddiff::Float64;
       ntemperatures = 100, nparticles = 100)
 
-   impweights = BMs.aisimportanceweights(bm, ntemperatures = ntemperatures,
-      nparticles = nparticles)
-
-   r = mean(impweights)
    exact = BMs.exactlogpartitionfunction(bm)
-   estimated = BMs.logpartitionfunction(bm, r)
+   estimated = BMs.logpartitionfunction(bm;
+         ntemperatures = ntemperatures, nparticles = nparticles)
 
    @test abs((exact - estimated)/exact) < percentalloweddiff / 100
 end
@@ -322,7 +319,7 @@ function test_likelihoodconsistency()
          parallelized = false, nparticles = 300, ntemperatures = 200)
    logp2 = BMs.loglikelihood(dbm, x[1:10,:];
          parallelized = true, nparticles = 300, ntemperatures = 200)
-   @test isapprox(logp1, logp2, rtol = 0.04)
+   @test isapprox(logp1, logp2, rtol = 0.055)
 
    rbm = BMs.fitrbm(x; epochs = 20)
    logz1 = BMs.logpartitionfunction(rbm; parallelized = false)
@@ -376,7 +373,7 @@ function test_mdbm_rbm_b2brbm()
          learningratepretraining = 0.001,
          pretraining = trainlayers1)
 
-   BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 5.0,
+   BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 5.5,
          ntemperatures = 300, nparticles = 300)
 
    # partitioned second layer
@@ -391,7 +388,7 @@ function test_mdbm_rbm_b2brbm()
    ]
 
    dbm2 = BMs.fitdbm(x, pretraining = trainlayers2)
-   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 5.0,
+   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 6.0,
          ntemperatures = 300, nparticles = 300)
 end
 
@@ -399,7 +396,7 @@ end
 function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
-   logz = BMs.logpartitionfunction(rbm;
+   logz = BMs.logpartitionfunction(rbm; parallelized = true,
       nparticles = nparticles, ntemperatures = ntemperatures)
    estloglik = BMs.loglikelihood(rbm, x, logz)
    exactloglik = BMs.exactloglikelihood(rbm, x)
@@ -413,7 +410,7 @@ function testlikelihoodempirically(dbm::BMs.MultimodalDBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
    emploglik = BMs.empiricalloglikelihood(dbm, x, 1000000)
-   estloglik = BMs.loglikelihood(dbm, x;
+   estloglik = BMs.loglikelihood(dbm, x; parallelized = true,
          ntemperatures = ntemperatures, nparticles = nparticles)
    exactloglik = BMs.exactloglikelihood(dbm, x)
    @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100

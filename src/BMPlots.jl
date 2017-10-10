@@ -77,11 +77,11 @@ function extractaisdata(monitor::BMs.Monitor, evaluation::AbstractString, sdrang
       # plot ribbon around log probs.
       for epoch in epochs
          sd = getvalue(monitor, BMs.monitoraisstandarddeviation, epoch)
-         r = getvalue(monitor, BMs.monitoraisr, epoch)
+         logr = getvalue(monitor, BMs.monitoraislogr, epoch)
 
          # log(Z) is subtracted from logproblowerbound, so overstimating log(Z)
          # means underestimating the log probability
-         bottom, top = BMs.aisprecision(r, sd, sdrange)
+         bottom, top = BMs.aisprecision(logr, sd, sdrange)
          plotdata[:ymin][plotdata[:epoch] .== epoch] -= top
          plotdata[:ymax][plotdata[:epoch] .== epoch] -= bottom
       end
