@@ -436,7 +436,7 @@ end
 function samplehidden(bgrbm::BernoulliGaussianRBM, v::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
    h = hiddenpotential(bgrbm, v, factor)
-   h .+ randn(size(hh))
+   h .+ randn(size(h))
 end
 
 
