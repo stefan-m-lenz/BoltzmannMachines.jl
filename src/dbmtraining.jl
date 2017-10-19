@@ -115,7 +115,10 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
 * `epochs`: number of training epochs for joint training
 * `epochspretraining`: number of training epochs for pretraining,
    defaults to `epochs`
-* `learningrate`: learning rate for joint training, see `traindbm!`
+* `learningrate`: learning rate for joint training of layers (= fine tuning)
+   using the learning algorithm for a general Boltzmann Machine.
+   The learning rate for fine tuning is by default decaying with the number of epochs,
+   starting with the given value. (For more details see `traindbm!`).
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
 * `nparticles`: number of particles used for sampling during joint training of
