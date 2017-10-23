@@ -66,10 +66,10 @@ Function name | Short description
 
 Function name          | Short description
 --------------         | -----------------
-`aisimportanceweights` | Performs AIS on a BM and calculates the importance weights for estimating the BM's partition function.
+`aislogimpweights`     | Performs AIS on a BM and calculates the logarithmised importance weights for estimating the BM's partition function.
 `freeenergy`           | Computes the mean free energy of a data set in an RBM model.
 `loglikelihood`        | Estimates the mean loglikelihood of a dataset in a BM model using AIS.
-`logpartitionfunction` | Estimates the log of the partition function of a BM. 
+`logpartitionfunction` | Estimates the log of the partition function of a BM.
 `logproblowerbound`    | Estimates the mean lower bound of the log probability of a dataset in a DBM model.
 `reconstructionerror`  | Computes the mean reconstruction error of a dataset in an RBM model.
 `sampleparticles`      | Generates samples from the distribution defined by a BM model.
@@ -78,7 +78,7 @@ Function name          | Short description
 ### Monitoring the learning process
 
 The functions of the form `monitor*!` can be used for monitoring a property of the model during the learning process.
-The following words, corresponding to the denominated properties, may stand in place of `*`: 
+The following words, corresponding to the denominated properties, may stand in place of `*`:
 
 * `freeenergy`
 * `exactloglikelihood`
@@ -97,7 +97,7 @@ For intended usage of these functions, best see the [examples](test/examples.jl)
 Prerequisite for running the [example code here](test/examples.jl) is that the `BoltzmannMachines` package is installed:
 
     Pkg.clone("https://github.com/binderh/BoltzmannMachines.jl.git")
-    
+
 If you want to use the plotting functionality in the submodule `BMPlots`, you are also required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
 
 ### Applications
@@ -113,7 +113,7 @@ The code for the analyses presented there is available in the article supplement
 [1] Salakhutdinov, R. (2015). *Learning Deep Generative Models*. Annual Review of Statistics and Its Application, 2, 361-385.
 
 [2] Salakhutdinov, R. Hinton, G. (2012). *An Efficient Learning Procedure for Deep Boltzmann Machines*. Neural computation, 24(8), 1967-2006.
- 
+
 [3] Salakhutdinov. R. (2008). *Learning and Evaluating Boltzmann Machines*. Technical Report UTML TR 2008-002, Department of Computer Science, University of Toronto.
 
 [4] Krizhevsky, A., Hinton, G. (2009). *Learning Multiple Layers of Features from Tiny Images*.

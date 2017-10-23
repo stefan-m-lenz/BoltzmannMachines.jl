@@ -29,7 +29,7 @@ x = rand(100, 10) + randn(100, 10);
 nvisible = 10
 nhidden = 10
 bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), rand(nvisible), ones(nhidden));
-@test isapprox(BMs.logpartitionfunction(bgrbm, 1.0),
+@test isapprox(BMs.logpartitionfunction(bgrbm, 0.0),
       BMs.exactlogpartitionfunction(bgrbm))
 
 # Test exact computation of log partition function of DBM:

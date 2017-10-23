@@ -24,7 +24,7 @@ with samples in rows) as values.
 const DataDict = Dict{AbstractString,Array{Float64,2}}
 
 
-const monitoraisr = "aisr"
+const monitoraislogr = "aislogr"
 const monitoraisstandarddeviation = "aisstandarddeviation"
 const monitorcordiff = "cordiff"
 const monitorexactloglikelihood = "exactloglikelihood"
@@ -106,7 +106,7 @@ If there is more than one worker available, the computation is parallelized
 by default. Parallelization can be turned on or off with the optional
 boolean argument `parallelized`.
 
-For the other optional keyword arguments, see `aisimportanceweights`.
+For the other optional keyword arguments, see `aislogimportanceweights`.
 
 See also: `loglikelihood`.
 """
@@ -115,28 +115,28 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
       parallelized::Bool = nworkers() > 1,
       # optional arguments for AIS:
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    if parallelized
-      impweights = BMs.batchparallelized(
-            n -> BMs.aisimportanceweights(rbm;
-                  ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.batchparallelized(
+            n -> BMs.aislogimpweights(rbm;
+                  ntemperatures = ntemperatures, temperatures = temperatures,
                   nparticles = n, burnin = burnin),
             nparticles, vcat)
    else
-      impweights = BMs.aisimportanceweights(rbm;
-            ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.aislogimpweights(rbm;
+            ntemperatures = ntemperatures, temperatures = temperatures,
             nparticles = nparticles, burnin = burnin)
    end
 
-   r = mean(impweights)
-   sd = BMs.aisstandarddeviation(impweights)
-   logz = BMs.logpartitionfunction(rbm, r)
+   logr = logmeanexp(logimpweights)
+   sd = BMs.aisstandarddeviation(logimpweights)
+   logz = BMs.logpartitionfunction(rbm, logr)
    push!(monitor,
          MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(BMs.monitoraisr, epoch, r, ""))
+         MonitoringItem(BMs.monitoraislogr, epoch, logr, ""))
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(BMs.monitorloglikelihood, epoch,
             BMs.loglikelihood(rbm, x, logz), datasetname))
@@ -154,7 +154,7 @@ If there is more than one worker available, the computation is parallelized
 by default. Parallelization can be turned on or off with the optional
 boolean argument `parallelized`.
 
-For the other optional keyword arguments, see `aisimportanceweights`.
+For the other optional keyword arguments, see `aislogimpweights`.
 
 See also: `logproblowerbound`.
 """
@@ -163,28 +163,28 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       parallelized::Bool = nworkers() > 1,
       # optional arguments for AIS:
       ntemperatures::Int = 100,
-      beta::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5)
 
    if parallelized
-      impweights = BMs.batchparallelized(
-            n -> BMs.aisimportanceweights(dbm;
-                  ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.batchparallelized(
+            n -> BMs.aislogimpweights(dbm;
+                  ntemperatures = ntemperatures, temperatures = temperatures,
                   nparticles = n, burnin = burnin),
             nparticles, vcat)
    else
-      impweights = BMs.aisimportanceweights(dbm;
-            ntemperatures = ntemperatures, beta = beta,
+      logimpweights = BMs.aislogimpweights(dbm;
+            ntemperatures = ntemperatures, temperatures = temperatures,
             nparticles = nparticles, burnin = burnin)
    end
 
-   r = mean(impweights)
-   sd = BMs.aisstandarddeviation(impweights)
-   logz = BMs.logpartitionfunction(dbm, r)
+   logr = logmeanexp(logimpweights)
+   sd = BMs.aisstandarddeviation(logimpweights)
+   logz = BMs.logpartitionfunction(dbm, logr)
    push!(monitor,
          MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(BMs.monitoraisr, epoch, r, ""))
+         MonitoringItem(BMs.monitoraislogr, epoch, logr, ""))
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(BMs.monitorlogproblowerbound, epoch,
             BMs.logproblowerbound(dbm, x, logpartitionfunction = logz),

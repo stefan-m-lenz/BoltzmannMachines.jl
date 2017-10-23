@@ -6,7 +6,7 @@ const BMs = BoltzmannMachines
 
 export
    AbstractBM,
-      aisimportanceweights, aisprecision, aisstandarddeviation,
+      aislogimpweights, aisprecision, aisstandarddeviation,
       empiricalloglikelihood, energy, exactloglikelihood,
       exactlogpartitionfunction, loglikelihood,
       logpartitionfunction, logpartitionfunctionzeroweights,
@@ -58,7 +58,7 @@ on all the available workers and reduces the results with the operator `op`.
 `f` is a function that gets a number (of tasks) to execute the tasks.
 
 # Example:
-    batchparallelized(n -> aisimportanceweights(dbm; nparticles = n), 100, vcat)
+    batchparallelized(n -> aislogimpweights(dbm; nparticles = n), 100, vcat)
 """
 function batchparallelized(f::Function, n::Int, op::Function)
    batches = mostevenbatches(n)
