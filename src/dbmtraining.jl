@@ -327,7 +327,7 @@ function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64}}
 
    if biased
-      for k in size(v,2)
+      for k in 1:size(v, 2)
          v[:,k] .= sigm(rbm.visbias[k])
       end
       bernoulli!(v)
@@ -341,7 +341,7 @@ function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
    ) where{M <: AbstractArray{Float64}}
 
    if biased
-      for k in size(v,2)
+      for k in 1:size(v, 2)
          v[:,k] .= sigm(b2brbm.visbias[k])
       end
       binomial2!(v)
