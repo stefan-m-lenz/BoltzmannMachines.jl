@@ -332,8 +332,9 @@ function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
       end
       bernoulli!(v)
    else
-      rand!([0.0 1.0], v)
+      rand!(v, [0.0 1.0])
    end
+   v
 end
 
 function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
@@ -345,8 +346,9 @@ function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
       end
       binomial2!(v)
    else
-      rand!([0.0 1.0 1.0 2.0], v)
+      rand!(v, [0.0 1.0 1.0 2.0])
    end
+   v
 end
 
 function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
@@ -356,6 +358,7 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
       broadcast!(*, v, v, rbm.sd')
       broadcast!(+, v, v, rbm.visbias')
    end
+   v
 end
 
 function initvisiblenodes!(v::M, prbm::PartitionedRBM, biased::Bool
