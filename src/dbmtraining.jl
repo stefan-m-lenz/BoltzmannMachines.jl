@@ -145,7 +145,8 @@ function fitdbm(x::Matrix{Float64};
 
    if isempty(pretraining) && isempty(nhiddens)
       # set default only if there is not any more detailed info
-      nhiddens = size(x,2)*ones(2)
+      nvariables = size(x,2)
+      nhiddens = [nvariables; nvariables]
    end
 
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
