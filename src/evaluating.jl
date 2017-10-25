@@ -1070,7 +1070,7 @@ function logproblowerbound(dbm::BasicDBM,
       x::Array{Float64};
       logimpweights::Array{Float64,1} = aislogimpweights(dbm),
       mu::Particles = meanfield(dbm, x),
-      logpartitionfunction::Float64 = logpartitionfunction(dbm,
+      logpartitionfunction::Float64 = BMs.logpartitionfunction(dbm,
             logmeanexp(logimpweights)))
 
    nsamples = size(mu[1], 1)

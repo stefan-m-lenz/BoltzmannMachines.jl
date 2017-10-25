@@ -16,8 +16,10 @@ gadflyinitialized = false
 
 # Called when loading the package, initializes Gadfly only if it is installed
 function __init__()
-   if Pkg.installed("Gadfly") != nothing
-      initgadfly()
+   if !isdefined(Main, :DO_NOT_LOAD_GADFLY)
+      if Pkg.installed("Gadfly") != nothing
+         initgadfly()
+      end
    end
 end
 
@@ -31,7 +33,10 @@ end
 
 
 function requiresgadfly()
-   if !gadflyinitialized
+   if isdefined(Main, :DO_NOT_LOAD_GADFLY)
+      error("Plotting requires that Gadfly is loaded when loading the package." *
+            "This was prevented by defining the variable 'DO_NOT_LOAD_GADFLY'.")
+   elseif !gadflyinitialized
       if Pkg.installed("Gadfly") == nothing
          error("Plotting requires Gadfly. Please install package \"Gadfly\".")
       else
@@ -179,9 +184,6 @@ function plotreconstructionerror(monitor::BMs.Monitor)
    plotevaluation(monitor, BMs.monitorreconstructionerror)
 end
 
-function emptyfunc
-end
-
 function bivariategaussiandensity(x1::Vector{Float64}, x2::Vector{Float64})
    c = cov(x1, x2)
    s = [var(x1) c; c var(x2)]
@@ -199,7 +201,7 @@ function plotpairs(x::Matrix{Float64};
       labels = Vector{AbstractString}(),
       cellsize = 0,
       subgroups = Vector{AbstractString}(),
-      densityestimation::Function = emptyfunc,
+      densityestimation::Function = BMs.emptyfunc,
       datafordensityestimation::Matrix{Float64} = x)
 
    requiresgadfly()
@@ -285,6 +287,19 @@ function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       plot(x = hh[:,1], y = hh[:,2], Geom.point)
    end
 
+end
+
+
+function crossvalidationcurve(cvres::BMs.CrossValidationResult)
+   boxplotdata = DataFrame(
+         parameter = map(r -> r.param, cvres),
+         score = map(r -> r.score, cvres))
+   meanplotdata = aggregate(boxplotdata, :parameter, mean)
+   plot(
+         layer(meanplotdata, x = "parameter", y = "score_mean", Geom.line,
+               Theme(default_color = parse(Compose.Colorant, "green"))),
+         layer(boxplotdata, x = "parameter", y = "score", Geom.boxplot),
+         Guide.xlabel("Parameter"), Guide.ylabel("Score"))
 end
 
 end # module BMPlots

@@ -57,5 +57,7 @@ BMTest.test_b2brbm()
 BMTest.test_mdbm_rbm_b2brbm()
 BMTest.test_mdbm_gaussianvisibles()
 
+BMTest.test_crossvalidation()
+
 # run examples
 include("../test/examples.jl")

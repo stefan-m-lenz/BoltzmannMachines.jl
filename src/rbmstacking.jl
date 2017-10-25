@@ -70,6 +70,24 @@ const AbstractTrainLayers = Vector{<:AbstractTrainLayer}
 
 
 """
+Converts a vector to a vector of the most specific type that all
+elements share as common supertype.
+"""
+function converttomostspecifictype(v::Vector)
+   Vector{mostspecifictype(v)}(v)
+end
+
+
+"""
+    mostspecifictype(v)
+Returns the most specific supertype for all elements in the vector `v`.
+"""
+function mostspecifictype(v::Vector)
+   mapreduce(typeof, typejoin, v)
+end
+
+
+"""
     stackrbms(x; ...)
 Performs greedy layerwise training for Deep Belief Networks or greedy layerwise
 pretraining for Deep Boltzmann Machines and returns the trained model.

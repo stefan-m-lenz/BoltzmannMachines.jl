@@ -95,19 +95,6 @@ end
 
 
 """
-Converts a vector to a vector of the most specific type that all
-elements share as common supertype.
-"""
-function converttomostspecifictype(v::Vector)
-   Vector{mostspecifictype(v)}(v)
-end
-
-function mostspecifictype(v::Vector)
-   mapreduce(typeof, typejoin, v)
-end
-
-
-"""
     barsandstripes(nsamples, nvariables)
 Generates a test data set. To see the structure in the data set, run e. g.
 `reshape(barsandstripes(1, 16), 4,4)` a few times.
@@ -132,6 +119,14 @@ function barsandstripes(nsamples::Int, nvariables::Int)
       fill!(sample, 0.0)
    end
    x
+end
+
+
+"""
+A function with no arguments doing nothing.
+Usable as default argument for functions as arguments.W
+"""
+function emptyfunc
 end
 
 
@@ -190,11 +185,12 @@ function splitdata(x::Matrix{Float64}, ratio::Float64)
    xtraining, xtest
 end
 
-
 include("weightsjoining.jl")
 
 include("evaluating.jl")
 include("monitoring.jl")
+
+include("crossvalidating.jl")
 
 include("BMPlots.jl")
 
