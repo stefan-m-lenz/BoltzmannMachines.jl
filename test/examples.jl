@@ -140,3 +140,23 @@ rbm = fitrbm(x, rbmtype = Binomial2BernoulliRBM,
 
 BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
+
+
+# ==============================================================================
+# Examples for cross-validation
+# ------------------------------------------------------------------------------
+
+nsamples = 500;
+nvariables = 9;
+x = barsandstripes(nsamples, nvariables);
+
+# Determine the optimal number of training epochs for a RBM
+# (given the other parameters)
+cvres = crossvalidation_epochs(
+      x -> BoltzmannMachines.initrbm(x, size(x, 2)),
+      (rbm, x) -> BoltzmannMachines.trainrbm!(rbm, x, learningrate = 0.01),
+      200, # maximum number of epochs to train
+      eval = (rbm, x) -> BoltzmannMachines.exactloglikelihood(rbm, x),
+      data = x);
+BMPlots.crossvalidationcurve(cvres)
+

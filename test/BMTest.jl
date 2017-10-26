@@ -304,20 +304,6 @@ function testdbmjoining()
 end
 
 
-""" Performs a cross validation. """
-function test_crossvalidation(;
-   nsamples::Int = 120, nunits::Vector{Int} = [9;8;5], epochs::Int = 10)
-
-x = BMs.barsandstripes(nsamples, nunits[1])
-BMs.crossvalidation(
-      fit = (x, param) -> BMs.stackrbms(x,
-            nhiddens = nunits[2:end], epochs = param),
-      eval = (dbm, x) -> BMs.exactloglikelihood(dbm, x),
-      x = x,
-      params = 1:epochs)
-end
-
-
 """
 Fits a larger RBM and a DBM and tests whether the AIS estimation
 yields approximately the same results, if performed parallel or not.
@@ -485,7 +471,7 @@ function test_mdbm_gaussianvisibles()
    # Test exact likelihood vs estimated likelihood
    estloglik = BMs.loglikelihood(dbm1, x; nparticles = 200, ntemperatures = 200)
    exactloglik = BMs.exactloglikelihood(dbm1, x)
-   @test abs((exactloglik - estloglik) / exactloglik) < 3 / 100
+   @test abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
 
    nothing
 end

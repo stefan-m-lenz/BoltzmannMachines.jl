@@ -108,7 +108,7 @@ with Contrastive Divergence (CD), and returns it.
 * `epoch`: number of training epochs
 * `learningrate`/`learningrates`: The learning rate for the weights and biases
    can be specified as single value, used throughout all epochs, or as a vector
-   of `learningrates` that contains a value for each epoch.
+   of `learningrates` that contains a value for each epoch. Defaults to 0.005.
 * `pcd`: indicating whether Persistent Contrastive Divergence (PCD) is to
    be used (true, default) or simple CD that initializes the Gibbs Chain with
    the training sample (false)

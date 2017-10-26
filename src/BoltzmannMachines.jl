@@ -40,6 +40,7 @@ export
       monitorreconstructionerror, monitorreconstructionerror!,
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
+   crossvalidation, crossvalidation_epochs,
    barsandstripes, splitdata,
    BMPlots
 
