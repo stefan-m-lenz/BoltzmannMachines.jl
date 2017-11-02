@@ -290,16 +290,16 @@ function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
 end
 
 
-function crossvalidationcurve(cvres::BMs.CrossValidationResult)
+function crossvalidationcurve(monitor::BMs.Monitor)
    boxplotdata = DataFrame(
-         parameter = map(r -> r.param, cvres),
-         score = map(r -> r.score, cvres))
-   meanplotdata = aggregate(boxplotdata, :parameter, mean)
+         epoch = map(r -> r.epoch, monitor),
+         score = map(r -> r.value, monitor))
+   meanplotdata = aggregate(boxplotdata, :epoch, mean)
    plot(
-         layer(meanplotdata, x = "parameter", y = "score_mean", Geom.line,
+         layer(meanplotdata, x = "epoch", y = "score_mean", Geom.line,
                Theme(default_color = parse(Compose.Colorant, "green"))),
-         layer(boxplotdata, x = "parameter", y = "score", Geom.boxplot),
-         Guide.xlabel("Parameter"), Guide.ylabel("Score"))
+         layer(boxplotdata, x = "epoch", y = "score", Geom.boxplot),
+         Guide.xlabel("Epoch"), Guide.ylabel("Score"))
 end
 
 end # module BMPlots

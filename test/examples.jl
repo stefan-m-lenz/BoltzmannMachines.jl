@@ -147,16 +147,16 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 # ------------------------------------------------------------------------------
 
 nsamples = 500;
-nvariables = 9;
+nvariables = 16;
 x = barsandstripes(nsamples, nvariables);
 
 # Determine the optimal number of training epochs for a RBM
-# (given the other parameters)
-cvres = crossvalidation_epochs(
-      x -> BoltzmannMachines.initrbm(x, size(x, 2)),
-      (rbm, x) -> BoltzmannMachines.trainrbm!(rbm, x, learningrate = 0.01),
-      200, # maximum number of epochs to train
-      eval = (rbm, x) -> BoltzmannMachines.exactloglikelihood(rbm, x),
-      data = x);
-BMPlots.crossvalidationcurve(cvres)
+monitor = crossvalidation(x,
+      (monitor, datadict, x) ->
+            BoltzmannMachines.fitrbm(x, epochs = 50,
+                  learningrate = 0.005,
+                  monitoring = (rbm, epoch) ->
+                        BoltzmannMachines.monitorexactloglikelihood!(
+                              monitor, rbm, epoch, datadict)));
+BMPlots.crossvalidationcurve(monitor)
 
