@@ -31,6 +31,7 @@ const monitorexactloglikelihood = "exactloglikelihood"
 const monitorfreeenergy = "freeenergy"
 const monitorloglikelihood = "loglikelihood"
 const monitorlogproblowerbound = "logproblowerbound"
+const monitormeandiff = "monitormeandiff"
 const monitorreconstructionerror = "reconstructionerror"
 const monitorsd = "sd"
 const monitorweightsnorm = "weightsnorm"
@@ -48,18 +49,29 @@ end
 
 
 """
+    means(datadict)
+Creates and returns a dictionary with the same keys as the given `datadict`.
+The values of the returned dictionary are the samples' means in the `datadict`.
+"""
+function means(datadict::DataDict)
+   DataDict(map(kv -> (kv[1] => mean(kv[2], 1)), datadict))
+end
+
+
+"""
     monitorcordiff!(monitor, rbm, epoch, cordict)
 Generates samples and records the distance of their correlation matrix to the
 correlation matrices for (original) datasets contained in the `cordict`.
 """
 function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       cordict::DataDict;
-      nparticles::Int = 3000, burnin::Int = 10)
+      nparticles::Int = 3000, burnin::Int = 10,
+      xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1])
 
-   samplecor = cor(BMs.sampleparticles(bm, nparticles, burnin)[1])
+   samplecor = cor(xgenerated)
    for (datasetname, datacor) in cordict
-      push!(monitor, MonitoringItem(BMs.monitorcordiff, epoch,
-               norm(samplecor-datacor), datasetname))
+      push!(monitor, MonitoringItem(monitorcordiff, epoch,
+            norm(samplecor - datacor), datasetname))
    end
 end
 
@@ -76,7 +88,7 @@ function monitorexactloglikelihood!(monitor::Monitor, bm::AbstractBM,
    logz = BMs.exactlogpartitionfunction(bm)
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(BMs.monitorexactloglikelihood, epoch,
-               exactloglikelihood(bm, x, logz), datasetname))
+            exactloglikelihood(bm, x, logz), datasetname))
    end
 end
 
@@ -168,28 +180,53 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
       burnin::Int = 5)
 
    if parallelized
-      logimpweights = BMs.batchparallelized(
-            n -> BMs.aislogimpweights(dbm;
+      logimpweights = batchparallelized(
+            n -> aislogimpweights(dbm;
                   ntemperatures = ntemperatures, temperatures = temperatures,
                   nparticles = n, burnin = burnin),
             nparticles, vcat)
    else
-      logimpweights = BMs.aislogimpweights(dbm;
+      logimpweights = aislogimpweights(dbm;
             ntemperatures = ntemperatures, temperatures = temperatures,
             nparticles = nparticles, burnin = burnin)
    end
 
    logr = logmeanexp(logimpweights)
-   sd = BMs.aisstandarddeviation(logimpweights)
-   logz = BMs.logpartitionfunction(dbm, logr)
+   sd = aisstandarddeviation(logimpweights)
+   logz = logpartitionfunction(dbm, logr)
    push!(monitor,
-         MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(BMs.monitoraislogr, epoch, logr, ""))
+         MonitoringItem(monitoraisstandarddeviation, epoch, sd, ""),
+         MonitoringItem(monitoraislogr, epoch, logr, ""))
    for (datasetname, x) in datadict
-      push!(monitor, MonitoringItem(BMs.monitorlogproblowerbound, epoch,
-            BMs.logproblowerbound(dbm, x, logpartitionfunction = logz),
+      push!(monitor, MonitoringItem(monitorlogproblowerbound, epoch,
+            logproblowerbound(dbm, x, logpartitionfunction = logz),
             datasetname))
    end
+end
+
+
+function monitormeandiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
+      meandict::DataDict;
+      nparticles::Int = 3000, burnin::Int = 10,
+      xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1])
+
+   samplemean = mean(xgenerated, 1)
+   for (datasetname, datamean) in meandict
+      push!(monitor, MonitoringItem(monitormeandiff, epoch,
+               norm(samplemean - datamean), datasetname))
+   end
+end
+
+
+function monitormeanandcordiff!(monitor::Monitor, bm::AbstractBM,
+      epoch::Int;
+      meandict::DataDict = DataDict(),
+      cordict::DataDict = DataDict(),
+      nparticles::Int = 3000, burnin::Int = 10)
+
+   xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1]
+   monitormeandiff!(monitor, bm, epoch, meandict; xgenerated = xgenerated)
+   monitorcordiff!(monitor, bm, epoch, cordict; xgenerated = xgenerated)
 end
 
 
@@ -202,7 +239,7 @@ function monitorreconstructionerror!(monitor::Monitor, rbm::AbstractRBM,
       epoch::Int, datadict::DataDict)
 
    for (datasetname, x) in datadict
-      push!(monitor, MonitoringItem(BMs.monitorreconstructionerror, epoch,
+      push!(monitor, MonitoringItem(monitorreconstructionerror, epoch,
                reconstructionerror(rbm, x), datasetname))
    end
 end
@@ -212,7 +249,7 @@ function monitorsd!(monitor::Monitor, gbrbm::GaussianBernoulliRBM, epoch::Int)
    nvisible = length(gbrbm.sd)
    for i = 1:nvisible
       push!(monitor,
-            MonitoringItem(BMs.monitorsd, epoch, gbrbm.sd[i], string(i)))
+            MonitoringItem(monitorsd, epoch, gbrbm.sd[i], string(i)))
    end
 end
 
@@ -226,11 +263,11 @@ during learning.
 """
 function monitorweightsnorm!(monitor::Monitor, rbm::AbstractRBM, epoch::Int)
    push!(monitor,
-         MonitoringItem(BMs.monitorweightsnorm, epoch,
+         MonitoringItem(monitorweightsnorm, epoch,
                norm(rbm.weights), "Weights"),
-         MonitoringItem(BMs.monitorweightsnorm, epoch,
+         MonitoringItem(monitorweightsnorm, epoch,
                norm(rbm.visbias), "Visible bias"),
-         MonitoringItem(BMs.monitorweightsnorm, epoch,
+         MonitoringItem(monitorweightsnorm, epoch,
                norm(rbm.hidbias), "Hidden bias"))
 end
 

@@ -121,6 +121,7 @@ end
 plottitledict = Dict(
       BMs.monitorreconstructionerror => "Mean reconstruction error",
       BMs.monitorloglikelihood => "Log-likelihood estimated by AIS",
+      BMs.monitormeandiff => "L²-difference between means \nof generated and original data",
       BMs.monitorexactloglikelihood => "Exact log-likelihood",
       BMs.monitorweightsnorm => "L²-norm of weights",
       BMs.monitorsd => "Standard deviation parameters of visible units",
