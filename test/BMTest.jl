@@ -321,10 +321,42 @@ function test_likelihoodconsistency()
          parallelized = true, nparticles = 300, ntemperatures = 200)
    @test isapprox(logp1, logp2, rtol = 0.055)
 
-   rbm = BMs.fitrbm(x; epochs = 20)
-   logz1 = BMs.logpartitionfunction(rbm; parallelized = false)
-   logz2 = BMs.logpartitionfunction(rbm; parallelized = true)
-   @test isapprox(logz1, logz2, rtol = 0.02)
+   rbm1 = BMs.fitrbm(x; epochs = 20)
+   logz1 = BMs.logpartitionfunction(rbm1; parallelized = false)
+   logz1_2 = BMs.logpartitionfunction(rbm1; parallelized = true)
+   @test isapprox(logz1, logz1_2, rtol = 0.02)
+
+   logp1 = BMs.loglikelihood(rbm1, x, logz1)
+   rbm2 = BMs.fitrbm(x; epochs = 20, nhidden = 30)
+   logz2 = BMs.logpartitionfunction(rbm2)
+   logp2 = BMs.loglikelihood(rbm2, x, logz2)
+
+   samplemeanrbm =
+         BMs.BernoulliRBM(zeros(nvariables,1), vec(mean(x, 1)), zeros(1))
+   samplemeanrbm2 =
+         BMs.BernoulliRBM(zeros(rbm1.weights), vec(mean(x, 1)), zeros(rbm1.hidbias))
+
+   # Annealing between two RBMs with zero weights
+   @test isapprox(
+         BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, samplemeanrbm2)),
+         (BMs.logpartitionfunctionzeroweights(samplemeanrbm2) -
+               BMs.logpartitionfunctionzeroweights(samplemeanrbm)))
+
+   # Annealing from RBM to RBM with sample mean and zero weights
+   @test abs(logz1 - BMs.logpartitionfunctionzeroweights(samplemeanrbm) -
+         BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, rbm1))) <
+               logz1 * 0.013
+
+   # Annealing from one RBM to another RBM: Compare partitionf functions ...
+   logimpweights = BMs.aislogimpweights(rbm1, rbm2; ntemperatures = 1000,
+         burnin = 10)
+   @test abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
+         max(logz2, logz1) / 0.015
+   # ... and loglikelihood
+   lldiff2 = BMs.loglikelihooddiff(rbm1, rbm2, x, logimpweights)
+   lldiff1 = logp1 - logp2
+   # very weak test, TODO: check and improve
+   @test sign(lldiff1) == sign(lldiff2)
 end
 
 
@@ -388,7 +420,7 @@ function test_mdbm_rbm_b2brbm()
    ]
 
    dbm2 = BMs.fitdbm(x, pretraining = trainlayers2)
-   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 6.0,
+   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 6.3,
          ntemperatures = 300, nparticles = 300)
 end
 

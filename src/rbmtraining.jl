@@ -32,6 +32,7 @@ type GaussianBernoulliRBM <: AbstractXBernoulliRBM
    sd::Array{Float64,1}
 end
 
+
 """
     BernoulliGaussianRBM(weights, visbias, hidbias)
 Encapsulates the parameters of an RBM with Bernoulli distributed visible nodes
@@ -312,16 +313,11 @@ function hiddenpotential(rbm::AbstractXBernoulliRBM, v::Array{Float64}, factor::
 end
 
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, v::Array{Float64,1}, factor::Float64 = 1.0)
-   factor*(bgrbm.hidbias + bgrbm.weights' * v)
+   factor * (bgrbm.hidbias + bgrbm.weights' * v)
 end
 
-"
-For BernoulliGaussianRBMs, the potential of the hidden nodes is the vector of
-means of the Gaussian distributions for each node.
-The factor is ignored in this case.
-"
 function hiddenpotential(bgrbm::BernoulliGaussianRBM, vv::Array{Float64,2}, factor::Float64 = 1.0)
-   broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
+   factor * broadcast(+, vv*bgrbm.weights, bgrbm.hidbias')
 end
 
 function hiddenpotential(prbm::PartitionedRBM, vv::Array{Float64,2}, factor::Float64)
@@ -340,7 +336,9 @@ function hiddenpotential!(hh::M, rbm::AbstractXBernoulliRBM, vv::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
    hiddeninput!(hh, rbm, vv)
-   hh .*= factor
+   if factor != 1.0
+      hh .*= factor
+   end
    sigm!(hh)
 end
 
@@ -349,7 +347,10 @@ function hiddenpotential!(hh::M, bgrbm::BernoulliGaussianRBM, vv::M,
 
    A_mul_B!(hh, vv, bgrbm.weights)
    broadcast!(+, hh, hh, bgrbm.hidbias')
-   hh .*= factor
+   if factor != 1.0
+      hh .*= factor
+   end
+   hh
 end
 
 function hiddenpotential!(hh::M, prbm::PartitionedRBM, vv::M,
@@ -771,7 +772,9 @@ function visiblepotential!(v::M, rbm::BernoulliRBM, h::M,
       factor::Float64 = 1.0) where {M <: AbstractArray{Float64}}
 
    visibleinput!(v, rbm, h)
-   v .*= factor
+   if factor != 1.0
+      v .*= factor
+   end
    sigm!(v)
 end
 
@@ -779,7 +782,9 @@ function visiblepotential!(v::M, rbm::BernoulliGaussianRBM, h::M,
       factor::Float64 = 1.0) where {M <: AbstractArray{Float64}}
 
    visibleinput!(v, rbm, h)
-   v .*= factor
+   if factor != 1.0
+      v .*= factor
+   end
    sigm!(v)
 end
 
@@ -787,7 +792,9 @@ function visiblepotential!(v::M, rbm::Binomial2BernoulliRBM, h::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
    visibleinput!(v, rbm, h)
-   v .*= factor
+   if factor != 1.0
+      v .*= factor
+   end
    sigm!(v)
    v .*= 2.0
 end

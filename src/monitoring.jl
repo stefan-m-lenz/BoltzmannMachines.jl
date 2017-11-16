@@ -222,9 +222,9 @@ function monitormeanandcordiff!(monitor::Monitor, bm::AbstractBM,
       epoch::Int;
       meandict::DataDict = DataDict(),
       cordict::DataDict = DataDict(),
-      nparticles::Int = 3000, burnin::Int = 10)
+      nparticles::Int = 3000, burnin::Int = 10,
+      xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1])
 
-   xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1]
    monitormeandiff!(monitor, bm, epoch, meandict; xgenerated = xgenerated)
    monitorcordiff!(monitor, bm, epoch, cordict; xgenerated = xgenerated)
 end

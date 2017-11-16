@@ -48,52 +48,46 @@ end
 
 """
     aislogimpweights(rbm1, rbm2; ...)
-Computes the logarithmised importance weights for estimating the ratio Z2/Z1
-of the partition functions of the two given RBMs.
+Computes the logarithmised importance weights for estimating the log-ratio
+log(Z2/Z1) for the partition functions Z1 and Z2 of `rbm1` and `rbm2`, respectively.
 Implements the procedure described in section 4.1.2 of [Salakhutdinov, 2008].
 """
-function aislogimpweights(rbm1::BernoulliRBM, rbm2::BernoulliRBM;
+function aislogimpweights(rbm1::R, rbm2::R;
       ntemperatures::Int = 100,
       temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 5)
+      burnin::Int = 5) where {R<:AbstractRBM}
 
-   nvisible = length(rbm1.visbias)
-
-   if length(rbm2.visbias) != nvisible
+   if length(rbm2.visbias) != length(rbm1.visbias)
       error("The two RBMs must have the same numer of visible units.")
    end
 
    logimpweights = zeros(nparticles)
 
-   visbiasdiff = rbm2.visbias - rbm1.visbias
+   vv = BMs.sampleparticles(rbm1, nparticles, burnin)[1]
+   nhidden1 = length(rbm1.hidbias)
+   nhidden2 = length(rbm2.hidbias)
+   hh = Matrix{Float64}(nparticles, nhidden1 + nhidden2)
 
-   for j = 1:nparticles
-      v = rand(nvisible)
+   prevmixedrbm = BMs.mixedrbm(rbm1, rbm2, temperatures[1])
 
-      for k = 2:length(temperatures)
+   for k = 2:length(temperatures)
+      curmixedrbm = BMs.mixedrbm(rbm1, rbm2, temperatures[k])
 
-         # Sample next value for v using Gibbs Sampling in the RBM
-         for burn = 1:burnin
-            h1 = bernoulli!(hiddenpotential(rbm1, v, 1 - temperatures[k]));
-            h2 = bernoulli!(hiddenpotential(rbm2, v,     temperatures[k]));
+      # log(p*(x)) = -freeenergy(x)
+      logimpweights .+= BMs.freeenergydiffs(prevmixedrbm, curmixedrbm, vv)
 
-            v = bernoulli!(sigm(
-                (1-temperatures[k]) * visibleinput(rbm1, h1) +
-                   temperatures[k]  * visibleinput(rbm2, h2)))
-         end
-
-         # Multiply ratios of unnormalized probabilities
-         hinput1 = hiddeninput(rbm1, v)
-         hinput2 = hiddeninput(rbm2, v)
-         logimpweights[j] += (
-               (temperatures[k] - temperatures[k-1]) * dot(visbiasdiff, v)) +
-               sum(log((1 + exp.( (1 - temperatures[k])   * hinput1 )) ./
-                       (1 + exp.( (1 - temperatures[k-1]) * hinput1 )))) *
-               sum(log((1 + exp.(      temperatures[k]    * hinput2 )) ./
-                       (1 + exp.(      temperatures[k-1]  * hinput2 ))))
+      # Gibbs transition for the (visible) nodes
+      for burn = 1:burnin
+         BMs.samplehidden!(hh, curmixedrbm, vv)
+         BMs.samplevisible!(vv, curmixedrbm, hh)
       end
+
+      prevmixedrbm = curmixedrbm
    end
+
+   # account for different model size
+   logimpweights += log(2) * (nhidden2 - nhidden1)
 
    logimpweights
 end
@@ -739,32 +733,12 @@ end
 Computes the average free energy of the samples in the dataset `x` for the
 AbstractRBM `rbm`.
 """
-function freeenergy(rbm::BernoulliRBM, x::Matrix{Float64})
-   nsamples = size(x,1)
+function freeenergy(rbm::AbstractRBM, x::Matrix{Float64})
+   nsamples = size(x, 1)
    freeenergy = 0.0
    for j = 1:nsamples
-      v = vec(x[j,:])
-      freeenergy -= dot(rbm.visbias, v) + sum(log.(1 + exp.(hiddeninput(rbm, v))))
-   end
-   freeenergy /= nsamples
-   freeenergy
-end
-
-function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
-   - dot(rbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(rbm, v))))
-end
-
-function freeenergy(b2brbm::Binomial2BernoulliRBM, x::Matrix{Float64})
-   nsamples = size(x,1)
-   freeenergy = 0.0
-   for j = 1:nsamples
-      v = vec(x[j,:])
-      # To get probabilities for 0/1/2-valued v, multiply probabilities for v's
-      # with 2^(number of 1s in v), because each v can be represented by
-      # this number of combinations in the 00/01/10/11 space, all having equal
-      # probability.
-      freeenergy -= sum(v .== 1.0) * log(2) +
-            dot(b2brbm.visbias, v) + sum(log.(1 + exp.(hiddeninput(b2brbm, v))))
+      v = vec(x[j, :])
+      freeenergy += BMs.freeenergy(rbm, v)
    end
    freeenergy /= nsamples
    freeenergy
@@ -790,19 +764,55 @@ function freeenergy(gbrbm::GaussianBernoulliRBM, x::Matrix{Float64})
 end
 
 function freeenergy(bgrbm::BernoulliGaussianRBM, x::Matrix{Float64})
-   nsamples = size(x,1)
+   nsamples = size(x, 1)
    nhidden = length(bgrbm.hidbias)
 
    freeenergy = 0.0
    for j = 1:nsamples
       v = vec(x[j,:])
-      wtv = bgrbm.weights'*v
+      wtv = bgrbm.weights' * v
       freeenergy -= dot(bgrbm.hidbias, wtv) + 0.5 * sum(wtv.^2) + dot(bgrbm.visbias, v)
    end
    freeenergy /= nsamples
    freeenergy -= nhidden / 2 * log(2pi)
    freeenergy
 end
+
+
+"""
+    freeenergy(rbm, v)
+Computes the free energy of the sample `v` (a vector) for the `rbm`.
+"""
+function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
+   - dot(rbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(rbm, v))))
+end
+
+function freeenergy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
+   # To get probabilities for 0/1/2-valued v, multiply probabilities for v's
+   # with 2^(number of 1s in v), because each v can be represented by
+   # this number of combinations in the 00/01/10/11 space, all having equal
+   # probability.
+   - sum(v .== 1.0) * log(2) -
+         dot(b2brbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(b2brbm, v))))
+end
+
+
+"""
+    freeeenergydiffs(rbm1, rbm2, x)
+Computes the differences of the free energy for the samples in the dataset `x`
+regarding the RBM models `rbm1` and `rbm2`. Returns a vector of differences.
+"""
+function freeenergydiffs(rbm1::AbstractRBM, rbm2::AbstractRBM, x::Matrix{Float64})
+   nsamples = size(x, 1)
+   freeenergydiffs = Vector{Float64}(nsamples)
+   for j = 1:nsamples
+      v = vec(x[j,:])
+      freeenergydiffs[j] = freeenergy(rbm1, v) - freeenergy(rbm2, v)
+   end
+   freeenergydiffs
+end
+
+# TODO: optimize freenergydiffs for BernoulliRBM (Matrix operation)
 
 
 "
@@ -890,35 +900,32 @@ end
 
 """
     loglikelihooddiff(rbm1, rbm2, x)
-    loglikelihooddiff(rbm1, rbm2, x, impweights)
+    loglikelihooddiff(rbm1, rbm2, x, logzdiff)
+    loglikelihooddiff(rbm1, rbm2, x, logimpweights)
 Computes difference of the loglikelihood functions of the two RBMs on the data
 matrix `x`, averaged over the samples.
-For this purpose, the partition function ratio Z2/Z1 is estimated by AIS, if
-the importance weights are not given by parameter `impweights`.
+For this purpose, the partition function ratio Z2/Z1 is estimated by AIS unless
+the importance weights are specified the by parameter `logimpweights` or the
+difference in the log partition functions is given by `logzdiff`.
+
 The first model is better than the second if the returned value is positive.
 """
-function loglikelihooddiff(rbm1::BernoulliRBM, rbm2::BernoulliRBM,
+function loglikelihooddiff(rbm1::R, rbm2::R,
       x::Array{Float64,2},
-      logimpweights::Array{Float64,1} = aislogimpweights(rbm1, rbm2))
+      logzdiff::Float64,
+      ) where {R<:AbstractRBM}
 
-   nsamples = size(x, 1)
-
-   lldiff = 0.0
-
-   visbiasdiff = rbm1.visbias - rbm2.visbias
-
-   # calculate difference of sum of unnormalized log probabilities
-   for j = 1:nsamples
-      v = vec(x[j, :])
-      lldiff += dot(visbiasdiff, v) +
-            sum(log.(1 + exp.(hiddeninput(rbm1, v)))) -
-            sum(log.(1 + exp.(hiddeninput(rbm2, v))))
-   end
-
-   # average over samples
-   lldiff /= nsamples
-   lldiff += logmeanexp(logimpweights) # estimator for Z2/Z1
+   lldiff = mean(freeenergydiffs(rbm2, rbm1, x))
+   lldiff += logzdiff # estimator for log(Z2/Z1)
    lldiff
+end
+
+function loglikelihooddiff(rbm1::R, rbm2::R,
+      x::Array{Float64,2},
+      logimpweights::Array{Float64,1} = aislogimpweights(rbm1, rbm2)
+      ) where {R<:AbstractRBM}
+
+   loglikelihooddiff(rbm1, rbm2, x, BMs.logmeanexp(logimpweights))
 end
 
 
@@ -1097,6 +1104,18 @@ function logproblowerbound(dbm::BasicDBM,
    lowerbound /= nsamples
    lowerbound -= logpartitionfunction
    lowerbound
+end
+
+
+function mixedrbm(rbm1::BernoulliRBM, rbm2::BernoulliRBM, temperature::Float64)
+   visbias = (1 - temperature) * rbm1.visbias + temperature * rbm2.visbias
+   weights = hcat(
+         (1 - temperature) * rbm1.weights,
+         temperature * rbm2.weights)
+   hidbias = vcat(
+         (1 - temperature) * rbm1.hidbias,
+         temperature * rbm2.hidbias)
+   BernoulliRBM(weights, visbias, hidbias)
 end
 
 
@@ -1281,7 +1300,6 @@ function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
    end
    particles
 end
-
 
 function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
    particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
