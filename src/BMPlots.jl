@@ -145,7 +145,7 @@ the area around the curve that contains the values that deviate at maximum
 Default value for `sdrange` is 2.0.
 """
 function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString;
-      sdrange::Float64 = 2.0)
+      sdrange::Float64 = 2.0, changetitle::Function = identity)
 
    if evaluationkey == BMs.monitorloglikelihood
       return plotloglikelihood(monitor, sdrange = sdrange)
@@ -155,7 +155,7 @@ function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString;
 
    # Otherwise, it is a simple line plot.
    requiresgadfly()
-   title = get(plottitledict, evaluationkey, evaluationkey)
+   title = changetitle(get(plottitledict, evaluationkey, evaluationkey))
    plotdata = extractevaluationdata(monitor, evaluationkey)
    checkdata(plotdata)
    plot(plotdata, x ="epoch", y = "value", color = "datasetname",
