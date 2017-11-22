@@ -161,13 +161,23 @@ function fitrbm(x::Matrix{Float64};
       chainstate = Array{Float64,1}()
    end
 
+   # allocate space for trainrbm!
+   nvisible = size(x, 2)
+   h = Vector{Float64}(nhidden)
+   hmodel = Vector{Float64}(nhidden)
+   vmodel = Vector{Float64}(nvisible)
+   posupdatespace = Matrix{Float64}(nvisible, nhidden)
+   negupdatespace = Matrix{Float64}(nvisible, nhidden)
+
    for epoch = 1:epochs
 
       # Train RBM on data set
       trainrbm!(rbm, x, cdsteps = cdsteps, chainstate = chainstate,
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
-            sdlearningrate = sdlearningrates[epoch])
+            sdlearningrate = sdlearningrates[epoch],
+            h = h, hmodel = hmodel, vmodel = vmodel,
+            posupdatespace = posupdatespace, negupdatespace = negupdatespace)
 
       # Evaluation of learning after each training epoch
       monitoring(rbm, epoch)
@@ -333,13 +343,24 @@ end
 Like `hiddenpotential`, but stores the returned result in `hh`.
 """
 function hiddenpotential!(hh::M, rbm::AbstractXBernoulliRBM, vv::M,
-      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64}}
 
    hiddeninput!(hh, rbm, vv)
    if factor != 1.0
       hh .*= factor
    end
    sigm!(hh)
+end
+
+function hiddenpotential!(h::M, bgrbm::BernoulliGaussianRBM, v::M,
+      factor::Float64 = 1.0) where{M <: AbstractArray{Float64,1}}
+
+   At_mul_B!(h, bgrbm.weights, v)
+   h .+= bgrbm.hidbias
+   if factor != 1.0
+      h .*= factor
+   end
+   h
 end
 
 function hiddenpotential!(hh::M, bgrbm::BernoulliGaussianRBM, vv::M,
@@ -594,7 +615,13 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
-      sdlearningrate::Float64 = 0.0)
+      sdlearningrate::Float64 = 0.0,
+      # only to reuse allocated space:
+      h::Vector{Float64} = Vector{Float64}(length(rbm.hidbias)),
+      hmodel::Vector{Float64} = Vector{Float64}(length(rbm.hidbias)),
+      vmodel::Vector{Float64} = Vector{Float64}(length(rbm.visbias)),
+      posupdatespace::Matrix{Float64} = Matrix{Float64}(),
+      negupdatespace::Matrix{Float64} = Matrix{Float64}())
 
    nsamples = size(x,1)
 
@@ -604,29 +631,30 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
    for j = 1:nsamples
       v = vec(x[j,:])
 
-      h = samplehidden(rbm, v, upfactor)
+      # Calculate potential induced by visible nodes, used for update
+      hiddenpotential!(h, rbm, v, upfactor)
 
       # In case of CD, start Gibbs chain with the hidden state induced by the
       # states of the visible units. In case of PCD, start Gibbs chain with
       # previous state of the Gibbs chain.
-      hmodel = pcd ? chainstate : h
+      if pcd
+         hmodel = chainstate # state of chain will be visible by the caller
+      else
+         copy!(hmodel, h)
+      end
+      samplehiddenpotential!(hmodel, rbm)
 
       for step = 2:cdsteps
-         vmodel = samplevisible(rbm, hmodel, downfactor)
-         hmodel = samplehidden(rbm, vmodel, upfactor)
+         samplevisible!(vmodel, rbm, hmodel, downfactor)
+         samplehidden!(hmodel, rbm, vmodel, upfactor)
       end
 
       # Do not sample in last step to avoid unnecessary sampling noise
-      vmodel = visiblepotential(rbm, hmodel, downfactor)
-      hmodel = hiddenpotential(rbm, vmodel, upfactor)
+      visiblepotential!(vmodel, rbm, hmodel, downfactor)
+      hiddenpotential!(hmodel, rbm, vmodel, upfactor)
 
-      if pcd
-         # Preserve state of chain in a way that changes are visible to the caller.
-         copy!(chainstate, hmodel)
-         samplehiddenpotential!(chainstate, rbm)
-      end
-
-      updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate)
+      updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate,
+            posupdatespace, negupdatespace)
    end
 
    rbm
@@ -677,15 +705,18 @@ end
     visibleinput!(v, rbm, h)
 Like `visibleinput` but stores the returned result in `v`.
 """
-function visibleinput!(v::M, rbm::AbstractRBM, h::M
-   ) where {M <:AbstractArray{Float64,1}}
+function visibleinput!(v::M,
+      rbm::Union{BernoulliRBM, BernoulliGaussianRBM, Binomial2BernoulliRBM},
+      h::M) where {M <:AbstractArray{Float64,1}}
 
    A_mul_B!(v, rbm.weights, h)
-   v .+= rbm.visbias'
+   v .+= rbm.visbias
+   v
 end
 
-function visibleinput!(vv::M, rbm::AbstractRBM, hh::M
-      ) where {M <:AbstractArray{Float64,2}}
+function visibleinput!(vv::M,
+      rbm::Union{BernoulliRBM, BernoulliGaussianRBM, Binomial2BernoulliRBM},
+      hh::M) where {M <:AbstractArray{Float64,2}}
 
    A_mul_Bt!(vv, hh, rbm.weights)
    broadcast!(+, vv, vv, rbm.visbias')
@@ -799,6 +830,15 @@ function visiblepotential!(v::M, rbm::Binomial2BernoulliRBM, h::M,
    v .*= 2.0
 end
 
+function visiblepotential!(v::Vector{Float64}, gbrbm::GaussianBernoulliRBM,
+      h::Vector{Float64}, factor::Float64 = 1.0)
+
+   A_mul_B!(v, gbrbm.weights, h)
+   v .*= gbrbm.sd
+   v .+= gbrbm.visbias
+   v
+end
+
 function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM, h::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
@@ -818,17 +858,31 @@ function visiblepotential!(v::M, prbm::PartitionedRBM, h::M,
    v
 end
 
-
+"""
+    updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate,
+        posupdatespace, negupdatespace)
+Updates the RBM `rbm` given the sample `v`,
+the hidden activation `h` induced by the sample
+the vectors `vmodel` and `hmodel` generated by Gibbs sampling, the `learningrate`,
+the learningrate for the standard deviation `learningratesd` (only relevant for
+GaussianBernoulliRBMs) and allocated space for the weights update
+`posupdatespace`  and `negupdatespace`.
+"""
 function updateparameters!(rbm::AbstractRBM,
       v::Vector{Float64}, vmodel::Vector{Float64},
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
-      sdlearningrate::Float64)
+      sdlearningrate::Float64,
+      posupdatespace::Matrix{Float64},
+      negupdatespace::Matrix{Float64})
 
-   deltaw = v*h' - vmodel*hmodel'
-   rbm.weights += deltaw * learningrate
-   rbm.visbias += (v - vmodel) * learningrate
-   rbm.hidbias += (h - hmodel) * learningrate
+   A_mul_Bt!(posupdatespace, v, h)
+   A_mul_Bt!(negupdatespace, vmodel, hmodel)
+   posupdatespace .-= negupdatespace
+   posupdatespace .*= learningrate
+   rbm.weights .+= posupdatespace
+   rbm.visbias .+= (v - vmodel) * learningrate
+   rbm.hidbias .+= (h - hmodel) * learningrate
    nothing
 end
 
@@ -836,7 +890,9 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
       v::Vector{Float64}, vmodel::Vector{Float64},
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
-      sdlearningrate::Float64)
+      sdlearningrate::Float64,
+      posupdatespace::Matrix{Float64},
+      negupdatespace::Matrix{Float64})
 
    # To train a Binomial2BernoulliRBM exactly like
    # training a BernoulliRBM where each two nodes share the weights,
@@ -844,10 +900,13 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
    learningratehidden = learningrate
    learningrate /= 2.0
 
-   deltaw = v*h' - vmodel*hmodel'
-   rbm.weights += deltaw * learningrate
-   rbm.visbias += (v - vmodel) * learningrate
-   rbm.hidbias += (h - hmodel) * learningratehidden
+   A_mul_Bt!(posupdatespace, v, h)
+   A_mul_Bt!(negupdatespace, vmodel, hmodel)
+   posupdatespace .-= negupdatespace
+   posupdatespace .*= learningrate
+   rbm.weights .+= posupdatespace
+   rbm.visbias .+= (v - vmodel) * learningrate
+   rbm.hidbias .+= (h - hmodel) * learningratehidden
    nothing
 end
 
@@ -855,7 +914,9 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
       v::Vector{Float64}, vmodel::Vector{Float64},
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
-      sdlearningrate::Float64)
+      sdlearningrate::Float64,
+      posupdatespace::Matrix{Float64},
+      negupdatespace::Matrix{Float64})
 
    # See bottom of page 15 in [Krizhevsky, 2009].
 
