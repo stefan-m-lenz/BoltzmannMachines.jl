@@ -165,12 +165,10 @@ Performs Gibbs sampling on the `particles` in the DBM `dbm` for `nsteps` steps.
 (See also: `Particles`.)
 In-between layers are assumed to contain only Bernoulli-distributed nodes.
 """
-function gibbssample!(particles::Particles, dbm::MultimodalDBM,
-      nsteps::Int = 5,
-      biases::Particle = BMs.combinedbiases(dbm))
+function gibbssample!(particles::Particles, dbm::MultimodalDBM, nsteps::Int = 5)
 
-   input = deepcopy(particles)
-   input2 = deepcopy(particles)
+   input = newparticleslike(particles)
+   input2 = newparticleslike(particles)
 
    for step in 1:nsteps
       # first layer gets input only from layer above
