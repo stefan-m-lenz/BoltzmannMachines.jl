@@ -56,7 +56,8 @@ function aislogimpweights(rbm1::R, rbm2::R;
       ntemperatures::Int = 100,
       temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
-      burnin::Int = 5) where {R<:AbstractRBM}
+      burnin::Int = 5,
+      initburnin::Int = 30) where {R<:AbstractRBM}
 
    if length(rbm2.visbias) != length(rbm1.visbias)
       error("The two RBMs must have the same numer of visible units.")
@@ -64,7 +65,7 @@ function aislogimpweights(rbm1::R, rbm2::R;
 
    logimpweights = zeros(nparticles)
 
-   vv = BMs.sampleparticles(rbm1, nparticles, burnin)[1]
+   vv = BMs.sampleparticles(rbm1, nparticles, initburnin)[1]
    nhidden1 = length(rbm1.hidbias)
    nhidden2 = length(rbm2.hidbias)
    hh = Matrix{Float64}(nparticles, nhidden1 + nhidden2)
