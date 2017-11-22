@@ -32,6 +32,7 @@ const monitorfreeenergy = "freeenergy"
 const monitorloglikelihood = "loglikelihood"
 const monitorlogproblowerbound = "logproblowerbound"
 const monitormeandiff = "monitormeandiff"
+const monitormeandiffpervariable = "monitormeandiffpervariable"
 const monitorreconstructionerror = "reconstructionerror"
 const monitorsd = "sd"
 const monitorweightsnorm = "weightsnorm"
@@ -214,6 +215,22 @@ function monitormeandiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
    for (datasetname, datamean) in meandict
       push!(monitor, MonitoringItem(monitormeandiff, epoch,
                norm(samplemean - datamean), datasetname))
+   end
+end
+
+
+function monitormeandiffpervariable!(monitor::Monitor, bm::AbstractBM, epoch::Int,
+      meandict::DataDict;
+      nparticles::Int = 3000, burnin::Int = 10,
+      xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1],
+      variables::Vector{Int} = collect(1:size(xgenerated, 2)))
+
+   samplemean = mean(xgenerated, 1)
+   for (datasetname, datamean) in meandict
+      for i in variables
+         push!(monitor, MonitoringItem(monitormeandiffpervariable, epoch,
+               abs(samplemean[i] - datamean[i]), datasetname * "/Var" * string(i)))
+      end
    end
 end
 
