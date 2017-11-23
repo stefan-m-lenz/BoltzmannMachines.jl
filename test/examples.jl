@@ -17,7 +17,7 @@ datadict = DataDict("Training data" => x, "Test data" => xtest);
 # For small models, the model's loglikelihood can be computed exactly.
 monitor = Monitor();
 rbm = fitrbm(x; nhidden = 12,
-      epochs = 80, learningrate = 0.007,
+      epochs = 80, learningrate = 0.006,
       monitoring = (rbm, epoch) -> begin
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
             monitorreconstructionerror!(monitor, rbm, epoch, datadict)
@@ -86,7 +86,7 @@ BMPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3.0)
 # (But on the other hand, in some cases it might be too conservative to be
 # useful as it is only a lower bound.)
 
-srand(12);
+srand(2);
 monitor = Monitor();
 dbm = stackrbms(x; nhiddens = [36;10;5], predbm = true, learningrate = 0.05);
 traindbm!(dbm, x; epochs = 50, learningrate = 0.008,

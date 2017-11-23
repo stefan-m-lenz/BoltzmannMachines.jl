@@ -349,9 +349,9 @@ function test_likelihoodconsistency()
 
    # Annealing from one RBM to another RBM: Compare partitionf functions ...
    logimpweights = BMs.aislogimpweights(rbm1, rbm2;
-         ntemperatures = 500, nparticles = 200, burnin = 10)
+         ntemperatures = 1000, nparticles = 200, burnin = 10)
    @test abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
-         max(logz2, logz1) * 0.015
+         max(logz2, logz1) * 0.022
    # ... and loglikelihood
    lldiff2 = BMs.loglikelihooddiff(rbm1, rbm2, x, logimpweights)
    lldiff1 = logp1 - logp2

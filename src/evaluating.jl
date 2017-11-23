@@ -1303,7 +1303,7 @@ function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
 end
 
 function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
-   particles = invoke(sampleparticles, (AbstractRBM,Int,Int), gbrbm, nparticles, burnin-1)
+   particles = invoke(sampleparticles, Tuple{AbstractRBM,Int,Int}, gbrbm, nparticles, burnin-1)
    # do not sample in last step to avoid that the noise dominates the data
    particles[1] = visiblepotential(gbrbm, particles[2])
    particles
