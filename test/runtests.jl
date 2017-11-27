@@ -57,6 +57,8 @@ BMTest.test_b2brbm()
 BMTest.test_mdbm_rbm_b2brbm()
 BMTest.test_mdbm_gaussianvisibles()
 
+BMTest.test_exactsampling()
+
 
 # run examples
 include("../test/examples.jl")
