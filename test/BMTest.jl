@@ -305,6 +305,37 @@ end
 
 
 """
+Tests whether the empirical loglikelihood from samples that are generated from
+the exact distribution of Boltzmann machines is equal to the exact loglikelihood.
+"""
+function test_exactsampling()
+   nsamples = 200
+   x = BMs.barsandstripes(nsamples, 9)[:, 1:6]
+
+   dbm1 = BMs.fitdbm(x; epochspretraining = 20, epochs = 15, nhiddens = [8; 5])
+   BMTest.test_exactsampling(dbm1, x)
+
+   dbm1 = BMs.fitdbm(x; epochspretraining = 20, epochs = 15, nhiddens = [6; 5; 4])
+   BMTest.test_exactsampling(dbm1, x)
+
+   rbm = BMs.fitrbm(x; epochs = 100, nhidden = 20)
+   BMTest.test_exactsampling(rbm, x)
+end
+
+function test_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
+      percentalloweddiff = 2.0)
+
+   mbdist = BMs.MultivariateBernoulliDistribution(bm)
+   exactsamples = BMs.samples(mbdist, 20000)
+
+   emploglikexactsamples = BMs.empiricalloglikelihood(x, exactsamples)
+   exactloglik = BMs.exactloglikelihood(bm, x)
+   @test abs((emploglikexactsamples - exactloglik) / exactloglik) <
+         percentalloweddiff / 100
+end
+
+
+"""
 Fits a larger RBM and a DBM and tests whether the AIS estimation
 yields approximately the same results, if performed parallel or not.
 """
@@ -351,7 +382,7 @@ function test_likelihoodconsistency()
    logimpweights = BMs.aislogimpweights(rbm1, rbm2;
          ntemperatures = 1000, nparticles = 200, burnin = 10)
    @test abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
-         max(logz2, logz1) * 0.022
+         max(logz2, logz1) * 0.03
    # ... and loglikelihood
    lldiff2 = BMs.loglikelihooddiff(rbm1, rbm2, x, logimpweights)
    lldiff1 = logp1 - logp2
@@ -501,7 +532,7 @@ function test_mdbm_gaussianvisibles()
    BMTest.testaisvsexact(dbm1, 0.6)
 
    # Test exact likelihood vs estimated likelihood
-   estloglik = BMs.loglikelihood(dbm1, x; nparticles = 200, ntemperatures = 200)
+   estloglik = BMs.loglikelihood(dbm1, x; nparticles = 400, ntemperatures = 200)
    exactloglik = BMs.exactloglikelihood(dbm1, x)
    @test abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
 

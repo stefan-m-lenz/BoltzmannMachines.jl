@@ -730,6 +730,49 @@ end
 
 
 """
+    MultivariateBernoulliDistribution(bm)
+Calculates and stores the probabilities for all possible combinations of a
+multivariate Bernoulli distribution defined by a Boltzmann machine model
+with Bernoulli distributed visible nodes.
+Can be used for sampling from this distribution, see `samples`.
+"""
+struct MultivariateBernoulliDistribution
+   cumprobs::Vector{Float64}
+   samples::Vector{Vector{Float64}}
+
+   function MultivariateBernoulliDistribution(bm::AbstractBM)
+      nvisible = nunits(bm)[1]
+
+      # create samples, a vector of vectors, covering all
+      # theoretically possible combinations of the visible nodes' states
+      nviscombinations = 2^nvisible
+      samples = Vector{Vector{Float64}}(nviscombinations)
+      v = zeros(nvisible)
+      for i = 1:nviscombinations
+         samples[i] = copy(v)
+         next!(v)
+      end
+
+      # calculate unnormalized probabilities of all samples
+      probs = unnormalizedprobs(bm, samples)
+
+      # sort both the unnormalized probs and the samples
+      sortingperm = sortperm(probs)
+      permute!(probs, sortingperm)
+      permute!(samples, sortingperm)
+
+      # transform the unnormalized probabilities in a vector of cumulative
+      # probabilities (corresponding to intervals) that can be used for sampling
+      z = sum(probs)
+      probs ./= z
+      cumsum!(probs, probs)
+
+      new(probs, samples)
+   end
+end
+
+
+"""
     freeenergy(rbm, x)
 Computes the average free energy of the samples in the dataset `x` for the
 AbstractRBM `rbm`.
@@ -829,10 +872,11 @@ function initcombination(dbm::BasicDBM)
    u
 end
 
-"
+"""
+    initcombinationoddlayersonly(dbm)
 Creates and zero-initializes a particle for layers with odd indexes
 in the `dbm`.
-"
+"""
 function initcombinationoddlayersonly(dbm::MultimodalDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
@@ -1310,6 +1354,17 @@ function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::I
 end
 
 
+function samples(mbdist::MultivariateBernoulliDistribution, nsamples::Int)
+   nvisible = length(mbdist.samples[1])
+   ret = Matrix{Float64}(nsamples, nvisible)
+   for i = 1:nsamples
+      sampledindex = searchsortedfirst(mbdist.cumprobs, rand())
+      ret[i, :] .= mbdist.samples[sampledindex]
+   end
+   ret
+end
+
+
 function setvisiblebias!(rbm::BernoulliRBM, v::Vector{Float64})
    rbm.visbias .= v
 end
@@ -1365,6 +1420,44 @@ function unnormalizedlogprob(mdbm, x::Matrix{Float64};
 
    logp /= nsamples
    logp
+end
+
+
+"""
+    unnormalizedprobs(bm, samples)
+Calculates the unnormalized probabilities for all `samples` (vector of vectors),
+in the Boltzmann Machine `bm`.
+
+The visible nodes of the `bm` must be Bernoulli distributed.
+"""
+function unnormalizedprobs(rbm::Union{BernoulliRBM, BernoulliGaussianRBM},
+      samples::Vector{Vector{Float64}})
+
+   nsamples = length(samples)
+   probs = Vector{Float64}(nsamples)
+   for i = 1:nsamples
+      probs[i] = exp(-freeenergy(rbm, samples[i]))
+   end
+   probs
+end
+
+function unnormalizedprobs(dbm::PartitionedBernoulliDBM,
+      samples::Vector{Vector{Float64}})
+
+   nsamples = length(samples)
+   biases = combinedbiases(dbm)
+   oddparticle = initcombinationoddlayersonly(dbm)
+   oddhiddenparticles = oddparticle[2:end]
+   probs = Vector{Float64}(nsamples)
+   for i = 1:nsamples
+      oddparticle[1] = samples[i]
+      probs[i] = 0.0
+      while true
+         probs[i] += unnormalizedproboddlayers(dbm, oddparticle, biases)
+         next!(oddhiddenparticles) || break
+      end
+   end
+   probs
 end
 
 
