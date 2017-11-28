@@ -229,7 +229,7 @@ function monitormeandiffpervariable!(monitor::Monitor, bm::AbstractBM, epoch::In
    for (datasetname, datamean) in meandict
       for i in variables
          push!(monitor, MonitoringItem(monitormeandiffpervariable, epoch,
-               abs(samplemean[i] - datamean[i]), datasetname * "/Var" * string(i)))
+               samplemean[i] - datamean[i], datasetname * "/Var" * string(i)))
       end
    end
 end

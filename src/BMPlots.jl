@@ -181,6 +181,32 @@ function plotloglikelihood(monitor::BMs.Monitor; sdrange::Float64 = 2.0)
    end
 end
 
+
+function plotmeandiffpervariable(monitor::BMs.Monitor)
+   requiresgadfly()
+   plotdata = extractevaluationdata(monitor, BMs.monitormeandiffpervariable)
+   plotdata[:, :variableid] = map(s -> parse(Int, match(r"/Var([0-9]+)$", s)[1]),
+         plotdata[:, :datasetname])
+   variables = sort!(unique(plotdata[:, :variableid]))
+   nvariables = length(variables)
+   title = compose(context(0,0,1,0.1), font("Helvetica"),
+         text(0.5, 1.0,
+               "Difference of mean between generated and original samples",
+               hcenter, vbottom))
+   plots = Vector{Union{Compose.Context, Gadfly.Plot}}(nvariables)
+   for i = 1:nvariables
+      plots[i] = plot(plotdata[plotdata[:, :variableid] .== variables[i], :],
+            x = "epoch", y = "value", color = "datasetname",
+            Geom.line, Guide.colorkey(""))
+   end
+   rowlength = ceil(Int, sqrt(nvariables))
+   emptyplots = repmat([context()], rowlength^2 - nvariables)
+   plotgrid = reshape(vcat(plots, emptyplots), rowlength, rowlength)
+   plotgrid = permutedims(plotgrid, [2;1])
+   vstack(title, compose(context(0, 0, 1, 0.9), gridstack(plotgrid)))
+end
+
+
 function plotreconstructionerror(monitor::BMs.Monitor)
    plotevaluation(monitor, BMs.monitorreconstructionerror)
 end
