@@ -252,12 +252,12 @@ function plotpairs(x::Matrix{Float64};
    end
    plotdata[:subgroup] = subgroups
 
-   if densityestimation != emptyfunc
+   if densityestimation != BMs.emptyfunc
       mins = [minimum(x[:,i])::Float64 for i = 1:nvariables]
       maxs = [maximum(x[:,i])::Float64 for i = 1:nvariables]
    end
 
-   grid = Array(Compose.Context, (nvariables, nvariables))
+   grid = Matrix{Compose.Context}(nvariables, nvariables)
    for i = 1:nvariables
       for j = 1:nvariables
          if i == j
@@ -266,7 +266,7 @@ function plotpairs(x::Matrix{Float64};
                   Theme(key_position = :none), # do not show legend
                   Geom.histogram))
          else
-            if densityestimation != emptyfunc
+            if densityestimation != BMs.emptyfunc
                # bug in Gadfly: contour plot only if other layer has no subgroups
                estimateddensityfunction = densityestimation(
                      datafordensityestimation[:,i],
