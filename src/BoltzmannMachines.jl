@@ -173,6 +173,49 @@ end
 
 
 """
+    piecewiselinearsequences(nsamples, nvariables)
+Generates a dataset consisting of samples with values that
+are piecewise linear functions of the variable index.
+
+## Optional named arguments:
+ * `pbreak`: probability that an intermediate point is a breakpoint,
+    defaults to 0.2.
+ * `breakval`: a function that expects no input and generates a single
+   (random) value. Defaults to `rand`.
+
+# Example:
+To quickly grasp the idea, plot generated samples against the variable index, e. g.:
+
+    using Gadfly
+    plot(piecewiselinearsequences(3, 10),
+         x = Col.index, y = Col.value, color = Row.index, Geom.line,
+         Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
+         Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
+"""
+function piecewiselinearsequences(nsamples::Int, nvariables::Int,
+      pbreak::Float64 = 0.2, breakval::Function = rand)
+
+   inbetweenvariables = 2:(nvariables-1)
+   x = Matrix{Float64}(nsamples, nvariables)
+   for i = 1:nsamples
+      breakpointindexes = [1; randsubseq(inbetweenvariables, pbreak); nvariables]
+      breakpointvalues = [breakval() for i = 1:length(breakpointindexes)]
+      lastbreakpoint = 1
+      x[i, breakpointindexes] .= breakpointvalues
+      for breakpoint in breakpointindexes[2:end]
+         valdiff = (x[i, breakpoint] - x[i, lastbreakpoint]) /
+               (breakpoint - lastbreakpoint)
+         for j = (lastbreakpoint + 1):(breakpoint - 1)
+            x[i, j] = x[i, j - 1] + valdiff
+         end
+         lastbreakpoint = breakpoint
+      end
+   end
+   x
+end
+
+
+"""
     splitdata(x, ratio)
 Splits the data set `x` randomly in two data sets `x1` and `x2`, such that
 the ratio `n2`/`n1` of the numbers of lines/samples in `x1` and `x2` is
