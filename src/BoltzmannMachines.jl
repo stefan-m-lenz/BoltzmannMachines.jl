@@ -173,31 +173,78 @@ end
 
 
 """
-    piecewiselinearsequences(nsamples, nvariables)
+    piecewiselinearsequencebundles(...)
 Generates a dataset consisting of samples with values that
 are piecewise linear functions of the variable index.
 
 ## Optional named arguments:
- * `pbreak`: probability that an intermediate point is a breakpoint,
-    defaults to 0.2.
- * `breakval`: a function that expects no input and generates a single
-   (random) value. Defaults to `rand`.
+* `nbundles`: number of bundles
+* `nperbundle`: number of sequences per bundle
+* `nvariables`: number of variables in the sequences
+* `noisesd`: standard deviation of the noise added on all sequences
+* `addbundlecodes`: add leading columns to the resulting dataset, specifying the
+   membership to a bundle
+* `pbreak`: probability that an intermediate point in a sequence is a
+   breakpoint, defaults to 0.2.
+* `breakval`: a function that expects no input and generates a single
+  (random) value for a defining point of a piecewise linear sequence.
+  Defaults to `rand`.
 
 # Example:
 To quickly grasp the idea, plot generated samples against the variable index, e. g.:
 
     using Gadfly
-    plot(piecewiselinearsequences(3, 10),
-         x = Col.index, y = Col.value, color = Row.index, Geom.line,
+    x = BMs.piecewiselinearsequencebundles(
+         nvariables = 10, nbundles = 3, nperbundle = 2, noisesd = 0.05)
+    plot(x, x = Col.index, y = Col.value, color = Row.index, Geom.line,
          Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
          Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
 """
-function piecewiselinearsequences(nsamples::Int, nvariables::Int,
+function piecewiselinearsequencebundles(;
+      nbundles::Int = 3,
+      nperbundle::Int = 50,
+      nvariables::Int = 10,
+      noisesd::Float64 = 0.05,
+      addbundlecodes::Bool = false,
+      pbreak::Float64 = 0.2,
+      breakval::Function = rand)
+
+   x = piecewiselinearsequences(nbundles, nvariables;
+         pbreak = pbreak, breakval = breakval)
+   x = repmat(x, nperbundle)
+   nsamples = size(x, 1)
+   x .+= noisesd * randn(nsamples, nvariables)
+
+   if addbundlecodes
+      bundlecodesize = ceil(log(nbundles)/log(2))
+      bundlecode = zeros(bundlecodesize)
+      bundlecodes = Vector{Matrix{Float64}}(nbundles)
+      for j = 1:nbundles
+         bundlecodes[j] = repmat(bundlecode', nperbundle)
+         next!(bundlecode)
+      end
+      x = hcat(vcat(bundlecodes...), x)
+   end
+
+   x = x[randperm(nsamples), :]
+   x
+end
+
+
+"""
+    piecewiselinearsequences(nsequences, nvariables; ...)
+Generates a dataset consisting of samples with values that
+are piecewise linear functions of the variable index.
+
+Optional named arguments: `pbreak`, `breakval`,
+see `piecewiselinearsequencebundles`.
+"""
+function piecewiselinearsequences(nsequences::Int, nvariables::Int;
       pbreak::Float64 = 0.2, breakval::Function = rand)
 
    inbetweenvariables = 2:(nvariables-1)
-   x = Matrix{Float64}(nsamples, nvariables)
-   for i = 1:nsamples
+   x = Matrix{Float64}(nsequences, nvariables)
+   for i = 1:nsequences
       breakpointindexes = [1; randsubseq(inbetweenvariables, pbreak); nvariables]
       breakpointvalues = [breakval() for i = 1:length(breakpointindexes)]
       lastbreakpoint = 1
