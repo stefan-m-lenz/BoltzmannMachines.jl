@@ -139,6 +139,7 @@ function fitrbm(x::Matrix{Float64};
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
+      sdgradclipnorm::Float64 = 0.0,
       sdinitfactor::Float64 = 0.0)
 
    rbm = initrbm(x, nhidden, rbmtype)
@@ -147,7 +148,7 @@ function fitrbm(x::Matrix{Float64};
       sdlearningrates = sdlearningrate * ones(epochs)
    end
    if sdinitfactor > 0 && rbmtype == GaussianBernoulliRBM
-      rbm.sd *= sdinitfactor
+      rbm.sd .*= sdinitfactor
    end
 
    if length(learningrates) < epochs ||
@@ -176,6 +177,7 @@ function fitrbm(x::Matrix{Float64};
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
+            sdgradclipnorm = sdgradclipnorm,
             h = h, hmodel = hmodel, vmodel = vmodel,
             posupdate = posupdate, negupdate = negupdate)
 
@@ -408,6 +410,14 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianBernoulliRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
+      #hidbias = randn(nhidden)/sqrt(nhidden)
+      # weights = rand(nvisible, nhidden)
+      # bengioglorotfactor = sqrt(6 / (nvisible + nhidden))
+      # weights .*= 2 * bengioglorotfactor
+      # weights .-= bengioglorotfactor
+      # visbiassqnorm = sum(visbias.^2)
+      #hidbias = randn(nhidden)*0.01
+      # hidbias = [-(sum((weights .+ visbias)[:,j].^2) - visbiassqnorm)/2*0.1^2 + log(0.01) for j = 1:nhidden]
       return GaussianBernoulliRBM(weights, visbias, hidbias, sd)
 
    elseif rbmtype == BernoulliGaussianRBM
@@ -579,8 +589,18 @@ function samplevisiblepotential!(v::M, b2brbm::Binomial2BernoulliRBM
 end
 
 function samplevisiblepotential!(v::M, gbrbm::GaussianBernoulliRBM
-      ) where{M <: AbstractArray{Float64}}
-   gaussiannoise = broadcast(*, randn(size(v)), gbrbm.sd')
+      ) where{M <: AbstractArray{Float64, 1}}
+
+   gaussiannoise = randn(length(v))
+   gaussiannoise .*= gbrbm.sd
+   v .+= gaussiannoise
+end
+
+function samplevisiblepotential!(v::M, gbrbm::GaussianBernoulliRBM
+      ) where{M <: AbstractArray{Float64, 2}}
+
+   gaussiannoise = randn(size(v))
+   gaussiannoise .*= gbrbm.sd'
    v .+= gaussiannoise
 end
 
@@ -616,6 +636,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
       sdlearningrate::Float64 = 0.0,
+      sdgradclipnorm::Float64 = 0.0,
 
       # write-only arguments for reusing allocated space:
       h::Vector{Float64} = Vector{Float64}(length(rbm.hidbias)),
@@ -655,7 +676,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       hiddenpotential!(hmodel, rbm, vmodel, upfactor)
 
       updateparameters!(rbm, v, vmodel, h, hmodel,
-            learningrate, sdlearningrate,
+            learningrate, sdlearningrate, sdgradclipnorm,
             posupdate, negupdate)
    end
 
@@ -880,6 +901,7 @@ function updateparameters!(rbm::AbstractRBM,
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
+      sdgradclipnorm::Float64,
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    A_mul_Bt!(posupdate, v, h)
@@ -898,6 +920,7 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
+      sdgradclipnorm::Float64,
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    # To train a Binomial2BernoulliRBM exactly like
@@ -921,25 +944,43 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
       h::Vector{Float64}, hmodel::Vector{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
+      sdgradclipnorm::Float64,
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    # See bottom of page 15 in [Krizhevsky, 2009].
 
-   sd = gbrbm.sd
+   if sdlearningrate > 0.0
+      sdgrad = sdupdateterm(gbrbm, v, h) - sdupdateterm(gbrbm, vmodel, hmodel)
 
-   if sdlearningrate > 0
-      gbrbm.sd -= (sdupdateterm(gbrbm, v, h) -
-            sdupdateterm(gbrbm, vmodel, hmodel)) * sdlearningrate
+      v ./= gbrbm.sd
+      vmodel ./= gbrbm.sd
+
+      if sdgradclipnorm > 0.0
+         sdgradnorm = norm(sdgrad)
+         if sdgradnorm > sdgradclipnorm
+            rescaling = sdgradclipnorm / sdgradnorm
+            sdlearningrate *= rescaling
+            learningrate *= rescaling
+         end
+      end
+      sdgrad .*= sdlearningrate
+      gbrbm.sd .+= sdgrad
+      if any(gbrbm.sd .< 0.0)
+         warn("SD-Update leading to negative standard deviation not performed")
+         gbrbm.sd .-= sdgrad
+      end
+   else
+      v ./= gbrbm.sd
+      vmodel ./= gbrbm.sd
    end
 
-   v = v ./ sd
-   vmodel = vmodel ./ sd
+   A_mul_Bt!(posupdate, v, h)
+   A_mul_Bt!(negupdate, vmodel, hmodel)
+   posupdate .-= negupdate
+   posupdate .*= learningrate
+   gbrbm.weights .+= posupdate
+   gbrbm.hidbias .+= (h - hmodel) * learningrate
 
-   invoke(updateparameters!,
-         Tuple{AbstractRBM, Vector{Float64}, Vector{Float64},
-               Vector{Float64}, Vector{Float64}, Float64, Float64,
-               Matrix{Float64}, Matrix{Float64}},
-         gbrbm, v, vmodel, h, hmodel, learningrate, sdlearningrate,
-         posupdate, negupdate)
+   gbrbm.visbias .+= (v - vmodel) ./ gbrbm.sd * learningrate
    nothing
 end
