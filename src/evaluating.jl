@@ -1163,6 +1163,23 @@ function mixedrbm(rbm1::BernoulliRBM, rbm2::BernoulliRBM, temperature::Float64)
    BernoulliRBM(weights, visbias, hidbias)
 end
 
+# function mixedrbm(rbm1::GaussianBernoulliRBM, rbm2::GaussianBernoulliRBM,
+#          temperature::Float64)
+
+#    sdf1 = 1 ./ rbm1.sd.^2 * (1 - temperature)
+#    sdf2 = 1 ./ rbm2.sd.^2 * temperature
+#    sdsq = 1 ./ (sdf1 + sdf2)
+#    sd = sqrt.(sdsq)
+#    visbias = (sdf1 .* rbm1.visbias + sdf2 .* rbm2.visbias) .* sdsq
+#    weights = hcat(
+#          rbm1.weights ./ (rbm1.sd .* sd / (1-temperature)),
+#          rbm2.weights ./ (rbm2.sd .* sd / temperature))
+#    hidbias = vcat(
+#          (1 - temperature) * rbm1.hidbias,
+#          temperature * rbm2.hidbias)
+#    GaussianBernoulliRBM(weights, visbias, hidbias, sd)
+# end
+
 
 """
     next!(combination)
@@ -1346,13 +1363,44 @@ function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
    particles
 end
 
-function sampleparticles(gbrbm::GaussianBernoulliRBM, nparticles::Int, burnin::Int = 10)
-   particles = invoke(sampleparticles, Tuple{AbstractRBM,Int,Int}, gbrbm, nparticles, burnin-1)
-   # do not sample in last step to avoid that the noise dominates the data
-   particles[1] = visiblepotential(gbrbm, particles[2])
-   particles
+
+function samples(rbm::AbstractRBM, nsamples::Int;
+      burnin::Int = 50,
+      init::Matrix{Float64} = Matrix{Float64}(0, 0),
+      samplelast::Bool = true)
+
+   if samplelast
+      vv = sampleparticles(rbm, nsamples, burnin)[1]
+   else
+      particles = sampleparticles(rbm, nsamples, burnin - 1)
+      visiblepotential!(particles[1], rbm, particles[2])
+      vv = particles[1]
+   end
+   vv
 end
 
+function samples(rbm::AbstractRBM, init::Matrix{Float64};
+      burnin::Int = 50,
+      samplelast::Bool = true)
+
+   particles = Particles(2)
+   particles[2] = Matrix{Float64}(size(init, 1), size(rbm.weights, 2))
+   particles[1] = copy(init)
+
+   nsamplingsteps = samplelast ? burnin : burnin - 1
+
+   for i = 1:nsamplingsteps
+      samplehidden!(particles[2], rbm, particles[1])
+      samplevisible!(particles[1], rbm, particles[2])
+   end
+
+   if !samplelast
+      samplehidden!(particles[2], rbm, particles[1])
+      visiblepotential!(particles[1], rbm, particles[2])
+   end
+
+   particles[1]
+end
 
 function samples(mbdist::MultivariateBernoulliDistribution, nsamples::Int)
    nvisible = length(mbdist.samples[1])
