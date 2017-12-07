@@ -92,6 +92,10 @@ function extractaisdata(monitor::BMs.Monitor, evaluation::AbstractString, sdrang
       end
    end
 
+   # avoid plotting error if NaNs were introduced when calculating ymin/ymax
+   plotdata[:ymin][isnan.(plotdata[:ymin])] .= 0
+   plotdata[:ymax][isnan.(plotdata[:ymax])] .= 0
+
    plotdata
 end
 
@@ -204,6 +208,13 @@ function plotmeandiffpervariable(monitor::BMs.Monitor)
    plotgrid = reshape(vcat(plots, emptyplots), rowlength, rowlength)
    plotgrid = permutedims(plotgrid, [2;1])
    vstack(title, compose(context(0, 0, 1, 0.9), gridstack(plotgrid)))
+end
+
+
+function plotpiecewiselinearsequences(x::Matrix{Float64})
+   plot(x, x = Col.index, y = Col.value, color = Row.index, Geom.line,
+         Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
+         Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
 end
 
 
