@@ -1278,13 +1278,16 @@ function reconstructionerror(rbm::AbstractRBM,
       upfactor::Float64 = 1.0,
       downfactor::Float64 = 1.0)
 
-   nsamples = size(x,1)
+   nsamples = size(x, 1)
    reconstructionerror = 0.0
+
+   vmodel = Vector{Float64}(nvisiblenodes(rbm))
+   hmodel = Vector{Float64}(nhiddennodes(rbm))
 
    for sample = 1:nsamples
       v = vec(x[sample,:])
-      hmodel = hiddenpotential(rbm, v, upfactor)
-      vmodel = visiblepotential(rbm, hmodel, downfactor)
+      hiddenpotential!(hmodel, rbm, v, upfactor)
+      visiblepotential!(vmodel, rbm, hmodel, downfactor)
       reconstructionerror += sum(abs.(v - vmodel))
    end
 
@@ -1379,6 +1382,7 @@ function samples(rbm::AbstractRBM, nsamples::Int;
    vv
 end
 
+# TODO simplify, avoid code repetition from sampleparticles
 function samples(rbm::AbstractRBM, init::Matrix{Float64};
       burnin::Int = 50,
       samplelast::Bool = true)

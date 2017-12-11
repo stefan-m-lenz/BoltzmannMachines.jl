@@ -262,7 +262,9 @@ function monitorreconstructionerror!(monitor::Monitor, rbm::AbstractRBM,
 end
 
 
-function monitorsd!(monitor::Monitor, gbrbm::GaussianBernoulliRBM, epoch::Int)
+function monitorsd!(monitor::Monitor,
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}, epoch::Int)
+
    nvisible = length(gbrbm.sd)
    for i = 1:nvisible
       push!(monitor,
