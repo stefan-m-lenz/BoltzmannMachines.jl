@@ -667,6 +667,21 @@ function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM)
    log(z) + nvisible/2 * log(2*pi) + sum(log.(gbrbm.sd))
 end
 
+function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM2)
+   nvisible = length(gbrbm.visbias)
+   nhidden = length(gbrbm.hidbias)
+
+   h = zeros(nhidden)
+   z = 0.0
+   while true
+      wh = gbrbm.weights * h
+      z += exp(dot(gbrbm.hidbias, h) +
+            sum((wh.^2 / 2 + gbrbm.visbias .* wh) ./ (gbrbm.sd .^2)))
+      next!(h) || break
+   end
+   log(z) + nvisible/2 * log(2*pi) + sum(log.(gbrbm.sd))
+end
+
 """
     exactlogpartitionfunction(bgrbm)
 Calculates the log of the partition function of the BernoulliGaussianRBM `bgrbm`
@@ -788,25 +803,6 @@ function freeenergy(rbm::AbstractRBM, x::Matrix{Float64})
    freeenergy
 end
 
-function freeenergy(gbrbm::GaussianBernoulliRBM, x::Matrix{Float64})
-   # For derivation of formula for free energy of Gaussian-Bernoulli-RBMs,
-   # see [Krizhevsky, 2009], page 15.
-   nsamples = size(x,1)
-   nhidden = length(gbrbm.hidbias)
-
-   freeenergy = 0.0
-   for j = 1:nsamples
-      v = vec(x[j,:])
-      for k = 1:nhidden
-         freeenergy -=
-               log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], v ./ gbrbm.sd)))
-      end
-      freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
-   end
-   freeenergy /= nsamples
-   freeenergy
-end
-
 function freeenergy(bgrbm::BernoulliGaussianRBM, x::Matrix{Float64})
    nsamples = size(x, 1)
    nhidden = length(bgrbm.hidbias)
@@ -838,6 +834,28 @@ function freeenergy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
    # probability.
    - sum(v .== 1.0) * log(2) -
          dot(b2brbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(b2brbm, v))))
+end
+
+function freeenergy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64})
+   nhidden = length(gbrbm.hidbias)
+   vscaled = v ./ gbrbm.sd
+   freeenergy = 0.0
+   for k = 1:nhidden
+      freeenergy -=
+            log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled)))
+   end
+   freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
+end
+
+function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
+   nhidden = length(gbrbm.hidbias)
+   vscaled = v ./ (gbrbm.sd .^ 2)
+   freeenergy = 0.0
+   for k = 1:nhidden
+      freeenergy -=
+            log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled)))
+   end
+   freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
 
 

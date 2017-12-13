@@ -553,9 +553,9 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
 end
 
 function updatedbmpart!(dbmpart::PartitionedRBM,
-   learningrate::Float64,
-   vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-   ) where {M<:AbstractArray{Float64,2}}
+      learningrate::Float64,
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
 
    for i in eachindex(dbmpart.rbms)
       visrange = dbmpart.visranges[i]
