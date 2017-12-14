@@ -51,6 +51,7 @@ BMTest.test_stackrbms_preparetrainlayers()
 BMTest.testdbmjoining()
 
 BMTest.test_likelihoodconsistency()
+BMTest.test_likelihoodconsistency_gaussian()
 
 BMTest.test_rbm()
 BMTest.test_b2brbm()

@@ -130,6 +130,19 @@ Usable as default argument for functions as arguments.W
 function emptyfunc
 end
 
+"""
+    log1pexp(x)
+Calculates log(1+exp(x)). For sufficiently large values of x, the approximation
+log(1+exp(x)) ≈ x is used. This is useful to prevent overflow.
+"""
+function log1pexp(x::Float64)
+   if x > 34
+      return x
+   else
+      return log1p(exp(x))
+   end
+end
+
 
 function sigm(x::Float64)
    1./(1 + exp(-x))

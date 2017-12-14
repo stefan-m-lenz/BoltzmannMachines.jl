@@ -824,7 +824,7 @@ end
 Computes the free energy of the sample `v` (a vector) for the `rbm`.
 """
 function freeenergy(rbm::BernoulliRBM, v::Vector{Float64})
-   - dot(rbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(rbm, v))))
+  - dot(rbm.visbias, v) - sum(log1p.(exp.(hiddeninput(rbm, v))))
 end
 
 function freeenergy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
@@ -833,7 +833,7 @@ function freeenergy(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
    # this number of combinations in the 00/01/10/11 space, all having equal
    # probability.
    - sum(v .== 1.0) * log(2) -
-         dot(b2brbm.visbias, v) - sum(log.(1 + exp.(hiddeninput(b2brbm, v))))
+         dot(b2brbm.visbias, v) - sum(log1p.(exp.(hiddeninput(b2brbm, v))))
 end
 
 function freeenergy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64})
@@ -841,8 +841,7 @@ function freeenergy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64})
    vscaled = v ./ gbrbm.sd
    freeenergy = 0.0
    for k = 1:nhidden
-      freeenergy -=
-            log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled)))
+      freeenergy -= log1pexp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled))
    end
    freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
@@ -852,8 +851,7 @@ function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
    vscaled = v ./ (gbrbm.sd .^ 2)
    freeenergy = 0.0
    for k = 1:nhidden
-      freeenergy -=
-            log(1 + exp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled)))
+      freeenergy -= log1pexp(gbrbm.hidbias[k] + dot(gbrbm.weights[:,k], vscaled))
    end
    freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
@@ -1181,22 +1179,22 @@ function mixedrbm(rbm1::BernoulliRBM, rbm2::BernoulliRBM, temperature::Float64)
    BernoulliRBM(weights, visbias, hidbias)
 end
 
-# function mixedrbm(rbm1::GaussianBernoulliRBM, rbm2::GaussianBernoulliRBM,
-#          temperature::Float64)
+function mixedrbm(rbm1::GaussianBernoulliRBM, rbm2::GaussianBernoulliRBM,
+      temperature::Float64)
 
-#    sdf1 = 1 ./ rbm1.sd.^2 * (1 - temperature)
-#    sdf2 = 1 ./ rbm2.sd.^2 * temperature
-#    sdsq = 1 ./ (sdf1 + sdf2)
-#    sd = sqrt.(sdsq)
-#    visbias = (sdf1 .* rbm1.visbias + sdf2 .* rbm2.visbias) .* sdsq
-#    weights = hcat(
-#          rbm1.weights ./ (rbm1.sd .* sd / (1-temperature)),
-#          rbm2.weights ./ (rbm2.sd .* sd / temperature))
-#    hidbias = vcat(
-#          (1 - temperature) * rbm1.hidbias,
-#          temperature * rbm2.hidbias)
-#    GaussianBernoulliRBM(weights, visbias, hidbias, sd)
-# end
+   sdf1 = (1 - temperature) ./ rbm1.sd.^2
+   sdf2 = temperature ./ rbm2.sd.^2
+   sdsq = 1 ./ (sdf1 + sdf2)
+   sd = sqrt.(sdsq)
+   visbias = (sdf1 .* rbm1.visbias + sdf2 .* rbm2.visbias) .* sdsq
+   weights = hcat(
+         (1-temperature) * rbm1.weights ./ (rbm1.sd ./ sd),
+         temperature * rbm2.weights ./ (rbm2.sd ./ sd))
+   hidbias = vcat(
+         (1 - temperature) * rbm1.hidbias,
+         temperature * rbm2.hidbias)
+   GaussianBernoulliRBM(weights, visbias, hidbias, sd)
+end
 
 
 """

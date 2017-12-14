@@ -326,7 +326,7 @@ function test_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
       percentalloweddiff = 2.0)
 
    mbdist = BMs.MultivariateBernoulliDistribution(bm)
-   exactsamples = BMs.samples(mbdist, 20000)
+   exactsamples = BMs.samples(mbdist, 35000)
 
    emploglikexactsamples = BMs.empiricalloglikelihood(x, exactsamples)
    exactloglik = BMs.exactloglikelihood(bm, x)
@@ -378,13 +378,55 @@ function test_likelihoodconsistency()
          BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, rbm1))) <
                logz1 * 0.013
 
-   # Annealing from one RBM to another RBM: Compare partitionf functions ...
+   # Annealing from one RBM to another RBM: Compare partition functions ...
    logimpweights = BMs.aislogimpweights(rbm1, rbm2;
          ntemperatures = 1000, nparticles = 200, burnin = 10)
    @test abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
          max(logz2, logz1) * 0.03
    # ... and loglikelihood
    lldiff2 = BMs.loglikelihooddiff(rbm1, rbm2, x, logimpweights)
+   lldiff1 = logp1 - logp2
+   # very weak test, TODO: check and improve
+   @test sign(lldiff1) == sign(lldiff2)
+end
+
+
+function test_likelihoodconsistency_gaussian()
+   x = BMs.piecewiselinearsequencebundles(nperbundle = 300, nvariables = 10,
+         nbundles = 4)
+
+   gbrbm1 = BMs.fitrbm(x; nhidden = 30, rbmtype = BMs.GaussianBernoulliRBM,
+         cdsteps = 10,
+         pcd = false,
+         learningrate = 0.001, epochs = 50,
+         sdlearningrate = 0.00001)
+
+   datainitrbm = BMs.GaussianBernoulliRBM(zeros(size(x,2), 1),
+         vec(mean(x,1)), [0.0], vec(std(x,1)))
+
+
+   # Compare estimated difference of log partition functions to difference
+   # between estimation and exact log partition function of GBRBM with zero weights
+   logz1 = BMs.logpartitionfunction(gbrbm1)
+   @test abs(logz1 - BMs.logpartitionfunctionzeroweights(datainitrbm) -
+         BMs.logmeanexp(BMs.aislogimpweights(datainitrbm, gbrbm1))) < 0.01 * logz1
+
+   gbrbm2 = BMs.fitrbm(x; nhidden = 15, rbmtype = BMs.GaussianBernoulliRBM,
+         cdsteps = 10,
+         learningrate = 0.001, epochs = 100,
+         sdlearningrates = [fill(0.0, 30); fill(0.00001, 300)])
+
+   logz2 = BMs.logpartitionfunction(gbrbm2)
+
+   logdiffimpweights = BMs.aislogimpweights(gbrbm1, gbrbm2)
+   logzdiff = BMs.logmeanexp(logdiffimpweights)
+
+   # Annealing from one RBM to another RBM: Compare partition functions ...
+   @test abs(logzdiff - (logz2 - logz1)) < max(logz2, logz1) * 0.03
+   # ... and loglikelihood
+   logp1 = BMs.loglikelihood(gbrbm1, x, logz1)
+   logp2 = BMs.loglikelihood(gbrbm2, x, logz2)
+   lldiff2 = BMs.loglikelihooddiff(gbrbm1, gbrbm2, x, logdiffimpweights)
    lldiff1 = logp1 - logp2
    # very weak test, TODO: check and improve
    @test sign(lldiff1) == sign(lldiff2)

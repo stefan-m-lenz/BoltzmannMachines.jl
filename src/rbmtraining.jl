@@ -412,19 +412,12 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianBernoulliRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      #hidbias = randn(nhidden)/sqrt(nhidden)
-      # weights = rand(nvisible, nhidden)
-      # bengioglorotfactor = sqrt(6 / (nvisible + nhidden))
-      # weights .*= 2 * bengioglorotfactor
-      # weights .-= bengioglorotfactor
-      # visbiassqnorm = sum(visbias.^2)
-      #hidbias = randn(nhidden)*0.01
-      # hidbias = [-(sum((weights .+ visbias)[:,j].^2) - visbiassqnorm)/2*0.1^2 + log(0.01) for j = 1:nhidden]
       return GaussianBernoulliRBM(weights, visbias, hidbias, sd)
 
    elseif rbmtype == GaussianBernoulliRBM2
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
+      #hidbias = randn(nhidden)/sqrt(nhidden)
       return GaussianBernoulliRBM2(weights, visbias, hidbias, sd)
 
    elseif rbmtype == BernoulliGaussianRBM
