@@ -391,17 +391,23 @@ function test_likelihoodconsistency()
 end
 
 
-function test_likelihoodconsistency_gaussian()
+"""
+Tests the likelihood estimation approaches for GaussianBernoulliRBMs
+and alternative GaussianBernoulliRBMs.
+"""
+function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
+      ) where GBRBM <: Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
+
    x = BMs.piecewiselinearsequencebundles(nperbundle = 300, nvariables = 10,
          nbundles = 4)
 
-   gbrbm1 = BMs.fitrbm(x; nhidden = 30, rbmtype = BMs.GaussianBernoulliRBM,
+   gbrbm1 = BMs.fitrbm(x; nhidden = 30, rbmtype = gbrbmtype,
          cdsteps = 10,
          pcd = false,
          learningrate = 0.001, epochs = 50,
          sdlearningrate = 0.00001)
 
-   datainitrbm = BMs.GaussianBernoulliRBM(zeros(size(x,2), 1),
+   datainitrbm = GBRBM(zeros(size(x,2), 1),
          vec(mean(x,1)), [0.0], vec(std(x,1)))
 
 
@@ -411,7 +417,7 @@ function test_likelihoodconsistency_gaussian()
    @test abs(logz1 - BMs.logpartitionfunctionzeroweights(datainitrbm) -
          BMs.logmeanexp(BMs.aislogimpweights(datainitrbm, gbrbm1))) < 0.01 * logz1
 
-   gbrbm2 = BMs.fitrbm(x; nhidden = 15, rbmtype = BMs.GaussianBernoulliRBM,
+   gbrbm2 = BMs.fitrbm(x; nhidden = 15, rbmtype = gbrbmtype,
          cdsteps = 10,
          learningrate = 0.001, epochs = 100,
          sdlearningrates = [fill(0.0, 30); fill(0.00001, 300)])
@@ -451,6 +457,24 @@ function test_rbm()
    rbm = BMs.fitrbm(x, epochs = 30,
          nhidden = 4, learningrate = 0.001)
    testlikelihoodempirically(rbm, x)
+end
+
+function test_gbrbm(gbrbmtype::Type{GBRBM}
+      ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
+
+   x = BMs.piecewiselinearsequencebundles(nperbundle = 300, nvariables = 10,
+         nbundles = 4)
+   gbrbm = BMs.fitrbm(x; nhidden = 15, rbmtype = gbrbmtype,
+         cdsteps = 10,
+         pcd = false,
+         learningrate = 0.001, epochs = 50,
+         sdlearningrate = 0.00001)
+
+   logz = BMs.logpartitionfunction(gbrbm; parallelized = true,
+         ntemperatures = 500, nparticles = 500)
+   estloglik = BMs.loglikelihood(gbrbm, x, logz)
+   exactloglik = BMs.exactloglikelihood(gbrbm, x)
+   @test abs((exactloglik - estloglik) / exactloglik) < 2.5 / 100
 end
 
 

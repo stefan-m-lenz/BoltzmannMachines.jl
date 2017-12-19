@@ -51,10 +51,13 @@ BMTest.test_stackrbms_preparetrainlayers()
 BMTest.testdbmjoining()
 
 BMTest.test_likelihoodconsistency()
-BMTest.test_likelihoodconsistency_gaussian()
+BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM)
+BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM2)
 
 BMTest.test_rbm()
 BMTest.test_b2brbm()
+BMTest.test_gbrbm(BMs.GaussianBernoulliRBM)
+BMTest.test_gbrbm(BMs.GaussianBernoulliRBM2)
 BMTest.test_mdbm_rbm_b2brbm()
 BMTest.test_mdbm_gaussianvisibles()
 

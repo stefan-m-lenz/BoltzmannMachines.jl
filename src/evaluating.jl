@@ -15,7 +15,7 @@ like described in section 4.1.3 of [Salakhutdinov, 2008].
    100
 * `burnin`: Number of steps to sample for the Gibbs transition between models
 """
-function aislogimpweights(rbm::BernoulliRBM;
+function aislogimpweights(rbm::AbstractXBernoulliRBM;
       ntemperatures::Int = 100,
       temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
@@ -35,7 +35,7 @@ function aislogimpweights(rbm::BernoulliRBM;
             temperatures[k], temperatures[k-1])
 
       # Gibbs transition
-      mixrbm.weights = rbm.weights * temperatures[k]
+      copyannealed!(mixrbm, rbm, temperatures[k])
       for burn = 1:burnin
          samplevisible!(vv, mixrbm, hh)
          samplehidden!(hh, mixrbm, vv)
@@ -51,13 +51,15 @@ end
 Computes the logarithmised importance weights for estimating the log-ratio
 log(Z2/Z1) for the partition functions Z1 and Z2 of `rbm1` and `rbm2`, respectively.
 Implements the procedure described in section 4.1.2 of [Salakhutdinov, 2008].
+This requires that `rbm1` and `rbm2` are of the same type and have the same
+number of visible units.
 """
 function aislogimpweights(rbm1::R, rbm2::R;
       ntemperatures::Int = 100,
       temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
       nparticles::Int = 100,
       burnin::Int = 5,
-      initburnin::Int = 30) where {R<:AbstractRBM}
+      initburnin::Int = 30) where {R <: AbstractRBM}
 
    if length(rbm2.visbias) != length(rbm1.visbias)
       error("The two RBMs must have the same numer of visible units.")
@@ -89,90 +91,6 @@ function aislogimpweights(rbm1::R, rbm2::R;
 
    # account for different model size
    logimpweights += log(2) * (nhidden2 - nhidden1)
-
-   logimpweights
-end
-
-
-"""
-    aislogimpweights(bgrbm; ...)
-Computes the logarithmised importance weights in the Annealed Importance Sampling
-algorithm (AIS) for estimating the ratio of the partition functions of the given
-BernoulliGaussianRBM `bgrbm` to the BernoulliGaussianRBM with the same visible
-bias and hidden bias but zero weights.
-"""
-function aislogimpweights(bgrbm::BernoulliGaussianRBM;
-      ntemperatures::Int = 100,
-      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   # reversed RBM has the same partition function
-   aislogimpweights(reversedrbm(bgrbm), ntemperatures = ntemperatures,
-         temperatures = temperatures, nparticles = nparticles, burnin = burnin)
-end
-
-
-"""
-    aislogimpweights(b2brbm; ...)
-Computes the logarithmised importance weights in the Annealed Importance Sampling
-algorithm (AIS) for estimating the ratio of the partition functions of the given
-Binomial2BernoulliRBM `b2brbm` to the Binomial2BernoulliRBM with same visible
-and hidden bias.
-"""
-function aislogimpweights(b2brbm::Binomial2BernoulliRBM;
-      ntemperatures::Int = 100,
-      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   # compute importance weights for BernoulliRBM with duplicated weights and
-   # visible bias
-   rbm = BernoulliRBM(vcat(b2brbm.weights, b2brbm.weights),
-         vcat(b2brbm.visbias, b2brbm.visbias), b2brbm.hidbias)
-
-   aislogimpweights(rbm;
-         ntemperatures = ntemperatures, temperatures = temperatures,
-         nparticles = nparticles, burnin = burnin)
-end
-
-
-"""
-    aislogimpweights(gbrbm; ...)
-Computes the importance weights in the Annealed Importance Sampling algorithm
-for estimating the ratio of the partition functions of the given
-GaussianBernoulliRBM `gbrbm` to the GaussianBernoulliRBM with same hidden and
-visible biases and same standard deviation but with zero weights.
-"""
-function aislogimpweights(gbrbm::GaussianBernoulliRBM;
-      ntemperatures::Int = 100,
-      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
-      nparticles::Int = 100,
-      burnin::Int = 5)
-
-   logimpweights = zeros(nparticles)
-
-   mixrbm = deepcopy(gbrbm)
-
-   for j=1:nparticles
-      h = bernoulli!(sigm(gbrbm.hidbias))
-
-      for k=2:(ntemperatures + 1)
-
-         wh = gbrbm.weights*h
-         logimpweights[j] += (temperatures[k] - temperatures[k-1]) *
-               sum(0.5 * wh.^2 + gbrbm.visbias ./gbrbm.sd .* wh)
-
-         # Gibbs transition
-         mixrbm.weights = gbrbm.weights * sqrt(temperatures[k])
-         mixrbm.sd = gbrbm.sd / sqrt(temperatures[k])
-         for burn = 1:burnin
-            v = samplevisible(mixrbm, h)
-            h = samplehidden(mixrbm, v)
-         end
-
-      end
-   end
 
    logimpweights
 end
@@ -360,6 +278,16 @@ function aisunnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
          0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
 end
 
+function aisunnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
+   hh::Matrix{Float64},
+   temperature1::Float64,
+   temperature2::Float64)
+
+   wht = hh * gbrbm.weights'
+   vec((temperature1 - temperature2) * sum(
+         (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', 2))
+end
+
 function aisunnormalizedproblogratios(prbm::PartitionedRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
@@ -369,7 +297,8 @@ function aisunnormalizedproblogratios(prbm::PartitionedRBM,
    mapreduce(
          i -> aisunnormalizedproblogratios(prbm.rbms[i],
                hh[:, prbm.hidranges[i]], temperature1, temperature2),
-         (x,y) -> broadcast(+, x, y) , eachindex(prbm.rbms))
+         (x,y) -> broadcast(+, x, y),
+         eachindex(prbm.rbms))
 end
 
 
@@ -413,21 +342,22 @@ end
 Copies all parameters that are to be annealed from the RBM `rbm` to the RBM
 `annealedrbm` and anneals them with the given `temperature`.
 """
-function copyannealed!(annealedrbm::AbstractRBM,
-      rbm::AbstractRBM, temperature::Float64)
+function copyannealed!(annealedrbm::BRBM, rbm::BRBM, temperature::Float64
+      ) where {BRBM <: Union{BernoulliRBM, Binomial2BernoulliRBM}}
 
    annealedrbm.weights .= rbm.weights
    annealedrbm.weights .*= temperature
    nothing
 end
 
-function copyannealed!(annealedrbm::GaussianBernoulliRBM,
-         gbrbm::GaussianBernoulliRBM, temperature::Float64)
+function copyannealed!(annealedrbm::GRBM, gbrbm::GRBM, temperature::Float64
+      ) where {GRBM <: Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
 
    annealedrbm.weights .= gbrbm.weights
-   annealedrbm.sd .= gbrbm.sd
-   annealedrbm.weights .*= sqrt(temperature)
-   annealedrbm.sd ./= sqrt(temperature)
+   annealedrbm.visbias .= gbrbm.visbias
+   tempsq = sqrt(temperature)
+   annealedrbm.weights .*= tempsq
+   annealedrbm.visbias .*= tempsq
    nothing
 end
 
@@ -1070,7 +1000,7 @@ function logpartitionfunctionzeroweights(dbm::PartitionedBernoulliDBM)
    logz0 = 0.0
    biases = combinedbiases(dbm)
    for i in eachindex(biases)
-      logz0 += sum(log.(1 + exp.(biases[i])))
+      logz0 += sum(log1p.(exp.(biases[i])))
    end
    logz0
 end
@@ -1084,18 +1014,20 @@ end
 
 
 function logpartitionfunctionzeroweights_visterm(rbm::BernoulliRBM)
-   sum(log.(1 + exp.(rbm.visbias)))
+   sum(log1p.(exp.(rbm.visbias)))
 end
 
 function logpartitionfunctionzeroweights_visterm(bgrbm::BernoulliGaussianRBM)
-   sum(log.(1 + exp.(bgrbm.visbias)))
+   sum(log1p.(exp.(bgrbm.visbias)))
 end
 
 function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
-   2*sum(log.(1 + exp.(b2brbm.visbias)))
+   2*sum(log1p.(exp.(b2brbm.visbias)))
 end
 
-function logpartitionfunctionzeroweights_visterm(gbrbm::GaussianBernoulliRBM)
+function logpartitionfunctionzeroweights_visterm(
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2})
+
    nvisible = length(gbrbm.visbias)
    nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd))
 end
@@ -1105,7 +1037,7 @@ function logpartitionfunctionzeroweights_visterm(prbm::PartitionedRBM)
 end
 
 function logpartitionfunctionzeroweights_hidterm(rbm::AbstractXBernoulliRBM)
-   sum(log.(1 + exp.(rbm.hidbias)))
+   sum(log1p.(exp.(rbm.hidbias)))
 end
 
 function logpartitionfunctionzeroweights_hidterm(bgrbm::BernoulliGaussianRBM)
@@ -1179,8 +1111,8 @@ function mixedrbm(rbm1::BernoulliRBM, rbm2::BernoulliRBM, temperature::Float64)
    BernoulliRBM(weights, visbias, hidbias)
 end
 
-function mixedrbm(rbm1::GaussianBernoulliRBM, rbm2::GaussianBernoulliRBM,
-      temperature::Float64)
+function mixedrbm(rbm1::GBRBM, rbm2::GBRBM, temperature::Float64
+      ) where {GBRBM <: Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
 
    sdf1 = (1 - temperature) ./ rbm1.sd.^2
    sdf2 = temperature ./ rbm2.sd.^2
@@ -1193,7 +1125,7 @@ function mixedrbm(rbm1::GaussianBernoulliRBM, rbm2::GaussianBernoulliRBM,
    hidbias = vcat(
          (1 - temperature) * rbm1.hidbias,
          temperature * rbm2.hidbias)
-   GaussianBernoulliRBM(weights, visbias, hidbias, sd)
+   GBRBM(weights, visbias, hidbias, sd)
 end
 
 
@@ -1574,6 +1506,14 @@ function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM, h::Vector{Float64})
    nvisible = length(gbrbm.visbias)
    wh = gbrbm.weights * h
    exp(dot(gbrbm.hidbias, h) + sum(0.5*wh.^2 + gbrbm.visbias ./ gbrbm.sd .* wh)) *
+         prod(gbrbm.sd) * sqrt2pi^nvisible
+end
+
+function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM2, h::Vector{Float64})
+   nvisible = length(gbrbm.visbias)
+   wh = gbrbm.weights * h
+   exp(dot(gbrbm.hidbias, h) +
+         sum((0.5*wh.^2 + gbrbm.visbias .* wh) ./ gbrbm.sd .^ 2)) *
          prod(gbrbm.sd) * sqrt2pi^nvisible
 end
 
