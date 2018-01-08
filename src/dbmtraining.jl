@@ -1,23 +1,3 @@
-const BasicDBM = Vector{BernoulliRBM}
-
-"A DBM with only Bernoulli distributed nodes which may contain partitioned layers."
-const PartitionedBernoulliDBM =
-      Vector{<:Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}
-
-"""
-`Particles` are an array of matrices.
-The i'th matrix contains in each row the vector of states of the nodes
-of the i'th layer of an RBM or a DBM. The set of rows with the same index define
-an activation state in a Boltzmann Machine.
-Therefore, the size of the i'th matrix is
-(number of samples/particles, number of nodes in layer i).
-"""
-const Particles = Array{Array{Float64,2},1}
-
-const Particle = Array{Array{Float64,1},1}
-
-const MultimodalDBM = Vector{<:AbstractRBM}
-
 function converttopartitionedbernoullidbm(mdbm::MultimodalDBM)
    Vector{Union{BernoulliRBM, PartitionedRBM{BernoulliRBM}}}(mdbm)
 end
@@ -72,27 +52,6 @@ function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
 
    push!(dbm, rbm)
    dbm
-end
-
-
-"""
-    combinedbiases(dbm)
-Returns a vector containing in the i'th element the bias vector for the i'th
-layer of the `dbm`. For intermediate layers, visible and hidden biases are
-combined to a single bias vector.
-"""
-function combinedbiases(dbm::MultimodalDBM)
-   biases = Particle(length(dbm) + 1)
-   # Create copy to avoid accidental modification of dbm.
-   # Use functions `visiblebias` and `hiddenbias` instead of
-   # fields `visbias` and `hidbias` of RBMs to be able to
-   # also respect PartitionedRBMs on an abstract level.
-   biases[1] = copy(visiblebias(dbm[1]))
-   for i = 2:length(dbm)
-      biases[i] = visiblebias(dbm[i]) + hiddenbias(dbm[i-1])
-   end
-   biases[end] = copy(hiddenbias(dbm[end]))
-   biases
 end
 
 
@@ -160,51 +119,6 @@ end
 
 
 """
-    gibbssample!(particles, dbm, nsteps)
-Performs Gibbs sampling on the `particles` in the DBM `dbm` for `nsteps` steps.
-(See also: `Particles`.)
-In-between layers are assumed to contain only Bernoulli-distributed nodes.
-"""
-function gibbssample!(particles::Particles, dbm::MultimodalDBM, nsteps::Int = 5)
-
-   input = newparticleslike(particles)
-   input2 = newparticleslike(particles)
-
-   for step in 1:nsteps
-      # first layer gets input only from layer above
-      samplevisible!(input[1], dbm[1], particles[2])
-
-      # intermediate layers get input from layers above and below
-      for i = 2:(length(particles) - 1)
-         visibleinput!(input[i], dbm[i], particles[i+1])
-         hiddeninput!(input2[i], dbm[i-1], particles[i-1])
-         input[i] .+= input2[i]
-         sigm_bernoulli!(input[i]) # Bernoulli-sample from total input
-      end
-
-      # last layer gets only input from layer below
-      samplehidden!(input[end], dbm[end], particles[end-1])
-
-      # swap input and particles
-      tmp = particles
-      particles = input
-      input = tmp
-   end
-
-   particles
-end
-
-
-function hiddenbias(rbm::AbstractRBM)
-   rbm.hidbias
-end
-
-function hiddenbias(prbm::PartitionedRBM)
-   vcat(map(rbm -> rbm.hidbias, prbm.rbms)...)
-end
-
-
-"""
     newparticleslike(particles)
 Creates new and uninitialized particles of the same dimensions as the given
 `particles`.
@@ -215,158 +129,6 @@ function newparticleslike(particles::Particles)
       newparticles[i] = Matrix{Float64}(size(particles[i]))
    end
    newparticles
-end
-
-
-"""
-    weightsinput!(input, input2, dbm, particles)
-Computes the input that results only from the weights (without biases)
-and the previous states in `particles` for all nodes in the DBM
-`dbm` and stores it in `input`.
-The state of the `particles` and the `dbm` is not altered.
-`input2` must have the same size as `input` and `particle`.
-For performance reasons, `input2` is used as preallocated space for storing
-intermediate results.
-"""
-function weightsinput!(input::Particles, input2::Particles,
-      dbm::PartitionedBernoulliDBM, particles::Particles)
-
-   # first layer gets input only from layer above
-   weightsvisibleinput!(input[1], dbm[1], particles[2])
-
-   # intermediate layers get input from layers above and below
-   for i = 2:(length(particles) - 1)
-      weightsvisibleinput!(input2[i], dbm[i], particles[i+1])
-      weightshiddeninput!(input[i], dbm[i-1], particles[i-1])
-      input[i] .+= input2[i]
-   end
-
-   # last layer gets only input from layer below
-   weightshiddeninput!(input[end], dbm[end], particles[end-1])
-   input
-end
-
-function weightshiddeninput!(hh::M, rbm::BernoulliRBM,
-      vv::M) where {M<:AbstractArray{Float64}}
-
-   A_mul_B!(hh, vv, rbm.weights)
-end
-
-function weightshiddeninput!(hh::M, prbm::PartitionedRBM{BernoulliRBM},
-      vv::M) where {M<:AbstractArray{Float64}}
-
-   for i in eachindex(prbm.rbms)
-      visrange = prbm.visranges[i]
-      hidrange = prbm.hidranges[i]
-      weightshiddeninput!(
-            view(hh, :, hidrange), prbm.rbms[i], view(vv,:, visrange))
-   end
-   hh
-end
-
-function weightsvisibleinput!(vv::M, rbm::BernoulliRBM,
-      hh::M) where {M<:AbstractArray{Float64}}
-
-   A_mul_Bt!(vv, hh, rbm.weights)
-end
-
-function weightsvisibleinput!(vv::M, prbm::PartitionedRBM{BernoulliRBM},
-      hh::M) where {M<:AbstractArray{Float64}}
-
-   for i in eachindex(prbm.rbms)
-      visrange = prbm.visranges[i]
-      hidrange = prbm.hidranges[i]
-      weightsvisibleinput!(
-            view(vv, :, visrange), prbm.rbms[i], view(hh,:, hidrange))
-   end
-   vv
-end
-
-
-"""
-    initparticles(dbm, nparticles; biased = false)
-Creates particles for Gibbs sampling in a DBM. (See also: `Particles`)
-
-The hidden layers of the `dbm` are assumed to be Bernoulli-distributed,
-the first `rbm` may have visible nodes of other types.
-
-For Bernoulli distributed layers, the particles are initialized with
-Bernoulli(p) distributed values. If `biased == false`, p is 0.5,
-otherwise the results of applying the sigmoid function to the bias values
-are used as values for the nodes' individual p's.
-
-Gaussian nodes are sampled from a normal distribution if `biased == false`.
-If `biased == true` the mean of the Gaussian distribution is shifted by the
-bias vector and the standard deviation of the nodes is used.
-"""
-function initparticles(dbm::MultimodalDBM, nparticles::Int; biased::Bool = false)
-   nlayers = length(dbm) + 1
-   particles = Particles(nlayers)
-
-   # initialize visible nodes
-   particles[1] = Matrix{Float64}(nparticles, length(visiblebias(dbm[1])))
-   initvisiblenodes!(particles[1], dbm[1], biased)
-
-   # initialize hidden nodes
-   if biased
-      biases = combinedbiases(dbm)
-      for i in 2:nlayers
-         particles[i] = bernoulli!(repmat(sigm(biases[i])', nparticles))
-      end
-   else
-      nunits = BMs.nunits(dbm)
-      for i in 2:nlayers
-         particles[i] = rand([0.0 1.0], nparticles, nunits[i])
-      end
-   end
-   particles
-end
-
-function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
-
-   if biased
-      for k in 1:size(v, 2)
-         v[:,k] .= sigm(rbm.visbias[k])
-      end
-      bernoulli!(v)
-   else
-      rand!(v, [0.0 1.0])
-   end
-   v
-end
-
-function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
-   ) where{M <: AbstractArray{Float64}}
-
-   if biased
-      for k in 1:size(v, 2)
-         v[:,k] .= sigm(b2brbm.visbias[k])
-      end
-      binomial2!(v)
-   else
-      rand!(v, [0.0 1.0 1.0 2.0])
-   end
-   v
-end
-
-function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
-   randn!(v)
-   if biased
-      broadcast!(*, v, v, rbm.sd')
-      broadcast!(+, v, v, rbm.visbias')
-   end
-   v
-end
-
-function initvisiblenodes!(v::M, prbm::PartitionedRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
-   for i in eachindex(prbm.rbms)
-      visrange = prbm.visranges[i]
-      initvisiblenodes!(view(v, :, visrange), prbm.rbms[i], biased)
-   end
-   v
 end
 
 
@@ -432,25 +194,6 @@ function meanfield(dbm::MultimodalDBM, x::Array{Float64,2}, eps::Float64 = 0.001
    end
 
    mu
-end
-
-
-function sigm_bernoulli!(input::Particles)
-   for i in eachindex(input)
-      sigm_bernoulli!(input[i])
-   end
-   input
-end
-
-# const pgrid = collect(linspace(0.00001,0.99999,99999))
-# const etagrid = log.(pgrid./(1.0-pgrid))
-
-function sigm_bernoulli!(input::Matrix{Float64})
-   for i in eachindex(input)
-      @inbounds input[i] = 1.0*(rand() < 1.0/(1.0 + exp(-input[i])))
-      # @inbounds input[i] = 1.0*(etagrid[Int(round(rand()*99998.0+1))] < input[i])
-   end
-   input
 end
 
 
@@ -587,13 +330,4 @@ function updatedbmpartcore!(dbmpart::AbstractRBM,
    dbmpart.visbias += learningrate*(lefta - righta)
    dbmpart.hidbias += learningrate*(leftb - rightb)
    nothing
-end
-
-
-function visiblebias(rbm::AbstractRBM)
-   rbm.visbias
-end
-
-function visiblebias(prbm::PartitionedRBM)
-   vcat(map(rbm -> rbm.visbias, prbm.rbms)...)
 end

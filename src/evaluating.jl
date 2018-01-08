@@ -31,7 +31,7 @@ function aislogimpweights(rbm::AbstractXBernoulliRBM;
    vv = Matrix{Float64}(nparticles, length(rbm.visbias))
 
    for k = 2:length(temperatures)
-      logimpweights .+= aisunnormalizedproblogratios(rbm, hh,
+      logimpweights .+= reversefreeenergy(rbm, hh,
             temperatures[k], temperatures[k-1])
 
       # Gibbs transition
@@ -183,7 +183,7 @@ function aislogimpweights(mdbm::MultimodalDBM;
    for k = 2:length(temperatures)
       # Calculate probability ratios for importance weights
       # according to activation of odd hidden layers (h1, h3, ...)
-      logimpweights += aisunnormalizedproblogratios(mdbm[1],
+      logimpweights += reversefreeenergy(mdbm[1],
             particles[2], temperatures[k], temperatures[k-1])
       aisupdatelogimpweights!(logimpweights, hiddbminput1, hiddbminput2,
             temperatures[k], temperatures[k-1], hiddbm, hidbiases, particles[2:end])
@@ -246,62 +246,6 @@ function aisstandarddeviation(logimpweights::Array{Float64,1})
 end
 
 
-function aisunnormalizedproblogratios(rbm::BernoulliRBM,
-      hh::Matrix{Float64},
-      temperature1::Float64,
-      temperature2::Float64)
-
-   weightsinput = hh * rbm.weights'
-   vec(sum(log.(
-         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2))
-end
-
-function aisunnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
-      hh::Matrix{Float64},
-      temperature1::Float64,
-      temperature2::Float64)
-
-   weightsinput = hh * rbm.weights'
-   vec(sum(log.(
-         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2) * 2)
-end
-
-function aisunnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
-      hh::Matrix{Float64},
-      temperature1::Float64,
-      temperature2::Float64)
-
-   wht = hh * gbrbm.weights'
-   vec((temperature1 - temperature2) * sum(
-         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
-end
-
-function aisunnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
-   hh::Matrix{Float64},
-   temperature1::Float64,
-   temperature2::Float64)
-
-   wht = hh * gbrbm.weights'
-   vec((temperature1 - temperature2) * sum(
-         (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', 2))
-end
-
-function aisunnormalizedproblogratios(prbm::PartitionedRBM,
-      hh::Matrix{Float64},
-      temperature1::Float64,
-      temperature2::Float64)
-
-   # TODO does not work with views
-   mapreduce(
-         i -> aisunnormalizedproblogratios(prbm.rbms[i],
-               hh[:, prbm.hidranges[i]], temperature1, temperature2),
-         (x,y) -> broadcast(+, x, y),
-         eachindex(prbm.rbms))
-end
-
-
 """
 Updates the logarithmized importance weights `logimpweights` in AIS
 by adding the log ratio of unnormalized probabilities of the states
@@ -334,6 +278,27 @@ function aisupdatelogimpweights!(logimpweights,
          end
       end
    end
+end
+
+
+"""
+    combinedbiases(dbm)
+Returns a vector containing in the i'th element the bias vector for the i'th
+layer of the `dbm`. For intermediate layers, visible and hidden biases are
+combined to a single bias vector.
+"""
+function combinedbiases(dbm::MultimodalDBM)
+   biases = Particle(length(dbm) + 1)
+   # Create copy to avoid accidental modification of dbm.
+   # Use functions `visiblebias` and `hiddenbias` instead of
+   # fields `visbias` and `hidbias` of RBMs to be able to
+   # also respect PartitionedRBMs on an abstract level.
+   biases[1] = copy(visiblebias(dbm[1]))
+   for i = 2:length(dbm)
+      biases[i] = visiblebias(dbm[i]) + hiddenbias(dbm[i-1])
+   end
+   biases[end] = copy(hiddenbias(dbm[end]))
+   biases
 end
 
 
@@ -805,6 +770,15 @@ end
 # TODO: optimize freenergydiffs for BernoulliRBM (Matrix operation)
 
 
+function hiddenbias(rbm::AbstractRBM)
+   rbm.hidbias
+end
+
+function hiddenbias(prbm::PartitionedRBM)
+   vcat(map(rbm -> rbm.hidbias, prbm.rbms)...)
+end
+
+
 "
 Returns particle for DBM, initialized with zeros.
 "
@@ -1190,9 +1164,9 @@ function nunits(dbm::MultimodalDBM)
    nlayers = length(dbm) + 1
    nu = Array{Int,1}(nlayers)
    for i = 1:nrbms
-      nu[i] = length(visiblebias(dbm[i]))
+      nu[i] = nvisiblenodes(dbm[i])
    end
-   nu[nlayers] = length(hiddenbias(dbm[nlayers-1]))
+   nu[nlayers] = nhiddennodes(dbm[nlayers-1])
    nu
 end
 
@@ -1267,6 +1241,62 @@ function reverseddbm(dbm::PartitionedBernoulliDBM)
 end
 
 
+function reversefreeenergy(rbm::BernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   weightsinput = hh * rbm.weights'
+   vec(sum(log.(
+         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2))
+end
+
+function reversefreeenergy(rbm::Binomial2BernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   weightsinput = hh * rbm.weights'
+   vec(sum(log.(
+         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2) * 2)
+end
+
+function reversefreeenergy(gbrbm::GaussianBernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   wht = hh * gbrbm.weights'
+   vec((temperature1 - temperature2) * sum(
+         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
+end
+
+function reversefreeenergy(gbrbm::GaussianBernoulliRBM2,
+   hh::Matrix{Float64},
+   temperature1::Float64,
+   temperature2::Float64)
+
+   wht = hh * gbrbm.weights'
+   vec((temperature1 - temperature2) * sum(
+         (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', 2))
+end
+
+function reversefreeenergy(prbm::PartitionedRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   # TODO does not work with views
+   mapreduce(
+         i -> reversefreeenergy(prbm.rbms[i],
+               hh[:, prbm.hidranges[i]], temperature1, temperature2),
+         (x,y) -> broadcast(+, x, y),
+         eachindex(prbm.rbms))
+end
+
+
 """
     samplefrequencies(x)
 Returns a dictionary containing the rows of the data set `x` as keys and their
@@ -1287,72 +1317,6 @@ function samplefrequencies{T}(x::Array{T,2})
    dict
 end
 
-
-"""
-    sampleparticles(bm, nparticles, burnin)
-Samples in the Boltzmann Machine model `bm` by running `nparticles` parallel,
-randomly initialized Gibbs chains for `burnin` steps.
-Returns particles containing `nparticles` generated samples.
-See also: `Particles`.
-"""
-function sampleparticles(dbm::MultimodalDBM, nparticles::Int, burnin::Int = 10)
-   particles = initparticles(dbm, nparticles)
-   gibbssample!(particles, dbm, burnin)
-   particles
-end
-
-function sampleparticles(rbm::AbstractRBM, nparticles::Int, burnin::Int = 10)
-   particles = Particles(2)
-   nunits = BMs.nunits(rbm)
-   particles[2] = rand([0.0 1.0], nparticles, nunits[2])
-   particles[1] = Matrix{Float64}(nparticles, nunits[1])
-
-   for i=1:burnin
-      samplevisible!(particles[1], rbm, particles[2])
-      samplehidden!(particles[2], rbm, particles[1])
-   end
-   particles
-end
-
-
-function samples(rbm::AbstractRBM, nsamples::Int;
-      burnin::Int = 50,
-      init::Matrix{Float64} = Matrix{Float64}(0, 0),
-      samplelast::Bool = true)
-
-   if samplelast
-      vv = sampleparticles(rbm, nsamples, burnin)[1]
-   else
-      particles = sampleparticles(rbm, nsamples, burnin - 1)
-      visiblepotential!(particles[1], rbm, particles[2])
-      vv = particles[1]
-   end
-   vv
-end
-
-# TODO simplify, avoid code repetition from sampleparticles
-function samples(rbm::AbstractRBM, init::Matrix{Float64};
-      burnin::Int = 50,
-      samplelast::Bool = true)
-
-   particles = Particles(2)
-   particles[2] = Matrix{Float64}(size(init, 1), size(rbm.weights, 2))
-   particles[1] = copy(init)
-
-   nsamplingsteps = samplelast ? burnin : burnin - 1
-
-   for i = 1:nsamplingsteps
-      samplehidden!(particles[2], rbm, particles[1])
-      samplevisible!(particles[1], rbm, particles[2])
-   end
-
-   if !samplelast
-      samplehidden!(particles[2], rbm, particles[1])
-      visiblepotential!(particles[1], rbm, particles[2])
-   end
-
-   particles[1]
-end
 
 function samples(mbdist::MultivariateBernoulliDistribution, nsamples::Int)
    nvisible = length(mbdist.samples[1])
@@ -1395,7 +1359,7 @@ function unnormalizedlogprob(mdbm, x::Matrix{Float64};
    nsamples = size(x, 1)
    logp = 0.0
    hiddbm = deepcopy(mdbm[2:end])
-   h1 = Vector{Float64}(length(hiddenbias(mdbm[1])))
+   h1 = Vector{Float64}(nhiddennodes(mdbm[1]))
    visbias2 = visiblebias(mdbm[2]) # visible bias of second RBM
 
    for j = 1:nsamples
@@ -1525,6 +1489,80 @@ function unnormalizedprobhidden(prbm::PartitionedRBM, h::Vector{Float64})
    end
    prob
 end
+
+function visiblebias(rbm::AbstractRBM)
+   rbm.visbias
+end
+
+function visiblebias(prbm::PartitionedRBM)
+   vcat(map(rbm -> rbm.visbias, prbm.rbms)...)
+end
+
+
+"""
+    weightsinput!(input, input2, dbm, particles)
+Computes the input that results only from the weights (without biases)
+and the previous states in `particles` for all nodes in the DBM
+`dbm` and stores it in `input`.
+The state of the `particles` and the `dbm` is not altered.
+`input2` must have the same size as `input` and `particle`.
+For performance reasons, `input2` is used as preallocated space for storing
+intermediate results.
+"""
+function weightsinput!(input::Particles, input2::Particles,
+      dbm::PartitionedBernoulliDBM, particles::Particles)
+
+   # first layer gets input only from layer above
+   weightsvisibleinput!(input[1], dbm[1], particles[2])
+
+   # intermediate layers get input from layers above and below
+   for i = 2:(length(particles) - 1)
+      weightsvisibleinput!(input2[i], dbm[i], particles[i+1])
+      weightshiddeninput!(input[i], dbm[i-1], particles[i-1])
+      input[i] .+= input2[i]
+   end
+
+   # last layer gets only input from layer below
+   weightshiddeninput!(input[end], dbm[end], particles[end-1])
+   input
+end
+
+function weightshiddeninput!(hh::M, rbm::BernoulliRBM,
+      vv::M) where {M<:AbstractArray{Float64}}
+
+   A_mul_B!(hh, vv, rbm.weights)
+end
+
+function weightshiddeninput!(hh::M, prbm::PartitionedRBM{BernoulliRBM},
+      vv::M) where {M<:AbstractArray{Float64}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      weightshiddeninput!(
+            view(hh, :, hidrange), prbm.rbms[i], view(vv,:, visrange))
+   end
+   hh
+end
+
+function weightsvisibleinput!(vv::M, rbm::BernoulliRBM,
+      hh::M) where {M<:AbstractArray{Float64}}
+
+   A_mul_Bt!(vv, hh, rbm.weights)
+end
+
+function weightsvisibleinput!(vv::M, prbm::PartitionedRBM{BernoulliRBM},
+      hh::M) where {M<:AbstractArray{Float64}}
+
+   for i in eachindex(prbm.rbms)
+      visrange = prbm.visranges[i]
+      hidrange = prbm.hidranges[i]
+      weightsvisibleinput!(
+            view(vv, :, visrange), prbm.rbms[i], view(hh,:, hidrange))
+   end
+   vv
+end
+
 
 ################################################################################
 ####################   Unsorted Functions (Rename?)         ####################
