@@ -136,16 +136,16 @@ end
 
 
 """
-    piecewiselinearsequencebundles(...)
-Generates a dataset consisting of samples with values that
-are piecewise linear functions of the variable index.
+    trendsdata(...)
+Generates an example dataset that can be visualized as bundles of trend curves
+with added noise. Additional binary columns with labels and noise may be added.
 
 ## Optional named arguments:
 * `nbundles`: number of bundles
 * `nperbundle`: number of sequences per bundle
 * `nvariables`: number of variables in the sequences
 * `noisesd`: standard deviation of the noise added on all sequences
-* `addbundlecodes`: add leading columns to the resulting dataset, specifying the
+* `addlabels`: add leading columns to the resulting dataset, specifying the
    membership to a bundle
 * `pbreak`: probability that an intermediate point in a sequence is a
    breakpoint, defaults to 0.2.
@@ -157,39 +157,44 @@ are piecewise linear functions of the variable index.
 To quickly grasp the idea, plot generated samples against the variable index, e. g.:
 
     using Gadfly
-    x = BMs.piecewiselinearsequencebundles(
+    x = BMs.trendsdata(
          nvariables = 10, nbundles = 3, nperbundle = 2, noisesd = 0.05)
     plot(x, x = Col.index, y = Col.value, color = Row.index, Geom.line,
          Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
          Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
 """
-function piecewiselinearsequencebundles(;
+function trendsdata(;
       nbundles::Int = 3,
       nperbundle::Int = 50,
       nvariables::Int = 10,
       noisesd::Float64 = 0.05,
-      addbundlecodes::Bool = false,
+      addlabels::Bool = false,
       pbreak::Float64 = 0.2,
-      breakval::Function = rand)
+      breakval::Function = rand,
+      nrandomlabelvars::Int = 0)
 
-   x = piecewiselinearsequences(nbundles, nvariables;
+   x = BMs.piecewiselinearsequences(nbundles, nvariables;
          pbreak = pbreak, breakval = breakval)
    x = repmat(x, nperbundle)
    nsamples = size(x, 1)
    x .+= noisesd * randn(nsamples, nvariables)
 
-   if addbundlecodes
-      bundlecodesize = ceil(log(nbundles)/log(2))
-      bundlecode = zeros(bundlecodesize)
-      bundlecodes = Vector{Matrix{Float64}}(nbundles)
-      for j = 1:nbundles
-         bundlecodes[j] = repmat(bundlecode', nperbundle)
-         next!(bundlecode)
+   if addlabels
+      nlabelvars = Int(ceil(log(nbundles)/log(2)))
+      labels = Matrix{Float64}(nbundles, nlabelvars)
+      labels[1,:] .= 0.0
+      for j = 2:nbundles
+         labels[j,:] .= labels[j-1,:]
+         BMs.next!(view(labels, j, :))
       end
-      x = hcat(vcat(bundlecodes...), x)
+      labels = repmat(labels, nperbundle)
+      if nrandomlabelvars > 0
+         labels = hcat(labels, float.(rand(nrandomlabelvars, size(x,1)) .< 0.5))
+      end
+      x = hcat(labels, x)
    end
 
-   x = x[randperm(nsamples), :]
+  # x = x[randperm(nsamples), :]
    x
 end
 

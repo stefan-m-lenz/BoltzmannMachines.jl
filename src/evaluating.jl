@@ -1109,7 +1109,7 @@ Sets the vector `combination`, containing a sequence of the values 0.0 and 1.0,
 to the next combination of 0.0s and 1.0s.
 Returns false if the new combination consists only of zeros; true otherwise.
 """
-function next!(combination::Vector{Float64})
+function next!(combination::T) where {T <: AbstractArray{Float64, 1}}
    i = 1
    while i <= length(combination)
       if combination[i] == 0.0

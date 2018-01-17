@@ -211,10 +211,36 @@ function plotmeandiffpervariable(monitor::BMs.Monitor)
 end
 
 
-function plotpiecewiselinearsequences(x::Matrix{Float64})
-   plot(x, x = Col.index, y = Col.value, color = Row.index, Geom.line,
-         Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
-         Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
+function plottrendsdata(x::Matrix{Float64};
+      nlabelvars::Int =
+            sum(mapslices(col -> all(((col .== 1.0) .| (col .== 0.0))), x, 1))
+      )
+
+   if nlabelvars == 0
+      plot(x, x = Col.index, y = Col.value, color = Row.index, Geom.line,
+            Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
+            Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
+   else
+      powersoftwo = 2.^(0:(nlabelvars-1))
+      labels = vec(mapslices(
+            row -> sum(powersoftwo[convert(Vector{Bool}, row)]) + 1,
+            x[:, 1:nlabelvars], 2))
+
+      nlabels = maximum(labels)
+      labelcolors = Scale.default_discrete_colors(nlabels)
+      plotdata = convert(DataFrame, x[:, (nlabelvars + 1):end])
+      names!(plotdata, map(Symbol, 1:ncol(plotdata)))
+      plotdata[:label] = labels
+      plotlayerdfs = map(i -> DataFrames.melt(plotdata[i, :], [:label]),
+            1:nrow(plotdata))
+
+      plotlayers = map(d -> layer(d, x = "variable", y = "value", Geom.line,
+               Theme(default_color = labelcolors[d[1,:label]])),
+            plotlayerdfs)
+      plot(plotlayers...,
+            Guide.xlabel("Variable index"),
+            Guide.ylabel("Value"))
+   end
 end
 
 

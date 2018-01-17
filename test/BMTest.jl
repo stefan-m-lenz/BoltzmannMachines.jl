@@ -398,7 +398,7 @@ and alternative GaussianBernoulliRBMs.
 function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
       ) where GBRBM <: Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
 
-   x = BMs.piecewiselinearsequencebundles(nperbundle = 300, nvariables = 10,
+   x = BMs.trendsdata(nperbundle = 300, nvariables = 10,
          nbundles = 4)
 
    gbrbm1 = BMs.fitrbm(x; nhidden = 30, rbmtype = gbrbmtype,
@@ -462,7 +462,7 @@ end
 function test_gbrbm(gbrbmtype::Type{GBRBM}
       ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
 
-   x = BMs.piecewiselinearsequencebundles(nperbundle = 300, nvariables = 10,
+   x = BMs.trendsdata(nperbundle = 300, nvariables = 10,
          nbundles = 4)
    gbrbm = BMs.fitrbm(x; nhidden = 15, rbmtype = gbrbmtype,
          cdsteps = 10,
