@@ -117,7 +117,7 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianBernoulliRBM2
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      #hidbias = randn(nhidden)/sqrt(nhidden)
+      weights .*= sd
       return GaussianBernoulliRBM2(weights, visbias, hidbias, sd)
 
    elseif rbmtype == BernoulliGaussianRBM

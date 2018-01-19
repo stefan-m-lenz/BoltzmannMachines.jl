@@ -295,6 +295,21 @@ function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
          vgibbs, hgibbs, vmeanfield, hmeanfield)
 end
 
+function updatedbmpart!(dbmpart::GaussianBernoulliRBM2,
+      learningrate::Float64,
+      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
+      ) where {M<:AbstractArray{Float64,2}}
+
+   # For respecting standard deviation in update rule
+   # see [Srivastava+Salakhutdinov, 2014], p. 2962
+   sdsq = dbmpart.sd.^2
+   vmeanfield = broadcast(/, vmeanfield, sdsq')
+   vgibbs = broadcast(/, vgibbs, sdsq')
+
+   updatedbmpartcore!(dbmpart, learningrate,
+         vgibbs, hgibbs, vmeanfield, hmeanfield)
+end
+
 function updatedbmpart!(dbmpart::PartitionedRBM,
       learningrate::Float64,
       vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M

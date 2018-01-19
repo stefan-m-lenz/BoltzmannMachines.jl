@@ -211,7 +211,7 @@ function plotmeandiffpervariable(monitor::BMs.Monitor)
 end
 
 
-function plottrendsdata(x::Matrix{Float64};
+function plotcurvebundles(x::Matrix{Float64};
       nlabelvars::Int =
             sum(mapslices(col -> all(((col .== 1.0) .| (col .== 0.0))), x, 1))
       )
@@ -234,8 +234,9 @@ function plottrendsdata(x::Matrix{Float64};
       plotlayerdfs = map(i -> DataFrames.melt(plotdata[i, :], [:label]),
             1:nrow(plotdata))
 
-      plotlayers = map(d -> layer(d, x = "variable", y = "value", Geom.line,
-               Theme(default_color = labelcolors[d[1,:label]])),
+      plotlayers = map(
+            d -> layer(d, x = "variable", y = "value", Geom.line,
+                  Theme(default_color = labelcolors[d[1,:label]])),
             plotlayerdfs)
       plot(plotlayers...,
             Guide.xlabel("Variable index"),

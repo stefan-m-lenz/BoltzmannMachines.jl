@@ -10,6 +10,7 @@ type TrainLayer <: AbstractTrainLayer
    epochs::Int
    usedefaultepochs::Bool
    learningrate::Float64
+   learningrates::Vector{Float64}
    usedefaultlearningrate::Bool
    sdlearningrate::Float64
    sdlearningrates::Vector{Float64}
@@ -17,6 +18,8 @@ type TrainLayer <: AbstractTrainLayer
    rbmtype::DataType
    nhidden::Int
    nvisible::Int
+   pcd::Bool
+   cdsteps::Int
 end
 
 
@@ -32,30 +35,39 @@ Specify parameters for training one RBM-layer in a DBM.
    A negative value indicates that a default value should be used.
 * `learningrate`: learning rate.
    A negative value indicates that a default value should be used.
+* `learningrates`: a vector of learning rates, containing values for each epoch.
+   If this is specified, the argument `learningrate` is ignored.
 * `sdlearningrate`/`sdlearningrates`: learning rate / learning rates for each epoch
    for learning the standard deviation. Only used for GaussianBernoulliRBMs.
+* `cdsteps`: Number of steps for (persistent) contrastive divergence. Default is 1.
+* `pcd`: Boolean indicating whether persistent contrastive divergence is used
+   (true, default) or whether contrastive divergence is used (false).
 * `monitoring`: a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
 """
 function TrainLayer(;
       epochs::Int = -1,
       learningrate::Float64 = -Inf,
+      learningrates::Vector{Float64} = Vector{Float64}(),
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
       monitoring = ((rbm, epoch) -> nothing),
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
-      nvisible::Int = -1)
+      nvisible::Int = -1,
+      pcd::Bool = true,
+      cdsteps::Int = 1)
 
    usedefaultepochs = (epochs < 0)
-   usedefaultlearningrate = (learningrate < 0)
+   usedefaultlearningrate = (learningrate < 0 && isempty(learningrates))
    TrainLayer(
          (usedefaultepochs ? 10 : epochs),
          usedefaultepochs,
          (usedefaultlearningrate ? 0.005 : learningrate),
+         learningrates,
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
-         monitoring, rbmtype, nhidden, nvisible)
+         monitoring, rbmtype, nhidden, nvisible, pcd, cdsteps)
 end
 
 """
@@ -189,6 +201,12 @@ function stackrbms_preparetrainlayers(
       if trainlayer.usedefaultepochs
          trainlayer.epochs = epochs
       end
+      if isempty(trainlayer.learningrates)
+         # learning rates for each epoch have neither been explicitly specified
+         # --> set same value for each epoch
+         trainlayer.learningrates =
+               fill(trainlayer.learningrate, trainlayer.epochs)
+      end
    end
 
    function setdefaultsforunspecified(trainpartitionedlayer::TrainPartitionedLayer)
@@ -221,13 +239,27 @@ function stackrbms_preparetrainlayers(
       end
    end
 
+   # derive number of visible nodes for higher layers
    for i = 2:length(trainlayers)
       derive_nvisibles!(trainlayers[i], trainlayers[i-1])
    end
 
+   # check number of visible nodes for first layer
    if isa(trainlayers[1], TrainPartitionedLayer)
-      nvisiblestotal = mapreduce(t -> t.nvisible, +, trainlayers[1].parts)
-      if nvisiblestotal != size(x,2)
+      partswithoutnvisible = find(t -> t.nvisible <= 0, trainlayers[1].parts)
+      if length(partswithoutnvisible) > 1
+         error("The number of visible nodes is unspecified for more " *
+               "than one segment in the first layer. ")
+      end
+
+      nvariables = size(x, 2)
+      nvisiblestotal = mapreduce(t -> max(t.nvisible, 0), +, trainlayers[1].parts)
+
+      if length(partswithoutnvisible) == 1
+         # if only one is unspecified, derive it
+         partwithunspecifiednvisible = trainlayers[1].parts[partswithoutnvisible[1]]
+         partwithunspecifiednvisible.nvisible = nvariables - nvisiblestotal
+      elseif nvisiblestotal != nvariables
          error("Number of visible nodes for first layer " *
                "($nvisiblestotal) is not of same length as " *
                "number of columns in `x` ($(size(x,2))).")
@@ -244,11 +276,13 @@ function stackrbms_trainlayer(x::Matrix{Float64},
       upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
 
    BMs.fitrbm(x;
-         upfactor = upfactor, downfactor = downfactor, pcd = true,
+         upfactor = upfactor, downfactor = downfactor,
          nhidden = trainlayer.nhidden,
          epochs = trainlayer.epochs,
          rbmtype = trainlayer.rbmtype,
-         learningrate = trainlayer.learningrate,
+         learningrates = trainlayer.learningrates,
+         cdsteps = trainlayer.cdsteps,
+         pcd = trainlayer.pcd,
          sdlearningrate = trainlayer.sdlearningrate,
          sdlearningrates = trainlayer.sdlearningrates,
          monitoring = trainlayer.monitoring)

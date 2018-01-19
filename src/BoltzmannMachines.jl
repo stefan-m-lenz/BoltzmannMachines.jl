@@ -11,7 +11,7 @@ export
       exactlogpartitionfunction, loglikelihood,
       logpartitionfunction, logpartitionfunctionzeroweights,
       logproblowerbound, reconstructionerror,
-      sampleparticles,
+      sampleparticles, samples,
       AbstractRBM,
          BernoulliRBM,
          BernoulliGaussianRBM,

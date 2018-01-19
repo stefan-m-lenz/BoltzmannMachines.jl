@@ -31,7 +31,7 @@ function aislogimpweights(rbm::AbstractXBernoulliRBM;
    vv = Matrix{Float64}(nparticles, length(rbm.visbias))
 
    for k = 2:length(temperatures)
-      logimpweights .+= reversefreeenergy(rbm, hh,
+      logimpweights .+= unnormalizedproblogratios(rbm, hh,
             temperatures[k], temperatures[k-1])
 
       # Gibbs transition
@@ -183,7 +183,7 @@ function aislogimpweights(mdbm::MultimodalDBM;
    for k = 2:length(temperatures)
       # Calculate probability ratios for importance weights
       # according to activation of odd hidden layers (h1, h3, ...)
-      logimpweights += reversefreeenergy(mdbm[1],
+      logimpweights += unnormalizedproblogratios(mdbm[1],
             particles[2], temperatures[k], temperatures[k-1])
       aisupdatelogimpweights!(logimpweights, hiddbminput1, hiddbminput2,
             temperatures[k], temperatures[k-1], hiddbm, hidbiases, particles[2:end])
@@ -1241,7 +1241,7 @@ function reverseddbm(dbm::PartitionedBernoulliDBM)
 end
 
 
-function reversefreeenergy(rbm::BernoulliRBM,
+function unnormalizedproblogratios(rbm::BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
@@ -1252,7 +1252,7 @@ function reversefreeenergy(rbm::BernoulliRBM,
          (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2))
 end
 
-function reversefreeenergy(rbm::Binomial2BernoulliRBM,
+function unnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
@@ -1263,7 +1263,7 @@ function reversefreeenergy(rbm::Binomial2BernoulliRBM,
          (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2) * 2)
 end
 
-function reversefreeenergy(gbrbm::GaussianBernoulliRBM,
+function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
@@ -1273,7 +1273,7 @@ function reversefreeenergy(gbrbm::GaussianBernoulliRBM,
          0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
 end
 
-function reversefreeenergy(gbrbm::GaussianBernoulliRBM2,
+function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
    hh::Matrix{Float64},
    temperature1::Float64,
    temperature2::Float64)
@@ -1283,14 +1283,14 @@ function reversefreeenergy(gbrbm::GaussianBernoulliRBM2,
          (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', 2))
 end
 
-function reversefreeenergy(prbm::PartitionedRBM,
+function unnormalizedproblogratios(prbm::PartitionedRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    # TODO does not work with views
    mapreduce(
-         i -> reversefreeenergy(prbm.rbms[i],
+         i -> unnormalizedproblogratios(prbm.rbms[i],
                hh[:, prbm.hidranges[i]], temperature1, temperature2),
          (x,y) -> broadcast(+, x, y),
          eachindex(prbm.rbms))

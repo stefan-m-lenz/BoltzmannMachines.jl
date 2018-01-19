@@ -505,9 +505,18 @@ function sampleparticles(bm::AbstractBM, nparticles::Int, burnin::Int = 10)
 end
 
 
+"""
+    samples(bm, nsamples; ...)
+Generates `nsamples` samples from a Boltzmann machine model `bm` by running
+a Gibbs sampler.
+
+# Optional keyword arguments:
+* `burnin`: Number of Gibbs sampling steps, defaults to 50.
+* `samplelast`: boolean to indicate whether to sample in last step (true, default)
+  or whether to use the activation potential.
+"""
 function samples(rbm::AbstractRBM, nsamples::Int;
       burnin::Int = 50,
-      init::Matrix{Float64} = Matrix{Float64}(0, 0),
       samplelast::Bool = true)
 
    if samplelast
@@ -515,6 +524,20 @@ function samples(rbm::AbstractRBM, nsamples::Int;
    else
       particles = sampleparticles(rbm, nsamples, burnin - 1)
       visiblepotential!(particles[1], rbm, particles[2])
+      vv = particles[1]
+   end
+   vv
+end
+
+function samples(dbm::MultimodalDBM, nsamples::Int;
+      burnin::Int = 50,
+      samplelast::Bool = true)
+
+   if samplelast
+      vv = sampleparticles(dbm, nsamples, burnin)[1]
+   else
+      particles = sampleparticles(dbm, nsamples, burnin - 1)
+      visiblepotential!(particles[1], dbm[1], particles[2])
       vv = particles[1]
    end
    vv
