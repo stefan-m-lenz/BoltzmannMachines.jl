@@ -167,6 +167,15 @@ function aislogimpweights(mdbm::MultimodalDBM;
       nparticles::Int = 100,
       burnin::Int = 5)
 
+   if length(mdbm) == 1
+      # DBM with only one layer --> RBM
+      return aislogimpweights(mdbm[1];
+            ntemperatures = ntemperatures,
+            temperatures = temperatures,
+            nparticles = nparticles,
+            burnin = burnin)
+   end
+
    logimpweights = zeros(nparticles)
       # Todo: sample from null model, which has changed
    particles = initparticles(mdbm, nparticles, biased = true)
@@ -384,10 +393,8 @@ function empiricalloglikelihood(x::Matrix{Float64}, xgen::Matrix{Float64})
 end
 
 
-"
-Computes the energy of the combination of activations, given by the particle
-`u`, in the DBM.
-"
+# Computes the energy of the combination of activations, given by the particle
+# `u`, in the DBM.
 function energy(dbm::BasicDBM, u::Particle)
    energy = [0.0]
    for i = 1:length(dbm)
@@ -396,6 +403,11 @@ function energy(dbm::BasicDBM, u::Particle)
    energy[1]
 end
 
+"""
+    energy(rbm, v, h)
+Computes the energy of the configuration of the visible nodes `v` and the
+hidden nodes `h`, specified as vectors, in the `rbm`.
+"""
 function energy(rbm::BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
    - dot(v, rbm.weights*h) - dot(rbm.visbias, v) - dot(rbm.hidbias, h)
 end
@@ -409,6 +421,11 @@ end
 function energy(gbrbm::GaussianBernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
    sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2 - dot(gbrbm.hidbias, h) -
          dot(gbrbm.weights*h, v ./ gbrbm.sd)
+end
+
+function energy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64}, h::Vector{Float64})
+   sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2 - dot(gbrbm.hidbias, h) -
+         dot(gbrbm.weights*h, v ./ (gbrbm.sd .^ 2))
 end
 
 function energy(prbm::PartitionedRBM, v::Vector{Float64}, h::Vector{Float64})
@@ -437,6 +454,10 @@ function energyzerohiddens(b2brbm::Binomial2BernoulliRBM, v::Vector{Float64})
 end
 
 function energyzerohiddens(gbrbm::GaussianBernoulliRBM, v::Vector{Float64})
+   sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2
+end
+
+function energyzerohiddens(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
    sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2) / 2
 end
 
@@ -980,10 +1001,14 @@ function logpartitionfunctionzeroweights(dbm::PartitionedBernoulliDBM)
 end
 
 function logpartitionfunctionzeroweights(mdbm::MultimodalDBM)
-   logpartitionfunctionzeroweights_visterm(mdbm[1]) +
-         invoke(logpartitionfunctionzeroweights,
-               Tuple{PartitionedBernoulliDBM,},
-               converttopartitionedbernoullidbm(mdbm[2:end]))
+   if length(mdbm) == 1
+      logpartitionfunctionzeroweights(mdbm[1])
+   else
+      logpartitionfunctionzeroweights_visterm(mdbm[1]) +
+            invoke(logpartitionfunctionzeroweights,
+                  Tuple{PartitionedBernoulliDBM,},
+                  converttopartitionedbernoullidbm(mdbm[2:end]))
+   end
 end
 
 
@@ -1040,7 +1065,7 @@ in [Salakhutdinov, 2015].
 * The `logpartitionfunction` can be specified directly
   or is calculated using the `logimpweights`.
 """
-function logproblowerbound(dbm::BasicDBM,
+function logproblowerbound(dbm::MultimodalDBM,
       x::Array{Float64};
       logimpweights::Array{Float64,1} = aislogimpweights(dbm),
       mu::Particles = meanfield(dbm, x),
@@ -1058,8 +1083,7 @@ function logproblowerbound(dbm::BasicDBM,
          h = vec(mu[i+1][j,:]) # hidden units of i'th RBM
 
          # add energy
-         lowerbound +=
-               dot(v, dbm[i].visbias) + dot(h, dbm[i].hidbias) + dot(v, dbm[i].weights * h)
+         lowerbound -= energy(dbm[i], v, h)
 
          # add entropy of approximate posterior Q
          h = h[(h .> 0.0) .& (h .< 1.0)]
