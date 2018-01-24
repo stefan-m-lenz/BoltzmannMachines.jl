@@ -26,7 +26,7 @@ function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
       learningrates::Vector{Float64} = learningrate * ones(epochs),
       pcd::Bool = true,
       cdsteps::Int = 1,
-      monitoring::Function = ((rbm, epoch) -> nothing))
+      monitoring::Function = nomonitoring)
 
    # propagate input x up to last hidden layer
    hh = x
@@ -90,6 +90,10 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    If the number of training epochs and the learning rate are not specified
    explicitly for a layer, the values of `epochspretraining` and
    `learningratepretraining` are used.
+* `monitoring`: Monitoring function accepting a `dbm` and the number of epochs
+   retuning nothing. Used for the monitoring of fine-tuning.
+* `monitoringdatapretraining`: a `DataDict` that contains data used for
+   monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)
 """
 function fitdbm(x::Matrix{Float64};
       nhiddens::Vector{Int} = Vector{Int}(),
@@ -100,7 +104,9 @@ function fitdbm(x::Matrix{Float64};
             defaultfinetuninglearningrates(learningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
-      pretraining::AbstractTrainLayers = Vector{TrainLayer}())
+      pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
+      monitoring::Function = nomonitoring,
+      monitoringdatapretraining::DataDict = DataDict())
 
    if isempty(pretraining) && isempty(nhiddens)
       # set default only if there is not any more detailed info
@@ -111,10 +117,12 @@ function fitdbm(x::Matrix{Float64};
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
          learningrate = learningratepretraining,
-         trainlayers = pretraining)
+         trainlayers = pretraining,
+         monitoringdata = monitoringdatapretraining)
 
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
-         learningrate = learningrate, learningrates = learningrates)
+         learningrate = learningrate, learningrates = learningrates,
+         monitoring = monitoring)
 end
 
 
@@ -222,7 +230,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       learningrates::Array{Float64,1} =
             defaultfinetuninglearningrates(learningrate, epochs),
-      monitoring::Function = ((dbm, epoch) -> nothing))
+      monitoring::Function = nomonitoring)
 
    if length(learningrates) < epochs
       error("Not enough learning rates for training epochs")

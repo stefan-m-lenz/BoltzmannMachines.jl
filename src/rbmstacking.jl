@@ -43,7 +43,9 @@ Specify parameters for training one RBM-layer in a DBM.
 * `pcd`: Boolean indicating whether persistent contrastive divergence is used
    (true, default) or whether contrastive divergence is used (false).
 * `monitoring`: a function that is executed after each training epoch.
-   It takes an RBM and the epoch as arguments.
+   As arguments it receives the currently trained RBM
+   and the number of epochs for which the current layer has been trained.
+   It may take a `DataDict` as third argument (see function `stackrbms`).
 """
 function TrainLayer(;
       epochs::Int = -1,
@@ -51,7 +53,7 @@ function TrainLayer(;
       learningrates::Vector{Float64} = Vector{Float64}(),
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
-      monitoring = ((rbm, epoch) -> nothing),
+      monitoring = nomonitoring,
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
       nvisible::Int = -1,
@@ -82,6 +84,13 @@ const AbstractTrainLayers = Vector{<:AbstractTrainLayer}
 
 
 """
+A dictionary containing names of data sets as keys and the data sets (matrices
+with samples in rows) as values.
+"""
+const DataDict = Dict{AbstractString,Array{Float64,2}}
+
+
+"""
 Converts a vector to a vector of the most specific type that all
 elements share as common supertype.
 """
@@ -96,6 +105,22 @@ Returns the most specific supertype for all elements in the vector `v`.
 """
 function mostspecifictype(v::Vector)
    mapreduce(typeof, typejoin, v)
+end
+
+
+"""
+    propagateforward(rbm, datadict, factor)
+Returns a new `DataDict` containing the same labels as the given `datadict` but
+as mapped values it contains the hidden potential in the `rbm` of the original
+datasets. The factor is applied for calculating the hidden potential and is 1.0
+by default.
+"""
+function propagateforward(rbm::AbstractRBM, datadict::DataDict, factor::Float64 = 1.0)
+   DataDict(map(kv -> (kv[1] => hiddenpotential(rbm, kv[2], factor)), datadict))
+end
+
+function partitioneddata(datadict::DataDict, visrange::UnitRange{Int})
+   DataDict(map(kv -> (kv[1] => kv[2][:, visrange]), datadict))
 end
 
 
@@ -117,6 +142,11 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    If the number of training epochs and the learning rate are not specified
    explicitly for a layer, the values of `epochs` and `learningrate` are used.
    For more information see help of `TrainLayer`.
+* `monitoringdata`: a data dictionary (see type `DataDict`)
+   The data is propagated forward through the
+   network to monitor higher levels.
+   If a non-empty dictionary is given, the monitoring functions in the
+   `trainlayers`-arguments must accept a `DataDict` as third argument.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential,
    which is the default.
@@ -127,7 +157,8 @@ function stackrbms(x::Array{Float64,2};
       predbm::Bool = false,
       samplehidden::Bool = false,
       learningrate::Float64 = 0.005,
-      trainlayers::AbstractTrainLayers = Vector{TrainLayer}())
+      trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
+      monitoringdata::DataDict = DataDict())
 
    trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
          learningrate, nhiddens)
@@ -141,6 +172,7 @@ function stackrbms(x::Array{Float64,2};
    end
 
    dbmn[1] = stackrbms_trainlayer(x, trainlayers[1];
+         monitoringdata = monitoringdata,
          upfactor = upfactor, downfactor = downfactor)
 
    hiddenval = x
@@ -149,6 +181,11 @@ function stackrbms(x::Array{Float64,2};
       if samplehidden
          hiddenval = bernoulli(hiddenval)
       end
+
+      if !isempty(monitoringdata)
+         monitoringdata = propagateforward(dbmn[i-1], monitoringdata, upfactor)
+      end
+
       if predbm
          upfactor = downfactor = 2.0
          if i == nrbms
@@ -157,7 +194,9 @@ function stackrbms(x::Array{Float64,2};
       else
          upfactor = downfactor = 1.0
       end
+
       dbmn[i] = stackrbms_trainlayer(hiddenval, trainlayers[i];
+            monitoringdata = monitoringdata,
             upfactor = upfactor, downfactor = downfactor)
    end
 
@@ -273,7 +312,15 @@ end
 """ Trains a layer without partitioning for `stackrbms`. """
 function stackrbms_trainlayer(x::Matrix{Float64},
       trainlayer::TrainLayer;
+      monitoringdata::DataDict = DataDict(),
       upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+
+   if isempty(monitoringdata)
+      monitoring = trainlayer.monitoring
+   elseif trainlayer.monitoring != nomonitoring
+      monitoring = (rbm, epoch) ->
+            trainlayer.monitoring(rbm, epoch, monitoringdata)
+   end
 
    BMs.fitrbm(x;
          upfactor = upfactor, downfactor = downfactor,
@@ -285,12 +332,13 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          pcd = trainlayer.pcd,
          sdlearningrate = trainlayer.sdlearningrate,
          sdlearningrates = trainlayer.sdlearningrates,
-         monitoring = trainlayer.monitoring)
+         monitoring = monitoring)
 end
 
 """ Trains a partitioned layer for `stackrbms`. """
 function stackrbms_trainlayer(x::Matrix{Float64},
       trainpartitionedlayer::TrainPartitionedLayer;
+      monitoringdata::DataDict = DataDict(),
       upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
 
    visranges = ranges(map(t -> t.nvisible, trainpartitionedlayer.parts))
@@ -300,12 +348,14 @@ function stackrbms_trainlayer(x::Matrix{Float64},
    trainingargs = map(
          i -> (
                x[:, visranges[i]],
-               trainpartitionedlayer.parts[i]
+               trainpartitionedlayer.parts[i],
+               partitioneddata(monitoringdata, visranges[i])
          ),
          eachindex(trainpartitionedlayer.parts))
 
    rbms = @parallel (vcat) for arg in trainingargs
       stackrbms_trainlayer(arg[1], arg[2];
+            monitoringdata = arg[3],
             upfactor = upfactor, downfactor = downfactor)
    end
 

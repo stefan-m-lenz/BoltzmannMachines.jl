@@ -194,16 +194,17 @@ xgen2 = BMs.samples(gbrbm, 100; burnin = 200, samplelast = false)
 BMs.BMPlots.plotcurvebundles(xgen2)
 
 # Then use the parameters for learning a multimodal deep Boltzmann machine
-monitor = BMs.Monitor();
 monitorrbm1 = BMs.Monitor();
+monitorrbm2 = BMs.Monitor();
 monitorgbrbm = BMs.Monitor()
 trainlayers = [
-      # first layer is partitioned into a BernoulliRBM and a GaussianBernoulliRBM
+      #first layer is partitioned into a BernoulliRBM and a GaussianBernoulliRBM
       BMs.TrainPartitionedLayer([
          BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
+               epochs = 3,
                nvisible = nbinaryvars, nhidden = 5,
-               monitoring = (rbm, epoch) -> begin
-                  BMs.monitorexactloglikelihood!(monitorrbm1, rbm, epoch, binarydata)
+               monitoring = (rbm, epoch, datadict) -> begin
+                  BMs.monitorexactloglikelihood!(monitorrbm1, rbm, epoch, datadict)
                end),
          BMs.TrainLayer(
             nhidden = 15, rbmtype = BMs.GaussianBernoulliRBM2,
@@ -211,29 +212,47 @@ trainlayers = [
             epochs = 150,
             cdsteps = 15,
             pcd = false,
-            monitoring = (rbm, epoch) -> begin
-               BMs.monitorexactloglikelihood!(monitorgbrbm, rbm, epoch, gaussiandata)
+            monitoring = (rbm, epoch, datadict) -> begin
+               BMs.monitorexactloglikelihood!(monitorgbrbm, rbm, epoch, datadict)
             end)
-      ]),
-      BMs.TrainLayer(nhidden = 4)
+      ])
+      ;
+      BMs.TrainLayer(
+         nhidden = 4, epochs = 30,
+         monitoring = (rbm, epoch, datadict) ->
+               BMs.monitorloglikelihood!(monitorrbm2, rbm, epoch, datadict)
+         )
    ]
 
-mdbm = BMs.fitdbm(x, epochs = 30,
+
+
+monitor = BMs.Monitor();
+mdbm = BMs.fitdbm(gaussiandata["Training data"], epochs = 30,
       # learning rate and epochs that will be used as default
       # (here for all BernoulliRBMs):
       epochspretraining = 30,
       learningratepretraining = 0.001,
       pretraining = trainlayers,
-      epochs = 1)
+      learningrates = fill(0.00001, 50),
+      monitoring = (dbm, epoch) ->
+            BMs.monitorlogproblowerbound!(monitor, dbm, epoch, gaussiandata),
+      monitoringdatapretraining = gaussiandata,
+      epochs = 20)
+
+BMs.BMPlots.plotevaluation(monitorrbm1, BMs.monitorexactloglikelihood)
+BMs.BMPlots.plotevaluation(monitorrbm2, BMs.monitorloglikelihood)
+BMs.BMPlots.plotevaluation(monitor, BMs.monitorlogproblowerbound)
+
+      xgen = BMs.samples(mdbm, 100; burnin = 200, samplelast = false)
+      BMs.BMPlots.plotcurvebundles(xgen, nlabelvars = 0)
+      #BMs.BMPlots.plotcurvebundles(xgen[:,(nnonsensecols+1):end], nlabelvars = 0)
 
 BMs.BMPlots.plotevaluation(monitorrbm1, BMs.monitorexactloglikelihood)
 BMs.BMPlots.plotevaluation(monitorgbrbm, BMs.monitorexactloglikelihood)
 
 # Test whether the model can generate correctly labeled curves that look
 # like the original ones
-xgen = BMs.samples(mdbm, 100; burnin = 200, samplelast = true)
 
-BMs.BMPlots.plotcurvebundles(xgen[:,(nnonsensecols+1):end])
 
 
 # ==============================================================================

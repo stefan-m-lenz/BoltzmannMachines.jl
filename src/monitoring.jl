@@ -17,13 +17,6 @@ A vector for collecting `MonitoringItem`s during training.
 const Monitor = Vector{MonitoringItem}
 
 
-"""
-A dictionary containing names of data sets as keys and the data sets (matrices
-with samples in rows) as values.
-"""
-const DataDict = Dict{AbstractString,Array{Float64,2}}
-
-
 const monitoraislogr = "aislogr"
 const monitoraisstandarddeviation = "aisstandarddeviation"
 const monitorcordiff = "cordiff"
@@ -171,7 +164,7 @@ For the other optional keyword arguments, see `aislogimpweights`.
 
 See also: `logproblowerbound`.
 """
-function monitorlogproblowerbound!(monitor::Monitor, dbm::BasicDBM,
+function monitorlogproblowerbound!(monitor::Monitor, dbm::MultimodalDBM,
       epoch::Int, datadict::DataDict;
       parallelized::Bool = nworkers() > 1,
       # optional arguments for AIS:
@@ -288,16 +281,4 @@ function monitorweightsnorm!(monitor::Monitor, rbm::AbstractRBM, epoch::Int)
                norm(rbm.visbias), "Visible bias"),
          MonitoringItem(monitorweightsnorm, epoch,
                norm(rbm.hidbias), "Hidden bias"))
-end
-
-
-"""
-    propagateforward(rbm, datadict, factor)
-Returns a new `DataDict` containing the same labels as the given `datadict` but
-as mapped values it contains the hidden potential in the `rbm` of the original
-datasets. The factor is applied for calculating the hidden potential and is 1.0
-by default.
-"""
-function propagateforward(rbm::AbstractRBM, datadict::DataDict, factor::Float64 = 1.0)
-    DataDict(map(kv -> (kv[1] => hiddenpotential(rbm, kv[2], factor)), datadict))
 end

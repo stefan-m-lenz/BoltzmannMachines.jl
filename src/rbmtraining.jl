@@ -35,7 +35,7 @@ function fitrbm(x::Matrix{Float64};
       pcd::Bool = true,
       cdsteps::Int = 1,
       rbmtype::DataType = BernoulliRBM,
-      monitoring::Function = ((rbm, epoch) -> nothing),
+      monitoring::Function = nomonitoring,
 
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
@@ -149,6 +149,13 @@ function initvisiblebias(x::Array{Float64,2})
       end
    end
    initbias
+end
+
+"""
+    nomonitoring
+Accepts a model and a number of epochs and returns nothing.
+"""
+function nomonitoring(bm, epoch)
 end
 
 
