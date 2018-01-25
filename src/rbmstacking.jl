@@ -160,6 +160,8 @@ function stackrbms(x::Array{Float64,2};
       trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoringdata::DataDict = DataDict())
 
+   stackrbms_checkmonitoringdata(x, monitoringdata)
+
    trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
          learningrate, nhiddens)
 
@@ -202,6 +204,14 @@ function stackrbms(x::Array{Float64,2};
 
    dbmn = converttomostspecifictype(dbmn)
    dbmn
+end
+
+function stackrbms_checkmonitoringdata(x::Matrix{Float64}, monitoringdata::DataDict)
+   if !isempty(monitoringdata)
+      if any(map(m -> size(m, 2), values(monitoringdata)) .!= size(x, 2))
+         error("Matrices in the dictionary `monitoringdata` must have the same number of columns as the input matrix.")
+      end
+   end
 end
 
 
