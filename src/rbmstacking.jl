@@ -20,6 +20,7 @@ type TrainLayer <: AbstractTrainLayer
    nvisible::Int
    pcd::Bool
    cdsteps::Int
+   startrbm::AbstractRBM
 end
 
 
@@ -58,7 +59,8 @@ function TrainLayer(;
       nhidden::Int = -1,
       nvisible::Int = -1,
       pcd::Bool = true,
-      cdsteps::Int = 1)
+      cdsteps::Int = 1,
+      startrbm::AbstractRBM = NoRBM())
 
    usedefaultepochs = (epochs < 0)
    usedefaultlearningrate = (learningrate < 0 && isempty(learningrates))
@@ -69,7 +71,7 @@ function TrainLayer(;
          learningrates,
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
-         monitoring, rbmtype, nhidden, nvisible, pcd, cdsteps)
+         monitoring, rbmtype, nhidden, nvisible, pcd, cdsteps, startrbm)
 end
 
 """
@@ -342,7 +344,8 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          pcd = trainlayer.pcd,
          sdlearningrate = trainlayer.sdlearningrate,
          sdlearningrates = trainlayer.sdlearningrates,
-         monitoring = monitoring)
+         monitoring = monitoring,
+         startrbm = trainlayer.startrbm)
 end
 
 """ Trains a partitioned layer for `stackrbms`. """

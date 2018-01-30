@@ -146,13 +146,14 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 # binary and continuously valued variables
 # ------------------------------------------------------------------------------
 
+
 srand(12);
 # Generate example data containing binary coded labels and
 # continuously valued variables as y-values for curves
 # (for more details see help text of function)
 ncontinuousvars = 20
 x = BMs.curvebundles(nvariables = ncontinuousvars, nbundles = 3,
-      nperbundle = 30, noisesd = 0.05, addlabels = true)
+      nperbundle = 100, noisesd = 0.05, addlabels = false)
 # Visualize labels and groups (colored by label)
 BMs.BMPlots.plotcurvebundles(x)
 
@@ -167,30 +168,48 @@ nbinaryvars = size(x, 2) - ncontinuousvars
 x, xtest = BMs.splitdata(x, 0.3);
 datadict = BMs.DataDict("Training data" => x, "Test data" => xtest);
 
-gaussiandata = BMs.DataDict("Training data" => x[:, (end-ncontinuousvars+1):end],
-                              "Test data" => xtest[:, (end-ncontinuousvars+1):end])
-binarydata = BMs.DataDict("Training data" => x[:, 1:nbinaryvars],
-                              "Test data" => xtest[:, 1:nbinaryvars])
-
 # At first we try to fit a GaussianBernoulliRBM on the continuous variables
 # as tuning the parameters for this type of RBM is very difficult.
 # The learning rate and the number of epochs probably need to be set to
 # different values than for BernoulliRBMs.
-monitor = BMs.Monitor()
-gbrbm = BMs.fitrbm(gaussiandata["Training data"];
-      nhidden = 15, rbmtype = BMs.GaussianBernoulliRBM2,
-      learningrates = fill(0.00001, 200),
-      epochs = 150,
+
+c = cov(x)
+a = chol(c)
+mu = vec(mean(x,1))
+nmultisamples = 10000
+y = (randn(nmultisamples, size(x, 2)) * a) .+ mu'
+BMs.BMPlots.plotcurvebundles(y)
+
+premonitor = BMs.Monitor()
+gbrbm = BMs.fitrbm(y;
+      nhidden = 20, rbmtype = BMs.GaussianBernoulliRBM,
+      learningrate = 0.00005,
+      epochs = 6,
       cdsteps = 15,
       pcd = false,
       monitoring = (rbm, epoch) -> begin
-         BMs.monitorexactloglikelihood!(monitor, rbm, epoch, gaussiandata)
+         BMs.monitorexactloglikelihood!(premonitor, rbm, epoch, datadict)
+      end)
+BMs.BMPlots.plotevaluation(premonitor, BMs.monitorexactloglikelihood)
+
+monitor = BMs.Monitor()
+gbrbm = BMs.fitrbm(x;
+      startrbm = gbrbm,
+      learningrate = 0.00005,
+      epochs = 200,
+      cdsteps = 15,
+      #sdgradclipnorm = 0.1,
+      pcd = false,
+      monitoring = (rbm, epoch) -> begin
+         BMs.monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
       end)
 BMs.BMPlots.plotevaluation(monitor, BMs.monitorexactloglikelihood)
 
-xgen1 = BMs.samples(gbrbm, 100; burnin = 200, samplelast = true)
+
+
+xgen1 = BMs.samples(gbrbm, 1000; burnin = 200, samplelast = true)
 BMs.BMPlots.plotcurvebundles(xgen1)
-xgen2 = BMs.samples(gbrbm, 100; burnin = 200, samplelast = false)
+xgen2 = BMs.samples(gbrbm, 50; burnin = 200, samplelast = false)
 BMs.BMPlots.plotcurvebundles(xgen2)
 
 # Then use the parameters for learning a multimodal deep Boltzmann machine
@@ -199,15 +218,15 @@ monitorrbm2 = BMs.Monitor();
 monitorgbrbm = BMs.Monitor()
 trainlayers = [
       #first layer is partitioned into a BernoulliRBM and a GaussianBernoulliRBM
-      BMs.TrainPartitionedLayer([
-         BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
-               epochs = 3,
-               nvisible = nbinaryvars, nhidden = 5,
-               monitoring = (rbm, epoch, datadict) -> begin
-                  BMs.monitorexactloglikelihood!(monitorrbm1, rbm, epoch, datadict)
-               end),
+      # BMs.TrainPartitionedLayer([
+      #    BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
+      #          epochs = 3,
+      #          nvisible = nbinaryvars, nhidden = 5,
+      #          monitoring = (rbm, epoch, datadict) -> begin
+      #             BMs.monitorexactloglikelihood!(monitorrbm1, rbm, epoch, datadict)
+      #          end),
          BMs.TrainLayer(
-            nhidden = 15, rbmtype = BMs.GaussianBernoulliRBM2,
+            startrbm = gbrbm,
             learningrates = fill(0.00001, 200),
             epochs = 150,
             cdsteps = 15,
@@ -225,9 +244,8 @@ trainlayers = [
    ]
 
 
-
 monitor = BMs.Monitor();
-mdbm = BMs.fitdbm(gaussiandata["Training data"], epochs = 30,
+mdbm = BMs.fitdbm(x, epochs = 30,
       # learning rate and epochs that will be used as default
       # (here for all BernoulliRBMs):
       epochspretraining = 30,
@@ -235,8 +253,8 @@ mdbm = BMs.fitdbm(gaussiandata["Training data"], epochs = 30,
       pretraining = trainlayers,
       learningrates = fill(0.00001, 50),
       monitoring = (dbm, epoch) ->
-            BMs.monitorlogproblowerbound!(monitor, dbm, epoch, gaussiandata),
-      monitoringdatapretraining = gaussiandata,
+            BMs.monitorlogproblowerbound!(monitor, dbm, epoch, datadict),
+      monitoringdatapretraining = datadict,
       epochs = 20)
 
 BMs.BMPlots.plotevaluation(monitorrbm1, BMs.monitorexactloglikelihood)

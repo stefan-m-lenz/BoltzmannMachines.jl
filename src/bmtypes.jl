@@ -111,6 +111,11 @@ type PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
 end
 
 
+""" Singleton-Placeholder type for `AbstractRBM`s """
+type NoRBM <: AbstractRBM
+end
+
+
 const BasicDBM = Vector{BernoulliRBM}
 
 "A DBM with only Bernoulli distributed nodes which may contain partitioned layers."

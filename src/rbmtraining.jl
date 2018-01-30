@@ -24,6 +24,8 @@ with Contrastive Divergence (CD), and returns it.
    types of RBMs. It usually must be much smaller than the learning rates for
    the weights. By default, it is 0.0 which means that the standard deviation
    is not learned.
+* `startrbm`: start training with the parameters of the given RBM.
+   If this argument is specified, `nhidden` and `rbmtype` are ignored.
 """
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),
@@ -35,6 +37,7 @@ function fitrbm(x::Matrix{Float64};
       pcd::Bool = true,
       cdsteps::Int = 1,
       rbmtype::DataType = BernoulliRBM,
+      startrbm::AbstractRBM = NoRBM(),
       monitoring::Function = nomonitoring,
 
       # these arguments are only relevant for GaussianBernoulliRBMs:
@@ -43,7 +46,12 @@ function fitrbm(x::Matrix{Float64};
       sdgradclipnorm::Float64 = 0.0,
       sdinitfactor::Float64 = 0.0)
 
-   rbm = initrbm(x, nhidden, rbmtype)
+   if startrbm === NoRBM()
+      rbm = initrbm(x, nhidden, rbmtype)
+   else
+      rbm = deepcopy(startrbm)
+      nhidden = nhiddennodes(startrbm)
+   end
 
    if isempty(sdlearningrates)
       sdlearningrates = sdlearningrate * ones(epochs)
@@ -112,10 +120,12 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianBernoulliRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      return GaussianBernoulliRBM(weights, visbias, hidbias, sd)
+      #sd = fill(0.05, length(vec(std(x, 1))))
+      GaussianBernoulliRBM(weights, visbias, hidbias, sd)
 
    elseif rbmtype == GaussianBernoulliRBM2
       visbias = vec(mean(x, 1))
+      #sd = fill(0.05, length(vec(std(x, 1))))
       sd = vec(std(x, 1))
       weights .*= sd
       return GaussianBernoulliRBM2(weights, visbias, hidbias, sd)
@@ -340,6 +350,8 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM2,
       sdgradclipnorm::Float64,
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
+   # See Cho,
+   # "Improved learning of Gaussian-Bernoulli restricted Boltzmann machines"
    sdsq = gbrbm.sd .^ 2
 
    if sdlearningrate > 0.0
