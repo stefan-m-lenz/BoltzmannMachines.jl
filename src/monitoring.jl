@@ -4,10 +4,10 @@ If the evaluation depends on a dataset,
 the dataset's name can be specified also.
 """
 type MonitoringItem
-   evaluation::AbstractString
+   evaluation::String
    epoch::Int
    value::Float64
-   datasetname::AbstractString
+   datasetname::String
 end
 
 

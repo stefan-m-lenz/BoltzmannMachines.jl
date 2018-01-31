@@ -52,12 +52,12 @@ function checkdata(plotdata)
    end
 end
 
-function getvalue(monitor::BMs.Monitor, evaluation::AbstractString, epoch::Int)
+function getvalue(monitor::BMs.Monitor, evaluation::String, epoch::Int)
    itemidx = findfirst((item -> item.evaluation == evaluation && item.epoch == epoch), monitor)
    monitor[itemidx].value
 end
 
-function extractevaluationdata(monitor::BMs.Monitor, evaluation::AbstractString)
+function extractevaluationdata(monitor::BMs.Monitor, evaluation::String)
    evaluationidxs = find(item -> item.evaluation == evaluation, monitor)
    epochs = map(i -> monitor[i].epoch, evaluationidxs)
    values = map(i -> monitor[i].value, evaluationidxs)
@@ -65,7 +65,7 @@ function extractevaluationdata(monitor::BMs.Monitor, evaluation::AbstractString)
    plotdata = DataFrame(epoch = epochs, value = values, datasetname = datasetnames)
 end
 
-function extractaisdata(monitor::BMs.Monitor, evaluation::AbstractString, sdrange::Float64)
+function extractaisdata(monitor::BMs.Monitor, evaluation::String, sdrange::Float64)
 
    plotdata = extractevaluationdata(monitor, evaluation)
 
@@ -148,7 +148,7 @@ the area around the curve that contains the values that deviate at maximum
 `sdrange` times the standard deviation from the estimator.
 Default value for `sdrange` is 2.0.
 """
-function plotevaluation(monitor::BMs.Monitor, evaluationkey::AbstractString;
+function plotevaluation(monitor::BMs.Monitor, evaluationkey::String;
       sdrange::Float64 = 2.0, changetitle::Function = identity)
 
    if evaluationkey == BMs.monitorloglikelihood
@@ -262,10 +262,10 @@ end
 Pairs plot for each variable of the data set `x` versus each other variable.
 "
 function plotpairs(x::Matrix{Float64};
-      filename::AbstractString = "pairs",
-      labels = Vector{AbstractString}(),
+      filename::String = "pairs",
+      labels = Vector{String}(),
       cellsize = 0,
-      subgroups = Vector{AbstractString}(),
+      subgroups = Vector{String}(),
       densityestimation::Function = BMs.emptyfunc,
       datafordensityestimation::Matrix{Float64} = x)
 
@@ -334,7 +334,7 @@ end
 
 function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       hiddennodes::Tuple{Int,Int} = (1,2),
-      labels = Vector{AbstractString}())
+      labels = Vector{String}())
 
    hh = BMs.hiddenpotential(rbm, x)
    hh = hh[:,collect(hiddennodes)]

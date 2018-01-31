@@ -89,7 +89,7 @@ const AbstractTrainLayers = Vector{<:AbstractTrainLayer}
 A dictionary containing names of data sets as keys and the data sets (matrices
 with samples in rows) as values.
 """
-const DataDict = Dict{AbstractString,Array{Float64,2}}
+const DataDict = Dict{String,Array{Float64,2}}
 
 
 """
@@ -122,7 +122,7 @@ function propagateforward(rbm::AbstractRBM, datadict::DataDict, factor::Float64 
 end
 
 function partitioneddata(datadict::DataDict, visrange::UnitRange{Int})
-   DataDict(map(kv -> (kv[1] => kv[2][:, visrange]), datadict))
+   DataDict(map(kv -> (kv[1]::String => kv[2][:, visrange]), datadict))
 end
 
 
@@ -228,10 +228,12 @@ function stackrbms_preparetrainlayers(
    if isempty(trainlayers)
       # construct default "trainlayers"
       if isempty(nhiddens)
-         nhiddens = size(x,2)*ones(2) # default value for nhiddens
+         nhiddens = fill(size(x,2), 2) # default value for nhiddens
       end
       trainlayers = map(n -> TrainLayer(nhidden = n,
-            learningrate = learningrate, epochs = epochs), nhiddens)
+            learningrate = learningrate,
+            learningrates = fill(learningrate, epochs),
+            epochs = epochs), nhiddens)
       return trainlayers
    end
 

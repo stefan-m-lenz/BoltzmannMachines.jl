@@ -33,7 +33,7 @@ function fitrbm(x::Matrix{Float64};
       upfactor::Float64 = 1.0,
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
-      learningrates::Vector{Float64} = learningrate * ones(epochs),
+      learningrates::Vector{Float64} = fill(learningrate, epochs),
       pcd::Bool = true,
       cdsteps::Int = 1,
       rbmtype::DataType = BernoulliRBM,
@@ -63,7 +63,8 @@ function fitrbm(x::Matrix{Float64};
 
    if length(learningrates) < epochs ||
          (rbmtype == GaussianBernoulliRBM && length(sdlearningrates) < epochs)
-      error("Not enough learning rates for training epochs")
+      error("Not enough learning rates (vector of length $(length(learningrates))) " .*
+            "for training epochs ($epochs)")
    end
 
    if pcd
