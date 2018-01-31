@@ -29,6 +29,7 @@ export
          visibleinput, visibleinput!,
       MultimodalDBM,
          BasicDBM,
+         AbstractTrainLayer, AbstractTrainLayers,
          TrainLayer, TrainPartitionedLayer,
          addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
    Particle, Particles,
