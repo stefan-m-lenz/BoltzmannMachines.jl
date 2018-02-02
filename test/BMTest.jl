@@ -415,7 +415,8 @@ function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
    # between estimation and exact log partition function of GBRBM with zero weights
    logz1 = BMs.logpartitionfunction(gbrbm1)
    @test abs(logz1 - BMs.logpartitionfunctionzeroweights(datainitrbm) -
-         BMs.logmeanexp(BMs.aislogimpweights(datainitrbm, gbrbm1))) < 0.01 * logz1
+         BMs.logmeanexp(BMs.aislogimpweights(datainitrbm, gbrbm1,
+               nparticles = 200, ntemperatures = 200))) < 0.03 * logz1
 
    gbrbm2 = BMs.fitrbm(x; nhidden = 15, rbmtype = gbrbmtype,
          cdsteps = 10,
@@ -475,6 +476,29 @@ function test_gbrbm(gbrbmtype::Type{GBRBM}
    estloglik = BMs.loglikelihood(gbrbm, x, logz)
    exactloglik = BMs.exactloglikelihood(gbrbm, x)
    @test abs((exactloglik - estloglik) / exactloglik) < 2.5 / 100
+end
+
+function test_rbm_monitoring(gbrbmtype::Type{GBRBM}
+      ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
+
+   x = BMs.curvebundles(nperbundle = 20, nvariables = 5,
+      nbundles = 4)
+
+   # Test some more options and monitoring
+   monitor = BMs.Monitor()
+   datadict = BMs.DataDict("Small subset" => x[1:3, :])
+   gbrbm = BMs.fitrbm(x; nhidden = 5, rbmtype = gbrbmtype,
+         learningrate = 0.000001, epochs = 20,
+         batchsize = 10,
+         pcd = false,
+         sdlearningrate = 0.000000001,
+         monitoring = (rbm, epoch) -> begin
+            if epoch == 10 || epoch == 20
+               BMs.monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
+               BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict)
+            end
+         end)
+   nothing
 end
 
 

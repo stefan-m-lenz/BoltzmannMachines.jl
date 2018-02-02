@@ -54,6 +54,9 @@ BMTest.test_likelihoodconsistency()
 BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM)
 BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM2)
 
+BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM)
+BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM2)
+
 BMTest.test_rbm()
 BMTest.test_b2brbm()
 BMTest.test_gbrbm(BMs.GaussianBernoulliRBM)

@@ -18,6 +18,7 @@ type TrainLayer <: AbstractTrainLayer
    rbmtype::DataType
    nhidden::Int
    nvisible::Int
+   batchsize::Int
    pcd::Bool
    cdsteps::Int
    startrbm::AbstractRBM
@@ -58,6 +59,7 @@ function TrainLayer(;
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
       nvisible::Int = -1,
+      batchsize::Int = 1,
       pcd::Bool = true,
       cdsteps::Int = 1,
       startrbm::AbstractRBM = NoRBM())
@@ -71,7 +73,10 @@ function TrainLayer(;
          learningrates,
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
-         monitoring, rbmtype, nhidden, nvisible, pcd, cdsteps, startrbm)
+         monitoring, rbmtype, nhidden, nvisible,
+         batchsize,
+         pcd, cdsteps,
+         startrbm)
 end
 
 """
@@ -123,6 +128,45 @@ end
 
 function partitioneddata(datadict::DataDict, visrange::UnitRange{Int})
    DataDict(map(kv -> (kv[1]::String => kv[2][:, visrange]), datadict))
+end
+
+
+function setdefaultsforunspecified!(trainlayer::TrainLayer,
+         learningrate::Float64, epochs::Int)
+
+   if trainlayer.usedefaultlearningrate
+      trainlayer.learningrate = learningrate
+   end
+   if trainlayer.usedefaultepochs
+      trainlayer.epochs = epochs
+   end
+   if isempty(trainlayer.learningrates)
+      # learning rates for each epoch have neither been explicitly specified
+      # --> set same value for each epoch
+      trainlayer.learningrates =
+            fill(trainlayer.learningrate, trainlayer.epochs)
+   end
+   if isempty(trainlayer.sdlearningrates)
+      # same for sdlearningrates
+      trainlayer.sdlearningrates =
+            fill(trainlayer.sdlearningrate, trainlayer.epochs)
+   end
+   trainlayer
+end
+
+function setdefaultsforunspecified!(trainpartitionedlayer::TrainPartitionedLayer,
+      learningrate::Float64, epochs::Int)
+
+   setdefaultsforunspecified!(trainpartitionedlayer.parts, learningrate, epochs)
+end
+
+function setdefaultsforunspecified!(trainlayers::Vector{T},
+      learningrate::Float64, epochs::Int) where {T <: AbstractTrainLayer}
+
+   for trainlayer in trainlayers
+      setdefaultsforunspecified!(trainlayer, learningrate, epochs)
+   end
+   trainlayers
 end
 
 
@@ -230,10 +274,8 @@ function stackrbms_preparetrainlayers(
       if isempty(nhiddens)
          nhiddens = fill(size(x,2), 2) # default value for nhiddens
       end
-      trainlayers = map(n -> TrainLayer(nhidden = n,
-            learningrate = learningrate,
-            learningrates = fill(learningrate, epochs),
-            epochs = epochs), nhiddens)
+      trainlayers = map(n -> TrainLayer(nhidden = n), nhiddens)
+      setdefaultsforunspecified!(trainlayers, learningrate, epochs)
       return trainlayers
    end
 
@@ -247,30 +289,7 @@ function stackrbms_preparetrainlayers(
       warn("Argument `nhiddens` not used.")
    end
 
-   function setdefaultsforunspecified(trainlayer::TrainLayer)
-      if trainlayer.usedefaultlearningrate
-         trainlayer.learningrate = learningrate
-      end
-      if trainlayer.usedefaultepochs
-         trainlayer.epochs = epochs
-      end
-      if isempty(trainlayer.learningrates)
-         # learning rates for each epoch have neither been explicitly specified
-         # --> set same value for each epoch
-         trainlayer.learningrates =
-               fill(trainlayer.learningrate, trainlayer.epochs)
-      end
-   end
-
-   function setdefaultsforunspecified(trainpartitionedlayer::TrainPartitionedLayer)
-      for trainlayer in trainpartitionedlayer.parts
-         setdefaultsforunspecified(trainlayer)
-      end
-   end
-
-   for trainlayer in trainlayers
-      setdefaultsforunspecified(trainlayer)
-   end
+   setdefaultsforunspecified!(trainlayers, learningrate, epochs)
 
    function derive_nvisibles!(layer::AbstractTrainLayer,
          prevlayer::AbstractTrainLayer)
@@ -342,6 +361,7 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          epochs = trainlayer.epochs,
          rbmtype = trainlayer.rbmtype,
          learningrates = trainlayer.learningrates,
+         batchsize = trainlayer.batchsize,
          cdsteps = trainlayer.cdsteps,
          pcd = trainlayer.pcd,
          sdlearningrate = trainlayer.sdlearningrate,

@@ -1,3 +1,11 @@
+function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
+   if length(v) < epochs
+      error("Not enough `$vname` (vector of length $(length(v))) " .*
+         "for training epochs ($epochs)")
+   end
+end
+
+
 """
     fitrbm(x; ...)
 Fits an RBM model to the data set `x`, using Stochastic Gradient Descent (SGD)
@@ -36,13 +44,14 @@ function fitrbm(x::Matrix{Float64};
       learningrates::Vector{Float64} = fill(learningrate, epochs),
       pcd::Bool = true,
       cdsteps::Int = 1,
+      batchsize::Int = 1,
       rbmtype::DataType = BernoulliRBM,
       startrbm::AbstractRBM = NoRBM(),
       monitoring::Function = nomonitoring,
 
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
-      sdlearningrates::Vector{Float64} = Vector{Float64}(),
+      sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
       sdgradclipnorm::Float64 = 0.0,
       sdinitfactor::Float64 = 0.0)
 
@@ -53,31 +62,25 @@ function fitrbm(x::Matrix{Float64};
       nhidden = nhiddennodes(startrbm)
    end
 
-   if isempty(sdlearningrates)
-      sdlearningrates = sdlearningrate * ones(epochs)
-   end
+   assert_enoughvaluesforepochs("learningrates", learningrates, epochs)
+   assert_enoughvaluesforepochs("sdlearningrates", sdlearningrates, epochs)
+
    if sdinitfactor > 0 &&
          (rbmtype == GaussianBernoulliRBM || rbmtype == GaussianBernoulliRBM2)
       rbm.sd .*= sdinitfactor
    end
 
-   if length(learningrates) < epochs ||
-         (rbmtype == GaussianBernoulliRBM && length(sdlearningrates) < epochs)
-      error("Not enough learning rates (vector of length $(length(learningrates))) " .*
-            "for training epochs ($epochs)")
-   end
-
    if pcd
-      chainstate = rand(nhidden)
+      chainstate = rand(batchsize, nhidden)
    else
-      chainstate = Array{Float64,1}()
+      chainstate = Matrix{Float64}(batchsize, nhidden)
    end
 
    # allocate space for trainrbm!
    nvisible = size(x, 2)
-   h = Vector{Float64}(nhidden)
-   hmodel = Vector{Float64}(nhidden)
-   vmodel = Vector{Float64}(nvisible)
+   h = Matrix{Float64}(batchsize, nhidden)
+   hmodel = Matrix{Float64}(batchsize, nhidden)
+   vmodel = Matrix{Float64}(batchsize, nvisible)
    posupdate = Matrix{Float64}(nvisible, nhidden)
    negupdate = Matrix{Float64}(nvisible, nhidden)
 
@@ -89,6 +92,7 @@ function fitrbm(x::Matrix{Float64};
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
             sdgradclipnorm = sdgradclipnorm,
+            batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel,
             posupdate = posupdate, negupdate = negupdate)
 
@@ -170,44 +174,89 @@ function nomonitoring(bm, epoch)
 end
 
 
-function sdupdateterm(gbrbm::GaussianBernoulliRBM, v::Array{Float64,1}, h::Array{Float64,1})
-   (v - gbrbm.visbias).^2 ./ (gbrbm.sd .^3) - (v ./ (gbrbm.sd .^ 2)) .* (gbrbm.weights * h)
+"""
+    randombatchmasks(nsamples, batchsize)
+Returns BitArray-Sets for the sample indices when training on a dataset with
+`nsamples` samples using minibatches of size `batchsize`.
+"""
+function randombatchmasks(nsamples::Int, batchsize::Int)
+   if batchsize > nsamples
+      error("Batchsize ($batchsize) exceeds number of samples ($nsamples).")
+   end
+
+   nfullbatches, nremainingbatch = divrem(nsamples, batchsize)
+   batchsizes = fill(batchsize, nfullbatches)
+   if nremainingbatch > 0
+      push!(batchsizes, nremainingbatch)
+   end
+   randomsampleindices = randperm(nsamples)
+   map(batchrange -> randomsampleindices[batchrange],
+         ranges(batchsizes))
+end
+
+
+function sdupdateterm(gbrbm::GaussianBernoulliRBM,
+         v::Matrix{Float64}, h::Matrix{Float64})
+   vec(mean((v .- gbrbm.visbias').^2 ./ (gbrbm.sd' .^ 3) -
+         h * gbrbm.weights' .* (v ./ (gbrbm.sd' .^ 2)), 1))
 end
 
 
 """
     trainrbm!(rbm, x)
-Trains the given `rbm` for one epoch. (See also function `fitrbm`.)
+Trains the given `rbm` for one epoch using the data set `x`.
+(See also function `fitrbm`.)
 
 # Optional keyword arguments:
 * `learningrate`, `cdsteps`, `sdlearningrate`, `upfactor`, `downfactor`:
    See documentation of function `fitrbm`.
-* `chainstate`: a vector for holding the state of the RBM's hidden nodes. If
+* `chainstate`: a matrix for holding the states of the RBM's hidden nodes. If
    it is specified, PCD is used.
 """
 function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
-      chainstate::Array{Float64,1} = Array{Float64,1}(),
+      chainstate::Matrix{Float64} = Matrix{Float64}(0, 0),
       upfactor::Float64 = 1.0,
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
+      batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
 
       # write-only arguments for reusing allocated space:
-      h::Vector{Float64} = Vector{Float64}(length(rbm.hidbias)),
-      hmodel::Vector{Float64} = Vector{Float64}(length(rbm.hidbias)),
-      vmodel::Vector{Float64} = Vector{Float64}(length(rbm.visbias)),
+      v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
+      h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+      hmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+      vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
       posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
       negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
 
-   nsamples = size(x,1)
+   nsamples = size(x, 1)
 
    # perform PCD if a chain state is provided as parameter
    pcd = !isempty(chainstate)
 
-   for j = 1:nsamples
-      v = vec(x[j,:])
+   batchmasks = randombatchmasks(nsamples, batchsize)
+   nbatchmasks = length(batchmasks)
+
+   normalbatchsize = true
+
+   for batchindex in eachindex(batchmasks)
+      batchmask = batchmasks[batchindex]
+
+      normalbatchsize = (batchindex < nbatchmasks || nsamples % batchsize == 0)
+
+      if normalbatchsize
+         v .= view(x, batchmask, :)
+      else
+         v = x[batchmask, :]
+         thisbatchsize = nsamples % batchsize
+         h = Matrix{Float64}(thisbatchsize, nhiddennodes(rbm))
+         if !pcd
+            vmodel = Matrix{Float64}(size(v))
+            hmodel = Matrix{Float64}(size(h))
+         end # in case of pcd, vmodel and hmodel are not downsized
+      end
 
       # Calculate potential induced by visible nodes, used for update
       hiddenpotential!(h, rbm, v, upfactor)
@@ -230,6 +279,13 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       # Do not sample in last step to avoid unnecessary sampling noise
       visiblepotential!(vmodel, rbm, hmodel, downfactor)
       hiddenpotential!(hmodel, rbm, vmodel, upfactor)
+
+      if !normalbatchsize && pcd
+         # remove additional samples
+         # that are unnecessary for computing the gradient
+         vmodel = vmodel[1:thisbatchsize, :]
+         hmodel = hmodel[1:thisbatchsize, :]
+      end
 
       updateparameters!(rbm, v, vmodel, h, hmodel,
             learningrate, sdlearningrate, sdgradclipnorm,
@@ -254,28 +310,28 @@ as in form of the write-only arguments `posupdate` and `negupdate`.
      `hmodel` must not be changed by implementations of `updateparameters!`
      since the persistent chain state is stored there.
 """
-function updateparameters!(rbm::AbstractRBM,
-      v::Vector{Float64}, vmodel::Vector{Float64},
-      h::Vector{Float64}, hmodel::Vector{Float64},
+function updateparameters!(rbm::BernoulliRBM,
+      v::Matrix{Float64}, vmodel::Matrix{Float64},
+      h::Matrix{Float64}, hmodel::Matrix{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
-   A_mul_Bt!(posupdate, v, h)
-   A_mul_Bt!(negupdate, vmodel, hmodel)
+   At_mul_B!(posupdate, v, h)
+   At_mul_B!(negupdate, vmodel, hmodel)
    posupdate .-= negupdate
    posupdate .*= learningrate
    rbm.weights .+= posupdate
-   rbm.visbias .+= (v - vmodel) * learningrate
-   rbm.hidbias .+= (h - hmodel) * learningrate
+   rbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
+   rbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
    nothing
 end
 
 
 function updateparameters!(rbm::Binomial2BernoulliRBM,
-      v::Vector{Float64}, vmodel::Vector{Float64},
-      h::Vector{Float64}, hmodel::Vector{Float64},
+      v::Matrix{Float64}, vmodel::Matrix{Float64},
+      h::Matrix{Float64}, hmodel::Matrix{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
@@ -287,19 +343,19 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
    learningratehidden = learningrate
    learningrate /= 2.0
 
-   A_mul_Bt!(posupdate, v, h)
-   A_mul_Bt!(negupdate, vmodel, hmodel)
+   At_mul_B!(posupdate, v, h)
+   At_mul_B!(negupdate, vmodel, hmodel)
    posupdate .-= negupdate
    posupdate .*= learningrate
    rbm.weights .+= posupdate
-   rbm.visbias .+= (v - vmodel) * learningrate
-   rbm.hidbias .+= (h - hmodel) * learningratehidden
+   rbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
+   rbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningratehidden
    nothing
 end
 
 function updateparameters!(gbrbm::GaussianBernoulliRBM,
-      v::Vector{Float64}, vmodel::Vector{Float64},
-      h::Vector{Float64}, hmodel::Vector{Float64},
+      v::Matrix{Float64}, vmodel::Matrix{Float64},
+      h::Matrix{Float64}, hmodel::Matrix{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
@@ -310,8 +366,8 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
    if sdlearningrate > 0.0
       sdgrad = sdupdateterm(gbrbm, v, h) - sdupdateterm(gbrbm, vmodel, hmodel)
 
-      v ./= gbrbm.sd
-      vmodel ./= gbrbm.sd
+      v ./= gbrbm.sd'
+      vmodel ./= gbrbm.sd'
 
       if sdgradclipnorm > 0.0
          sdgradnorm = norm(sdgrad)
@@ -328,24 +384,24 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
          gbrbm.sd .-= sdgrad
       end
    else
-      v ./= gbrbm.sd
-      vmodel ./= gbrbm.sd
+      v ./= gbrbm.sd'
+      vmodel ./= gbrbm.sd'
    end
 
-   A_mul_Bt!(posupdate, v, h)
-   A_mul_Bt!(negupdate, vmodel, hmodel)
+   At_mul_B!(posupdate, v, h)
+   At_mul_B!(negupdate, vmodel, hmodel)
    posupdate .-= negupdate
    posupdate .*= learningrate
    gbrbm.weights .+= posupdate
-   gbrbm.hidbias .+= (h - hmodel) * learningrate
-
-   gbrbm.visbias .+= (v - vmodel) ./ gbrbm.sd * learningrate
+   gbrbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
+   gbrbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd *
+         learningrate
    nothing
 end
 
 function updateparameters!(gbrbm::GaussianBernoulliRBM2,
-      v::Vector{Float64}, vmodel::Vector{Float64},
-      h::Vector{Float64}, hmodel::Vector{Float64},
+      v::Matrix{Float64}, vmodel::Matrix{Float64},
+      h::Matrix{Float64}, hmodel::Matrix{Float64},
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
@@ -356,11 +412,12 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM2,
    sdsq = gbrbm.sd .^ 2
 
    if sdlearningrate > 0.0
-      sdgrad = vmodel .* (gbrbm.weights * hmodel)
-      sdgrad .-= v.* (gbrbm.weights * h)
-      sdgrad .*= 2.0
-      sdgrad .+= (v - gbrbm.visbias) .^ 2
-      sdgrad .-= (vmodel - gbrbm.visbias) .^ 2
+      sdgrads = vmodel .* (hmodel * gbrbm.weights')
+      sdgrads .-= v .* (h * gbrbm.weights')
+      sdgrads .*= 2.0
+      sdgrads .+= (v .- gbrbm.visbias') .^ 2
+      sdgrads .-= (vmodel .- gbrbm.visbias') .^ 2
+      sdgrad = vec(mean(sdgrads, 1))
       sdgrad ./= sdsq
       sdgrad ./= gbrbm.sd
 
@@ -380,15 +437,15 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM2,
       end
    end
 
-   v ./= sdsq
-   vmodel ./= sdsq
+   v ./= sdsq'
+   vmodel ./= sdsq'
 
-   A_mul_Bt!(posupdate, v, h)
-   A_mul_Bt!(negupdate, vmodel, hmodel)
+   At_mul_B!(posupdate, v, h)
+   At_mul_B!(negupdate, vmodel, hmodel)
    posupdate .-= negupdate
    posupdate .*= learningrate
    gbrbm.weights .+= posupdate
-   gbrbm.hidbias .+= (h - hmodel) * learningrate
-   gbrbm.visbias .+= (v - vmodel) * learningrate
+   gbrbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
+   gbrbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
    nothing
 end

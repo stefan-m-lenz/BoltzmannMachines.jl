@@ -36,7 +36,7 @@ y = (randn(nmultisamples, size(x, 2)) * a) .+ mu'
 BMs.BMPlots.plotcurvebundles(y)
 
 premonitor = BMs.Monitor()
-gbrbm = BMs.fitrbm(y;
+pregbrbm = BMs.fitrbm(y;
       nhidden = 20, rbmtype = BMs.GaussianBernoulliRBM,
       learningrate = 0.00005,
       epochs = 6,
@@ -49,10 +49,11 @@ BMs.BMPlots.plotevaluation(premonitor, BMs.monitorexactloglikelihood)
 
 monitor = BMs.Monitor()
 gbrbm = BMs.fitrbm(x;
-      startrbm = gbrbm,
-      learningrate = 0.00005,
+      startrbm = pregbrbm, batchsize = 50,
+      learningrate = 0.000005,
+      sdlearningrate = 0.0000001,
       epochs = 200,
-      upfactor = 2.0, downfactor = 1.0,
+      #upfactor = 2.0, downfactor = 1.0,
       cdsteps = 15,
       #sdgradclipnorm = 0.1,
       pcd = false,
