@@ -29,25 +29,19 @@ end
 Specify parameters for training one RBM-layer in a DBM.
 
 # Optional keyword arguments:
-* `rbmtype`: the type of the RBM that is to be trained.
-   This must be a subtype of AbstractRBM and defaults to `BernoulliRBM`.
-* `nhidden`: Number of hidden units in the RBM.
+* The optional keyword arguments `rbmtype`, `nhidden`, `epochs`,
+  `learningrate`/`learningrates`, `sdlearningrate`/`sdlearningrates`,
+  `batchsize`, `pcd`, `cdsteps`, and `startrbm` are passed to `fitrbm`.
+  For a detailed description, see there.
+  If a negative value is specified for `learningrate` or `epochs`, this indicates
+  that a corresponding default value should be used
+  (parameter defined by call to `stackrbms`).
+* `monitoring`: also like in `fitrbm`, but may take a `DataDict` as third argument
+   (see function `stackrbms` and its argument `monitoringdata`).
 * `nvisible`: Number of visible units in the RBM. Only relevant for partitioning.
-* `epochs`: number of training epochs.
-   A negative value indicates that a default value should be used.
-* `learningrate`: learning rate.
-   A negative value indicates that a default value should be used.
-* `learningrates`: a vector of learning rates, containing values for each epoch.
-   If this is specified, the argument `learningrate` is ignored.
-* `sdlearningrate`/`sdlearningrates`: learning rate / learning rates for each epoch
-   for learning the standard deviation. Only used for GaussianBernoulliRBMs.
-* `cdsteps`: Number of steps for (persistent) contrastive divergence. Default is 1.
-* `pcd`: Boolean indicating whether persistent contrastive divergence is used
-   (true, default) or whether contrastive divergence is used (false).
-* `monitoring`: a function that is executed after each training epoch.
-   As arguments it receives the currently trained RBM
-   and the number of epochs for which the current layer has been trained.
-   It may take a `DataDict` as third argument (see function `stackrbms`).
+   This parameter is derived as much as possible by `stackrbms`.
+   For `MultimodalDBM`s with a partitioned first layer, it is necessary to specify
+   the number of visible nodes for all but at most one partition in the input layer.
 """
 function TrainLayer(;
       epochs::Int = -1,

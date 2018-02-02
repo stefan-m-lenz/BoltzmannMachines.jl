@@ -12,25 +12,29 @@ Fits an RBM model to the data set `x`, using Stochastic Gradient Descent (SGD)
 with Contrastive Divergence (CD), and returns it.
 
 # Optional keyword arguments (ordered by importance):
-* `rbmtype`: the type of the desired RBM. This must be a subtype of AbstractRBM
-   and defaults to `BernoulliRBM`.
-* `nhidden`: number of hidden units for returned RBM
-* `epoch`: number of training epochs
+* `rbmtype`: the type of the RBM that is to be trained
+   This must be a subtype of `AbstractRBM` and defaults to `BernoulliRBM`.
+* `nhidden`: number of hidden units for the returned RBM
+* `epochs`: number of training epochs
 * `learningrate`/`learningrates`: The learning rate for the weights and biases
    can be specified as single value, used throughout all epochs, or as a vector
    of `learningrates` that contains a value for each epoch. Defaults to 0.005.
+* `batchsize`: number of samples that are used for making one step in the
+   stochastic gradient descent optimization algorithm. Default is 1.
 * `pcd`: indicating whether Persistent Contrastive Divergence (PCD) is to
    be used (true, default) or simple CD that initializes the Gibbs Chain with
    the training sample (false)
-* `cdsteps`: number of Gibbs sampling steps in CD/PCD, defaults to 1
+* `cdsteps`: number of Gibbs sampling steps for (persistent)
+   contrastive divergence, defaults to 1
 * `monitoring`: a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
 * `upfactor`, `downfactor`: If this function is used for pretraining a part of
    a DBM, it is necessary to multiply the weights of the RBM with factors.
 * `sdlearningrate`/`sdlearningrates`: learning rate(s) for the
-   standard deviation if training a `GaussianBernoulliRBM`. Ignored for other
-   types of RBMs. It usually must be much smaller than the learning rates for
-   the weights. By default, it is 0.0 which means that the standard deviation
+   standard deviation if training a `GaussianBernoulliRBM` or
+   `GaussianBernoulliRBM2`. Ignored for other types of RBMs.
+   It usually must be much smaller than the learning rates for
+   the weights. By default it is 0.0, which means that the standard deviation
    is not learned.
 * `startrbm`: start training with the parameters of the given RBM.
    If this argument is specified, `nhidden` and `rbmtype` are ignored.
