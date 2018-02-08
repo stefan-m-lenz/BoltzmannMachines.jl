@@ -25,7 +25,7 @@ end
 Joins the given vector of `rbms` of the same type to form one RBM of this type
 and returns the joined RBM.
 """
-function joinrbms{T<:AbstractRBM}(rbm1::T, rbm2::T)
+function joinrbms(rbm1::T, rbm2::T) where {T<:AbstractRBM}
    joinrbms(T[rbm1, rbm2])
 end
 
@@ -75,7 +75,7 @@ i'th entry an indexing vector that determines the positions in the combined
 weight matrix for the visible nodes of the i'th of the `rbms`.
 By default the indexes of the visible nodes are assumed to be consecutive.
 """
-function joinweights{T<:AbstractRBM}(rbms::Vector{T}, visibleindexes = [])
+function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractRBM}
    jointnhidden = mapreduce(rbm -> length(rbm.hidbias), +, 0, rbms)
    jointnvisible = mapreduce(rbm -> length(rbm.visbias), +, 0, rbms)
    jointweights = zeros(jointnvisible, jointnhidden)

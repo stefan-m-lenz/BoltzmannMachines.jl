@@ -4,9 +4,9 @@ May be specifications for a normal RBM layer (see `TrainLayer`) or
 multiple combined specifications for a partitioned layer
 (see `TrainPartitionedLayer`).
 """
-@compat abstract type AbstractTrainLayer end
+abstract type AbstractTrainLayer end
 
-type TrainLayer <: AbstractTrainLayer
+mutable struct TrainLayer <: AbstractTrainLayer
    epochs::Int
    usedefaultepochs::Bool
    learningrate::Float64
@@ -76,7 +76,7 @@ end
 """
 Encapsulates a vector of `TrainLayer` objects for training a partitioned layer.
 """
-type TrainPartitionedLayer <: AbstractTrainLayer
+struct TrainPartitionedLayer <: AbstractTrainLayer
    parts::Vector{TrainLayer}
 end
 

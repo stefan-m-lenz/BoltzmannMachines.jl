@@ -1,7 +1,5 @@
 module BoltzmannMachines
 
-using Compat
-
 const BMs = BoltzmannMachines
 
 export

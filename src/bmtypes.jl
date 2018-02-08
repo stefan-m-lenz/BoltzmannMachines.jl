@@ -1,9 +1,9 @@
-@compat abstract type AbstractRBM end
+abstract type AbstractRBM end
 
 """
 Abstract super type for RBMs with binary and Bernoulli distributed hidden nodes.
 """
-@compat abstract type AbstractXBernoulliRBM <: AbstractRBM end
+abstract type AbstractXBernoulliRBM <: AbstractRBM end
 
 """
     BernoulliRBM(weights, visbias, hidbias)
@@ -13,7 +13,7 @@ Encapsulates the parameters of an RBM with Bernoulli distributed nodes.
 * `visbias`: bias vector for visible nodes
 * `hidbias`: bias vector for hidden nodes
 """
-type BernoulliRBM <: AbstractXBernoulliRBM
+struct BernoulliRBM <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -25,7 +25,7 @@ end
 Encapsulates the parameters of an RBM with Gaussian distributed visible nodes
 and Bernoulli distributed hidden nodes.
 """
-type GaussianBernoulliRBM <: AbstractXBernoulliRBM
+struct GaussianBernoulliRBM <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -39,7 +39,7 @@ Encapsulates the parameters of an RBM with Gaussian distributed visible nodes
 and Bernoulli distributed hidden nodes with the alternative energy formula
 proposed by KyungHyun Cho.
 """
-type GaussianBernoulliRBM2 <: AbstractXBernoulliRBM
+struct GaussianBernoulliRBM2 <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -53,7 +53,7 @@ Encapsulates the parameters of an RBM with Bernoulli distributed visible nodes
 and Gaussian distributed hidden nodes.
 The standard deviation of the Gaussian distribution is 1.
 """
-type BernoulliGaussianRBM <: AbstractRBM
+struct BernoulliGaussianRBM <: AbstractRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -70,7 +70,7 @@ The states (0,0) / (1,0) / (0,1) / (1,1) of the visible nodes connected with
 with the same weights translate as states 0 / 1 / 1 / 2 in the
 Binomial2BernoulliRBM.
 """
-type Binomial2BernoulliRBM <: AbstractXBernoulliRBM
+struct Binomial2BernoulliRBM <: AbstractXBernoulliRBM
    weights::Matrix{Float64}
    visbias::Vector{Float64}
    hidbias::Vector{Float64}
@@ -98,7 +98,7 @@ end
 Encapsulates several (parallel) AbstractRBMs that form one partitioned RBM.
 The nodes of the parallel RBMs are not connected between the RBMs.
 """
-type PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
+struct PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
    rbms::Vector{R}
    visranges::Vector{UnitRange{Int}}
    hidranges::Vector{UnitRange{Int}}
@@ -111,8 +111,8 @@ type PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
 end
 
 
-""" Singleton-Placeholder type for `AbstractRBM`s """
-type NoRBM <: AbstractRBM
+""" Singleton-Placeholder mutable struct for `AbstractRBM`s """
+struct NoRBM <: AbstractRBM
 end
 
 

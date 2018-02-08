@@ -344,8 +344,8 @@ function copyannealed!(annealedrbm::PartitionedRBM,
    nothing
 end
 
-function copyannealed!{T<:AbstractRBM}(annealedrbms::Vector{T}, rbms::Vector{T},
-      temperature::Float64)
+function copyannealed!(annealedrbms::Vector{T}, rbms::Vector{T},
+      temperature::Float64) where {T<:AbstractRBM}
 
    for i in eachindex(rbms)
       copyannealed!(annealedrbms[i], rbms[i], temperature)
@@ -1326,7 +1326,7 @@ end
 Returns a dictionary containing the rows of the data set `x` as keys and their
 relative frequencies as values.
 """
-function samplefrequencies{T}(x::Array{T,2})
+function samplefrequencies(x::Array{T,2}) where T
    dict = Dict{Array{T}, Float64}()
    nsamples = size(x, 1)
    onefrac = 1/nsamples

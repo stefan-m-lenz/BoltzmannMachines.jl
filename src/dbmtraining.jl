@@ -349,8 +349,8 @@ function updatedbmpartcore!(dbmpart::AbstractRBM,
    righta = mean(vgibbs, 1)[:]
    rightb = mean(hgibbs, 1)[:]
 
-   dbmpart.weights += learningrate*(leftw - rightw)
-   dbmpart.visbias += learningrate*(lefta - righta)
-   dbmpart.hidbias += learningrate*(leftb - rightb)
+   dbmpart.weights .+= learningrate*(leftw - rightw)
+   dbmpart.visbias .+= learningrate*(lefta - righta)
+   dbmpart.hidbias .+= learningrate*(leftb - rightb)
    nothing
 end
