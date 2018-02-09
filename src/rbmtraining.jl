@@ -309,25 +309,35 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       upfactor::Float64 = 1.0,
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
-      cdsteps::Int = 1, # ignored
-      batchsize::Int = 1,
+      cdsteps::Int = 0, # ignored
+      batchsize::Int = 0, # ignored
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
 
       # write-only arguments for reusing allocated space:
-      v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-      h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+      v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.visbias)),
+      h::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.hidbias)),
       hmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
-      vmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
+      vmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.visbias)),
       posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
       negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
 
+   # reuse allocated space of arguments / rename space variables
+   visbiasgrads = v
+   hidbiasgrads = h
+   sdgrads = vmodel
+   weightsupdate = posupdate
 
-   hiddeninput!(v, gmrbm, x)
-   v .*= -1.0
-   v .-= exp.(gmrbm.visbias)
+   hiddenpotential!(hidbiasgrads, gmrbm, x)
+   hidbiasgrad = vec(mean(hidbiasgrads, 1))
+   hidbiasgrad .+= exp.(gmrbm.visbias)
 
-   gmrbm.visbias .+= learningrate * v
+   hiddenpotential!(sdgrads)
+   sdgrad = - v.^2 ./ gmrbm.sd.^3 # +
+
+   # make update
+   gmrbm.visbias .-= learningrate * visbiasgrad
+   #gmrbm.hidbias .+= h
 
 
 end

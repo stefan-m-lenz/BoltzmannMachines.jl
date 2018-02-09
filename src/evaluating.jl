@@ -598,6 +598,11 @@ function exactlogpartitionfunction(gbrbm::GaussianBernoulliRBM2)
    log(z) + nvisible/2 * log(2*pi) + sum(log.(gbrbm.sd))
 end
 
+# TODO document
+function exactlogpartitionfunction(gmrbm::GaussianMixtureRBM)
+   logpartitionfunction(gmrbm)
+end
+
 """
     exactlogpartitionfunction(bgrbm)
 Calculates the log of the partition function of the BernoulliGaussianRBM `bgrbm`
@@ -980,6 +985,10 @@ function logpartitionfunction(bm::AbstractBM;
    logpartitionfunction(bm, logmeanexp(logimpweights))
 end
 
+function logpartitionfunction(gmrbm::GaussianMixtureRBM)
+   logpartitionfunctionzeroweights(gmrbm)
+end
+
 
 """
     logpartitionfunctionzeroweights(bm)
@@ -1033,7 +1042,7 @@ function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
 end
 
 function logpartitionfunctionzeroweights_visterm(
-      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2})
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2, GaussianMixtureRBM})
 
    nvisible = length(gbrbm.visbias)
    nvisible / 2 * log(2*pi) + sum(log.(gbrbm.sd))
