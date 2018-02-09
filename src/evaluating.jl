@@ -1009,10 +1009,13 @@ function logpartitionfunctionzeroweights(mdbm::MultimodalDBM)
    if length(mdbm) == 1
       logpartitionfunctionzeroweights(mdbm[1])
    else
+      hiddbm = mdbm[2:end]
+      hiddbm[1] = deepcopy(hiddbm[1])
+      setvisiblebias!(hiddbm[1], visiblebias(hiddbm[1]) + hiddenbias(mdbm[1]))
       logpartitionfunctionzeroweights_visterm(mdbm[1]) +
             invoke(logpartitionfunctionzeroweights,
                   Tuple{PartitionedBernoulliDBM,},
-                  converttopartitionedbernoullidbm(mdbm[2:end]))
+                  converttopartitionedbernoullidbm(hiddbm))
    end
 end
 
