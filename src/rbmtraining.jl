@@ -77,7 +77,7 @@ function fitrbm(x::Matrix{Float64};
    if pcd
       chainstate = rand(batchsize, nhidden)
    else
-      chainstate = Matrix{Float64}(batchsize, nhidden)
+      chainstate = Matrix{Float64}(0, 0)
    end
 
    # allocate space for trainrbm!
