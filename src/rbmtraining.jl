@@ -77,7 +77,7 @@ function fitrbm(x::Matrix{Float64};
    if pcd
       chainstate = rand(batchsize, nhidden)
    else
-      chainstate = Matrix{Float64}(batchsize, nhidden)
+      chainstate = Matrix{Float64}(0, 0)
    end
 
    # allocate space for trainrbm!
@@ -147,6 +147,10 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       visbias = initvisiblebias(x/2)
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
+   elseif rbmtype == GaussianMixtureRBM
+      visbias = vec(mean(x, 1))
+      sd = vec(std(x, 1))
+      GaussianMixtureRBM(weights, visbias, hidbias, sd)
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
@@ -297,6 +301,35 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
    end
 
    rbm
+end
+
+
+function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
+      chainstate::Matrix{Float64} = Matrix{Float64}(0, 0), # ignored
+      upfactor::Float64 = 1.0,
+      downfactor::Float64 = 1.0,
+      learningrate::Float64 = 0.005,
+      cdsteps::Int = 1, # ignored
+      batchsize::Int = 1,
+      sdlearningrate::Float64 = 0.0,
+      sdgradclipnorm::Float64 = 0.0,
+
+      # write-only arguments for reusing allocated space:
+      v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
+      h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+      hmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
+      vmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
+      posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
+      negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
+
+
+   hiddeninput!(v, gmrbm, x)
+   v .*= -1.0
+   v .-= exp.(gmrbm.visbias)
+
+   gmrbm.visbias .+= learningrate * v
+
+
 end
 
 
