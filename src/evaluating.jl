@@ -772,6 +772,11 @@ function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
    freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
 
+function freeenergy(gmrbm::GaussianMixtureRBM, v::Vector{Float64})
+   sum(((v - gmrbm.visbias) ./ gmrbm.sd).^2) / 2.0 -
+         log1pexp(gmrbm.hidbias + hiddeninput(gmrbm, v))
+end
+
 
 """
     freeeenergydiffs(rbm1, rbm2, x)
@@ -1004,10 +1009,13 @@ function logpartitionfunctionzeroweights(mdbm::MultimodalDBM)
    if length(mdbm) == 1
       logpartitionfunctionzeroweights(mdbm[1])
    else
+      hiddbm = mdbm[2:end]
+      hiddbm[1] = deepcopy(hiddbm[1])
+      setvisiblebias!(hiddbm[1], visiblebias(hiddbm[1]) + hiddenbias(mdbm[1]))
       logpartitionfunctionzeroweights_visterm(mdbm[1]) +
             invoke(logpartitionfunctionzeroweights,
                   Tuple{PartitionedBernoulliDBM,},
-                  converttopartitionedbernoullidbm(mdbm[2:end]))
+                  converttopartitionedbernoullidbm(hiddbm))
    end
 end
 

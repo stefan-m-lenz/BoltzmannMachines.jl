@@ -176,6 +176,21 @@ function hiddeninput!(hh::M, gbrbm::GaussianBernoulliRBM2, vv::M,
    broadcast!(+, hh, hh, gbrbm.hidbias')
 end
 
+function hiddeninput!(h::M1, gmrbm::GaussianMixtureRBM, v::M2
+   ) where{M1 <: AbstractArray{Float64,1}, M2 <: AbstractArray{Float64,1}}
+
+   hiddeninput!(h[:,:], gmrbm, v)
+end
+
+function hiddeninput!(hh::M1, gmrbm::GaussianMixtureRBM, vv::M2
+      ) where{M1 <: AbstractArray{Float64,2}, M2 <: AbstractArray{Float64,2}}
+
+   A_mul_B!(hh, vv .- gmrbm.visbias', gmrbm.weights)
+   hh ./= gmrbm.sd .^ 2
+   hh .+= gmrbm.hidbias'
+   hh .-= sum((gmrbm.weights ./ gmrbm.sd') .^ 2, 1)
+end
+
 function hiddeninput!(h::M, prbm::PartitionedRBM, v::M,
       ) where{M <: AbstractArray{Float64,1}}
 
@@ -612,7 +627,7 @@ function samplevisiblepotential!(v::M, b2brbm::Binomial2BernoulliRBM
 end
 
 function samplevisiblepotential!(v::M,
-      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2, GaussianMixtureRBM}
       ) where{M <: AbstractArray{Float64, 1}}
 
    gaussiannoise = randn(length(v))
@@ -621,7 +636,7 @@ function samplevisiblepotential!(v::M,
 end
 
 function samplevisiblepotential!(v::M,
-      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2, GaussianMixtureRBM}
       ) where{M <: AbstractArray{Float64, 2}}
 
    gaussiannoise = randn(size(v))
@@ -804,14 +819,16 @@ function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM, h::M,
    broadcast!(+, v, v, gbrbm.visbias')
 end
 
-function visiblepotential!(v::Vector{Float64}, gbrbm::GaussianBernoulliRBM2,
+function visiblepotential!(v::Vector{Float64},
+      gbrbm::Union{GaussianBernoulliRBM2, GaussianMixtureRBM},
       h::Vector{Float64}, factor::Float64 = 1.0)
 
    A_mul_B!(v, gbrbm.weights, h)
    v .+= gbrbm.visbias
 end
 
-function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM2, h::M,
+function visiblepotential!(v::M,
+      gbrbm::Union{GaussianBernoulliRBM2, GaussianMixtureRBM}, h::M,
       factor::Float64 = 1.0) where{M <: AbstractArray{Float64,2}}
 
    A_mul_Bt!(v, h, gbrbm.weights)
