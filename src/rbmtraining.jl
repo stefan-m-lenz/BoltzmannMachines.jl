@@ -64,6 +64,7 @@ function fitrbm(x::Matrix{Float64};
    else
       rbm = deepcopy(startrbm)
       nhidden = nhiddennodes(startrbm)
+      rbmtype = typeof(rbm)
    end
 
    assert_enoughvaluesforepochs("learningrates", learningrates, epochs)
@@ -72,6 +73,10 @@ function fitrbm(x::Matrix{Float64};
    if sdinitfactor > 0 &&
          (rbmtype == GaussianBernoulliRBM || rbmtype == GaussianBernoulliRBM2)
       rbm.sd .*= sdinitfactor
+   end
+
+   if rbmtype == BMs.GaussianMixtureRBM
+      batchsize = size(x, 1)
    end
 
    if pcd
@@ -150,7 +155,7 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianMixtureRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      GaussianMixtureRBM(weights, visbias, hidbias, sd)
+      return GaussianMixtureRBM(weights, visbias, hidbias, sd)
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
@@ -306,7 +311,7 @@ end
 
 function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       chainstate::Matrix{Float64} = Matrix{Float64}(0, 0), # ignored
-      upfactor::Float64 = 1.0,
+      upfactor::Float64 = 1.0, # TODO: wie berücksichtigen??
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
       cdsteps::Int = 0, # ignored
@@ -315,31 +320,70 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       sdgradclipnorm::Float64 = 0.0,
 
       # write-only arguments for reusing allocated space:
-      v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.visbias)),
-      h::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.hidbias)),
-      hmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
-      vmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(rbm.visbias)),
-      posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
-      negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
+      v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
+      h::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.hidbias)),
+      hmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.hidbias)),
+      vmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
+      posupdate::Matrix{Float64} = Matrix{Float64}(size(gmrbm.weights)),
+      negupdate::Matrix{Float64} = Matrix{Float64}(size(gmrbm.weights)))
 
    # reuse allocated space of arguments / rename space variables
    visbiasgrads = v
    hidbiasgrads = h
-   sdgrads = vmodel
    weightsupdate = posupdate
 
-   hiddenpotential!(hidbiasgrads, gmrbm, x)
-   hidbiasgrad = vec(mean(hidbiasgrads, 1))
-   hidbiasgrad .+= exp.(gmrbm.visbias)
+   sdsq = gmrbm.sd .^ 2
+   hpot = hmodel
 
-   hiddenpotential!(sdgrads)
-   sdgrad = - v.^2 ./ gmrbm.sd.^3 # +
+   BMs.hiddenpotential!(hpot, gmrbm, x)
+
+   # calculate gradient of visible bias
+   A_mul_Bt!(visbiasgrads, hpot, gmrbm.weights)
+   visbiasgrad = vec(mean(visbiasgrads, 1))
+   visbiasgrad ./= sdsq
+
+   # calculate (negative of) gradient for hidden bias
+   BMs.hiddenpotential!(hidbiasgrads, gmrbm, x)
+   hidbiasgrad = vec(mean(hidbiasgrads, 1))
+   hidbiasgrad .+= sigm(gmrbm.hidbias)
+
+   # calculate gradient of standard deviation
+   nsamples = size(x, 1)
+   nvisible = length(gmrbm.sd)
+   nhidden = length(gmrbm.hidbias)
+   sdgrad = fill(0.0, length(gmrbm.sd))
+   for s = 1:nsamples
+      for i = 1:nvisible
+         for j = 1:nhidden
+            sdgrad[i] +=
+                  (2.0 * (x[s, i] - gmrbm.visbias[i]) * gmrbm.weights[i, j]
+                        - gmrbm.weights[i, j]^2) * hpot[s, j]
+         end
+      end
+   end
+   sdgrad ./= nsamples
+   sdgrad .-= vec(mean(x.^2, 1))
+   sdgrad ./= gmrbm.sd.^3
+   sdgrad .-= 1.0
+
+   # calculate gradient of weights
+   for s = 1:nsamples
+      for i = 1:nvisible
+         for j = 1:nhidden
+            weightsupdate[i, j] += hpot[s, j] * (gmrbm.weights[i, j] - x[s, i])
+         end
+      end
+   end
+   weightsupdate ./= nsamples * sdsq
+   weightsupdate .*= learningrate
 
    # make update
-   gmrbm.visbias .-= learningrate * visbiasgrad
-   #gmrbm.hidbias .+= h
+   gmrbm.weights .+= weightsupdate
+   gmrbm.hidbias .-= learningrate * hidbiasgrad
+   gmrbm.sd .+= learningrate * sdgrad
+   gmrbm.visbias .+= learningrate * visbiasgrad
 
-
+   gmrbm
 end
 
 

@@ -179,16 +179,15 @@ end
 function hiddeninput!(h::M1, gmrbm::GaussianMixtureRBM, v::M2
    ) where{M1 <: AbstractArray{Float64,1}, M2 <: AbstractArray{Float64,1}}
 
-   hiddeninput!(h[:,:], gmrbm, v)
+   hiddeninput!(h[:,:], gmrbm, v) # TODO use for all and reduce code?
 end
 
 function hiddeninput!(hh::M1, gmrbm::GaussianMixtureRBM, vv::M2
       ) where{M1 <: AbstractArray{Float64,2}, M2 <: AbstractArray{Float64,2}}
 
-   A_mul_B!(hh, vv .- gmrbm.visbias', gmrbm.weights)
-   hh ./= gmrbm.sd .^ 2
+   A_mul_B!(hh, (vv .- gmrbm.visbias') ./ gmrbm.sd'.^2, gmrbm.weights)
    hh .+= gmrbm.hidbias'
-   hh .-= sum((gmrbm.weights ./ gmrbm.sd') .^ 2, 1)
+   hh .-= sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1)
 end
 
 function hiddeninput!(h::M, prbm::PartitionedRBM, v::M,
