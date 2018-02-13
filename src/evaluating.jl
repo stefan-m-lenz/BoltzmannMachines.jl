@@ -778,8 +778,8 @@ function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
 end
 
 function freeenergy(gmrbm::GaussianMixtureRBM, v::Vector{Float64})
-   sum(((v - gmrbm.visbias) ./ gmrbm.sd).^2) / 2.0 -
-         log1pexp(gmrbm.hidbias + hiddeninput(gmrbm, v))
+   sum(((v - gmrbm.visbias) ./ gmrbm.sd) .^2) / 2.0 -
+         mapreduce(log1pexp, +, hiddeninput(gmrbm, v))
 end
 
 

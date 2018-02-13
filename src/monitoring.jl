@@ -149,6 +149,19 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
    end
 end
 
+function monitorloglikelihood!(monitor::Monitor, rbm::GaussianMixtureRBM,
+      epoch::Int, datadict::DataDict;
+      parallelized::Bool = nworkers() > 1,
+      # optional arguments for AIS:
+      ntemperatures::Int = 100,
+      temperatures::Array{Float64,1} = collect(0:(1/ntemperatures):1),
+      nparticles::Int = 100,
+      burnin::Int = 5)
+
+   error("Please use `monitorexactloglikelihood!` for RBMs " *
+         "of type `GaussianMixtureRBM`.")
+end
+
 
 """
     monitorlogproblowerbound!(monitor, dbm, epoch, datadict)
@@ -256,7 +269,8 @@ end
 
 
 function monitorsd!(monitor::Monitor,
-      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}, epoch::Int)
+      gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2, GaussianMixtureRBM},
+      epoch::Int)
 
    nvisible = length(gbrbm.sd)
    for i = 1:nvisible

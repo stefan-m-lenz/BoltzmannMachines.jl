@@ -179,13 +179,15 @@ end
 function hiddeninput!(h::M1, gmrbm::GaussianMixtureRBM, v::M2
    ) where{M1 <: AbstractArray{Float64,1}, M2 <: AbstractArray{Float64,1}}
 
-   hiddeninput!(h[:,:], gmrbm, v) # TODO use for all and reduce code?
+   At_mul_B!(h, gmrbm.weights, (v - gmrbm.visbias) ./ gmrbm.sd.^2)
+   h .+= gmrbm.hidbias
+   h .-= vec(sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1))
 end
 
 function hiddeninput!(hh::M1, gmrbm::GaussianMixtureRBM, vv::M2
       ) where{M1 <: AbstractArray{Float64,2}, M2 <: AbstractArray{Float64,2}}
 
-   A_mul_B!(hh, (vv .- gmrbm.visbias') ./ gmrbm.sd'.^2, gmrbm.weights)
+   A_mul_B!(hh, (vv .- gmrbm.visbias') ./ (gmrbm.sd'.^2), gmrbm.weights)
    hh .+= gmrbm.hidbias'
    hh .-= sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1)
 end
@@ -390,7 +392,8 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
    v
 end
 
-function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM2, biased::Bool
+function initvisiblenodes!(v::M,
+      rbm::Union{GaussianBernoulliRBM2, GaussianMixtureRBM}, biased::Bool
       ) where{M <: AbstractArray{Float64}}
    randn!(v)
    if biased

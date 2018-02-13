@@ -155,7 +155,7 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianMixtureRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      return GaussianMixtureRBM(weights, visbias, hidbias, sd)
+      return GaussianMixtureRBM(weights * 0.1, visbias, hidbias, sd)
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
@@ -335,9 +335,9 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
    sdsq = gmrbm.sd .^ 2
    hpot = hmodel
 
-   BMs.hiddenpotential!(hpot, gmrbm, x)
+   hiddenpotential!(hpot, gmrbm, x)
 
-   # calculate gradient of visible bias
+   # calculate negative of gradient of visible bias
    A_mul_Bt!(visbiasgrads, hpot, gmrbm.weights)
    visbiasgrad = vec(mean(visbiasgrads, 1))
    visbiasgrad ./= sdsq
@@ -355,22 +355,23 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
    for s = 1:nsamples
       for i = 1:nvisible
          for j = 1:nhidden
-            sdgrad[i] +=
-                  (2.0 * (x[s, i] - gmrbm.visbias[i]) * gmrbm.weights[i, j]
-                        - gmrbm.weights[i, j]^2) * hpot[s, j]
+            sdgrad[i] += hpot[s, j] * (gmrbm.weights[i, j]^2 -
+                        2.0 * (x[s, i] - gmrbm.visbias[i]) * gmrbm.weights[i, j])
          end
       end
    end
    sdgrad ./= nsamples
-   sdgrad .-= vec(mean(x.^2, 1))
+   sdgrad .+= vec(mean(x.^2, 1))
    sdgrad ./= gmrbm.sd.^3
-   sdgrad .-= 1.0
+   sdgrad .-= 1.0 ./ gmrbm.sd
 
    # calculate gradient of weights
+   fill!(weightsupdate, 0.0)
    for s = 1:nsamples
       for i = 1:nvisible
          for j = 1:nhidden
-            weightsupdate[i, j] += hpot[s, j] * (gmrbm.weights[i, j] - x[s, i])
+            weightsupdate[i, j] += hpot[s, j] *
+               (x[s, i] - gmrbm.visbias[i] - gmrbm.weights[i, j])
          end
       end
    end
@@ -379,8 +380,12 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
 
    # make update
    gmrbm.weights .+= weightsupdate
-   gmrbm.hidbias .-= learningrate * hidbiasgrad
-   gmrbm.sd .+= learningrate * sdgrad
+   gmrbm.hidbias .+= learningrate * hidbiasgrad
+   gmrbm.sd .+= sdlearningrate * sdgrad
+   if any(gmrbm.sd .< 0.0)
+      gmrbm.sd .-= sdlearningrate * sdgrad
+      warn("SD-Update leading to negative standard deviation not performed")
+   end
    gmrbm.visbias .+= learningrate * visbiasgrad
 
    gmrbm
