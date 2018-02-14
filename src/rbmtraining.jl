@@ -322,30 +322,25 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
       h::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.hidbias)),
-      hmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.hidbias)),
+      hmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
       vmodel::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
       posupdate::Matrix{Float64} = Matrix{Float64}(size(gmrbm.weights)),
-      negupdate::Matrix{Float64} = Matrix{Float64}(size(gmrbm.weights)))
+      negupdate::Matrix{Float64} = Matrix{Float64}(0,0))
 
    # reuse allocated space of arguments / rename space variables
-   visbiasgrads = v
-   hidbiasgrads = h
-   weightsupdate = posupdate
+   hpot = h
+   hiddenpotential!(hpot, gmrbm, x)
+   weightsgrad = posupdate
 
    sdsq = gmrbm.sd .^ 2
-   hpot = hmodel
 
-   hiddenpotential!(hpot, gmrbm, x)
-
-   # calculate negative of gradient of visible bias
-   A_mul_Bt!(visbiasgrads, hpot, gmrbm.weights)
-   visbiasgrad = vec(mean(visbiasgrads, 1))
+   # calculate gradient of visible bias
+   visbiasgrad = vec(mean((x .- gmrbm.visbias') - hpot * gmrbm.weights', 1))
    visbiasgrad ./= sdsq
 
-   # calculate (negative of) gradient for hidden bias
-   BMs.hiddenpotential!(hidbiasgrads, gmrbm, x)
-   hidbiasgrad = vec(mean(hidbiasgrads, 1))
-   hidbiasgrad .+= sigm(gmrbm.hidbias)
+   # calculate gradient for hidden bias
+   hidbiasgrad = vec(mean(hpot, 1))
+   hidbiasgrad .-= sigm(gmrbm.hidbias)
 
    # calculate gradient of standard deviation
    nsamples = size(x, 1)
@@ -361,25 +356,25 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       end
    end
    sdgrad ./= nsamples
-   sdgrad .+= vec(mean(x.^2, 1))
+   sdgrad .+= vec(mean((x .- gmrbm.visbias').^2, 1))
    sdgrad ./= gmrbm.sd.^3
    sdgrad .-= 1.0 ./ gmrbm.sd
 
    # calculate gradient of weights
-   fill!(weightsupdate, 0.0)
+   fill!(weightsgrad, 0.0)
    for s = 1:nsamples
       for i = 1:nvisible
          for j = 1:nhidden
-            weightsupdate[i, j] += hpot[s, j] *
+            weightsgrad[i, j] += hpot[s, j] *
                (x[s, i] - gmrbm.visbias[i] - gmrbm.weights[i, j])
          end
       end
    end
-   weightsupdate ./= nsamples * sdsq
-   weightsupdate .*= learningrate
+   weightsgrad ./= nsamples * sdsq
 
    # make update
-   gmrbm.weights .+= weightsupdate
+   weightsgrad .*= learningrate
+   gmrbm.weights .+= weightsgrad
    gmrbm.hidbias .+= learningrate * hidbiasgrad
    gmrbm.sd .+= sdlearningrate * sdgrad
    if any(gmrbm.sd .< 0.0)

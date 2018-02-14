@@ -181,7 +181,7 @@ function hiddeninput!(h::M1, gmrbm::GaussianMixtureRBM, v::M2
 
    At_mul_B!(h, gmrbm.weights, (v - gmrbm.visbias) ./ gmrbm.sd.^2)
    h .+= gmrbm.hidbias
-   h .-= vec(sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1))
+   h .-= vec(sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1)) ./ 2.0
 end
 
 function hiddeninput!(hh::M1, gmrbm::GaussianMixtureRBM, vv::M2
@@ -189,7 +189,7 @@ function hiddeninput!(hh::M1, gmrbm::GaussianMixtureRBM, vv::M2
 
    A_mul_B!(hh, (vv .- gmrbm.visbias') ./ (gmrbm.sd'.^2), gmrbm.weights)
    hh .+= gmrbm.hidbias'
-   hh .-= sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1)
+   hh .-= sum((gmrbm.weights ./ gmrbm.sd) .^ 2, 1) ./ 2.0
 end
 
 function hiddeninput!(h::M, prbm::PartitionedRBM, v::M,
