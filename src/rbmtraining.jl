@@ -56,6 +56,7 @@ function fitrbm(x::Matrix{Float64};
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
+      sdgroups::Vector{Vector{Int}} = Vector{Vector{Int}}(),
       sdgradclipnorm::Float64 = 0.0,
       sdinitfactor::Float64 = 0.0)
 
@@ -76,6 +77,15 @@ function fitrbm(x::Matrix{Float64};
    end
 
    if rbmtype == BMs.GaussianMixtureRBM
+      if isempty(sdgroups)
+         sdgroups = [ [i] for i = 1:length(rbm.sd)]
+      else
+         # TODO check argument
+         # change initialization of standard deviation to be equal in the groups
+         for sdgroup in sdgroups
+            rbm.sd[sdgroup] .= mean(rbm.sd[sdgroup])
+         end
+      end
       batchsize = size(x, 1)
    end
 
@@ -100,6 +110,7 @@ function fitrbm(x::Matrix{Float64};
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
+            sdgroups = sdgroups,
             sdgradclipnorm = sdgradclipnorm,
             batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel,
@@ -318,6 +329,7 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       batchsize::Int = 0, # ignored
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
+      sdgroups::Vector{Vector{Int}} = Vector{Vector{Int}}(),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
@@ -358,7 +370,14 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
    sdgrad ./= nsamples
    sdgrad .+= vec(mean((x .- gmrbm.visbias').^2, 1))
    sdgrad ./= gmrbm.sd.^3
-   sdgrad .-= 1.0 ./ gmrbm.sd
+   if !isempty(sdgroups)
+      for sdgroup in sdgroups
+         sdgrad[sdgroup] .= sum(sdgrad[sdgroup])
+         sdgrad[sdgroup] .-= sum(1.0 ./ gmrbm.sd[sdgroup])
+      end
+   else
+      sdgrad .-= 1.0 ./ gmrbm.sd
+   end
 
    # calculate gradient of weights
    fill!(weightsgrad, 0.0)
@@ -381,7 +400,7 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       gmrbm.sd .-= sdlearningrate * sdgrad
       warn("SD-Update leading to negative standard deviation not performed")
    end
-   gmrbm.visbias .+= learningrate * visbiasgrad
+   #gmrbm.visbias .+= learningrate * visbiasgrad
 
    gmrbm
 end
