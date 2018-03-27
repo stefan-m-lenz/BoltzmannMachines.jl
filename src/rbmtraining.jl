@@ -5,6 +5,9 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
    end
 end
 
+const sdupdatewarning =
+      "SD-Update leading to negative standard deviation not performed"
+
 
 """
     fitrbm(x; ...)
@@ -103,7 +106,12 @@ function fitrbm(x::Matrix{Float64};
    posupdate = Matrix{Float64}(nvisible, nhidden)
    negupdate = Matrix{Float64}(nvisible, nhidden)
 
+   warnings = Vector{String}()
+   warningsdict = Dict{String, Int}()
+
    for epoch = 1:epochs
+
+      prevrbm = deepcopy(rbm)
 
       # Train RBM on data set
       trainrbm!(rbm, x, cdsteps = cdsteps, chainstate = chainstate,
@@ -112,12 +120,33 @@ function fitrbm(x::Matrix{Float64};
             sdlearningrate = sdlearningrates[epoch],
             sdgroups = sdgroups,
             sdgradclipnorm = sdgradclipnorm,
+            warnings = warnings,
             batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel,
             posupdate = posupdate, negupdate = negupdate)
 
+      if !isempty(warnings)
+         for warning in warnings
+            if warning == sdupdatewarning
+               return prevrbm
+            end
+            # store only first warnings
+            if get(warningsdict, warning, -1) == -1
+               warningsdict[warning] = epoch
+            end
+         end
+         warnings = Vector{String}()
+      end
+
       # Evaluation of learning after each training epoch
       monitoring(rbm, epoch)
+   end
+
+   if !isempty(warningsdict)
+      warn(mapreduce(
+            kv -> "Epoch " * string(kv[2]) * ": " * kv[1],
+            (a, b) -> a * "\n" * b,
+            warningsdict))
    end
 
    rbm
@@ -166,7 +195,7 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
    elseif rbmtype == GaussianMixtureRBM
       visbias = vec(mean(x, 1))
       sd = vec(std(x, 1))
-      return GaussianMixtureRBM(weights * 0.1, visbias, hidbias, sd)
+      return GaussianMixtureRBM(10*randn(nvisible, nhidden), visbias, hidbias, sd)
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
@@ -246,6 +275,10 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
+      sdgroups::Vector{Vector{Int}} = Vector{Vector{Int}}(),
+
+      # array to store warnings
+      warnings::Vector{String} = Vector{String}(),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
@@ -313,7 +346,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
 
       updateparameters!(rbm, v, vmodel, h, hmodel,
             learningrate, sdlearningrate, sdgradclipnorm,
-            posupdate, negupdate)
+            warnings, posupdate, negupdate)
    end
 
    rbm
@@ -330,6 +363,9 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
       sdgroups::Vector{Vector{Int}} = Vector{Vector{Int}}(),
+
+      # array to store warnings
+      warnings::Vector{String} = Vector{String}(),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(size(x, 1), length(gmrbm.visbias)),
@@ -398,9 +434,9 @@ function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
    gmrbm.sd .+= sdlearningrate * sdgrad
    if any(gmrbm.sd .< 0.0)
       gmrbm.sd .-= sdlearningrate * sdgrad
-      warn("SD-Update leading to negative standard deviation not performed")
+      push!(warnings, sdupdatewarning)
    end
-   #gmrbm.visbias .+= learningrate * visbiasgrad
+   gmrbm.visbias .+= learningrate * visbiasgrad
 
    gmrbm
 end
@@ -408,6 +444,7 @@ end
 
 """
     updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate,
+            warnings,
             posupdate, negupdate)
 Updates the RBM `rbm` given the sample `v`,
 the hidden activation `h` induced by the sample
@@ -426,6 +463,7 @@ function updateparameters!(rbm::BernoulliRBM,
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
+      warnings::Vector{String},
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    At_mul_B!(posupdate, v, h)
@@ -445,6 +483,7 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
+      warnings::Vector{String},
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    # To train a Binomial2BernoulliRBM exactly like
@@ -469,6 +508,7 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
+      warnings::Vector{String},
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    # See bottom of page 15 in [Krizhevsky, 2009].
@@ -490,7 +530,7 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM,
       sdgrad .*= sdlearningrate
       gbrbm.sd .+= sdgrad
       if any(gbrbm.sd .< 0.0)
-         warn("SD-Update leading to negative standard deviation not performed")
+         push!(warnings, sdupdatewarning)
          gbrbm.sd .-= sdgrad
       end
    else
@@ -515,6 +555,7 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM2,
       learningrate::Float64,
       sdlearningrate::Float64,
       sdgradclipnorm::Float64,
+      warnings::Vector{String},
       posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
 
    # See Cho,
@@ -542,7 +583,7 @@ function updateparameters!(gbrbm::GaussianBernoulliRBM2,
       sdgrad .*= sdlearningrate
       gbrbm.sd .+= sdgrad
       if any(gbrbm.sd .< 0.0)
-         warn("SD-Update leading to negative standard deviation not performed")
+         push!(warnings, sdupdatewarning)
          gbrbm.sd .-= sdgrad
       end
    end
