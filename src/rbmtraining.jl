@@ -200,7 +200,7 @@ end
 
 """
     randombatchmasks(nsamples, batchsize)
-Returns BitArray-Sets for the sample indices when training on a dataset with
+Returns sets of indices for random minibatches in a dataset with
 `nsamples` samples using minibatches of size `batchsize`.
 """
 function randombatchmasks(nsamples::Int, batchsize::Int)
@@ -246,6 +246,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
+      sdgroups::Vector{Vector{Int}} = Vector{Vector{Int}}(),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
