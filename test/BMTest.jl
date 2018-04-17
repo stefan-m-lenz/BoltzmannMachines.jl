@@ -5,11 +5,34 @@ using RDatasets
 import BoltzmannMachines
 const BMs = BoltzmannMachines
 
-function createsamples(nsamples::Int, nvariables::Int, samerate=0.7)
-   x = round.(rand(nsamples,nvariables))
-   samerange = 1:round(Int, samerate*nsamples)
-   x[samerange,3] = x[samerange,2] = x[samerange,1]
-   x = x[randperm(nsamples),:] # shuffle lines
+
+function createsamples(nsamples::Int, nvariables::Int, samerate::Float64 = 0.7)
+
+   x = round.(rand(nsamples, nvariables))
+   samerows = ((x[:,1] .== x[:,2]) .& (x[:,2] .== x[:,3]))
+   sameratestart = count(samerows) / nsamples
+
+   sameratediff = samerate - sameratestart
+
+   if sameratediff > 0
+      addedsamerange = find(.!samerows)
+      shuffle!(addedsamerange)
+      nsameadded = round(Int, sameratediff * nsamples)
+      addedsamerange = addedsamerange[1:nsameadded]
+      x[addedsamerange, 3] = x[addedsamerange, 2] = x[addedsamerange, 1]
+   else
+      subtractedsamerange = find(samerows)
+      shuffle!(subtractedsamerange)
+      nsamesubtracted = round(Int, - sameratediff * nsamples)
+      subtractedsamerange = subtractedsamerange[1:nsamesubtracted]
+      for row in subtractedsamerange
+         while ((x[row,1] == x[row,2]) & (x[row,2] == x[row,3]))
+            xrow = view(x, row, 1:3)
+            rand!(xrow)
+            map!(round, xrow, xrow)
+         end
+      end
+   end
    x
 end
 
