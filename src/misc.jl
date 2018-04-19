@@ -62,21 +62,53 @@ by creating a cross-validation plot via `BMPlots.crossvalidationplot`.
 
 # Optional named argument:
 * `kfold`: specifies the `k` in "`k`-fold" (defaults to 10).
+
+
+    crossvalidation(x, monitoredfit, pars; ...)
+If additionaly a vector of parameters `pars` is given, `monitoredfit`
+also expects an additional parameter from the parameter set.
 """
 function crossvalidation(x::Matrix{Float64}, monitoredfit::Function;
       kfold::Int = 10)
 
    masks = crossvalidationmasks(x, kfold)
 
-   @parallel (vcat) for i in eachindex(masks)
-      mask = masks[i]
-      trainingdata = x[.!mask, :]
-      evaluationdata = x[mask, :]
-      monitor = Monitor()
-      datadict = DataDict(string(i) => evaluationdata)
-      monitoredfit(monitor, datadict, x)
-      monitor
-   end
+   reduce(vcat, pmap(
+         (mask, i) -> begin
+            trainingdata = x[.!mask, :]
+            evaluationdata = x[mask, :]
+            monitor = Monitor()
+            datadict = DataDict(string(i) => evaluationdata)
+            monitoredfit(monitor, datadict, x)
+            monitor
+         end,
+      masks, 1:length(masks)))
+end
+
+function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars;
+      kfold::Int = 10)
+
+   masks = BoltzmannMachines.crossvalidationmasks(x, kfold)
+
+   # parallelize over all combinations of masks and parameters
+   nmasks = length(masks)
+   npars = length(pars)
+   args_mask = repmat(masks, npars)
+   args_i = repmat(1:nmasks, npars)
+   args_par = repeat(pars; inner = nmasks)
+
+   # hcat(args_mask, args_i, args_par)
+
+   reduce(vcat, pmap(
+         (mask, i, par) -> begin
+            trainingdata = x[.!mask, :]
+            evaluationdata = x[mask, :]
+            monitor = BoltzmannMachines.Monitor()
+            datadict = BoltzmannMachines.DataDict(string(i) => evaluationdata)
+            monitoredfit(monitor, datadict, x, par)
+            monitor
+         end,
+         args_mask, args_i, args_par))
 end
 
 

@@ -166,3 +166,33 @@ monitor = crossvalidation(x,
                               monitor, rbm, epoch, datadict)));
 BMPlots.crossvalidationcurve(monitor)
 
+
+# Determine the optimal nummber of pretraining epochs for a DBM,
+# given the other parameters
+
+@everywhere my_pretraining_monitoring(
+      monitor::BoltzmannMachines.Monitor,
+      datadict::BoltzmannMachines.DataDict,
+      x::Matrix{Float64}, epoch::Int) =
+
+   BoltzmannMachines.monitorlogproblowerbound!(monitor,
+         BoltzmannMachines.stackrbms(x,
+               nhiddens = [16; 12],
+               learningrate = 0.001,
+               predbm = true,
+               epochs = epoch),
+         epoch,
+         datadict)
+
+monitor = BMs.crossvalidation(x, my_pretraining_monitoring, 10:10:200)
+BMPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)
+
+x = BMTest.createsamples(100, 20, 0.4)
+monitor = BMs.crossvalidation(x,
+      (monitor, datadict, x) ->
+            for epoch = 1:5:200
+               BoltzmannMachines.monitorlogproblowerbound!(
+                     monitor, my_fitdbm(x, epoch), epoch, datadict)
+            end)
+BMs.BMPlots.crossvalidationcurve(monitor)
+

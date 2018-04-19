@@ -355,7 +355,21 @@ function scatterhidden(rbm::BMs.AbstractRBM, x::Matrix{Float64};
 end
 
 
-function crossvalidationcurve(monitor::BMs.Monitor)
+function crossvalidationcurve(monitor::BMs.Monitor,
+         evaluation::String = "")
+
+   if !isempty(evaluation)
+      monitor = filter(r -> r.evaluation == evaluation, monitor)
+      if isempty(monitor)
+         error("No data for specified evaluation")
+      end
+   else
+      evaluations = map(r -> r.evaluation, monitor)
+      if length(unique(evaluations)) > 1
+         error("Please specify the evaluation via argument 'evaluation'.")
+      end
+   end
+
    boxplotdata = DataFrame(
          epoch = map(r -> r.epoch, monitor),
          score = map(r -> r.value, monitor))
