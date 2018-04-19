@@ -1,5 +1,5 @@
 if nprocs() == 1
-   addprocs(4) # test with multiple processes
+   addprocs() # test with multiple processes
 end
 
 using Base.Test

@@ -149,10 +149,10 @@ end
     mostevenbatches(ntasks)
     mostevenbatches(ntasks, nbatches)
 Splits a number of tasks `ntasks` into a number of batches `nbatches`.
-The number of batches is by default equal to the number of workers.
+The number of batches is by default `min(nworkers(), ntasks)`.
 The returned result is a vector containing the numbers of tasks for each batch.
 """
-function mostevenbatches(ntasks::Int, nbatches::Int = nworkers())
+function mostevenbatches(ntasks::Int, nbatches::Int = min(nworkers(), ntasks))
 
    minparticlesperbatch, nbatcheswithplus1 = divrem(ntasks, nbatches)
    batches = Vector{Int}(nbatches)
