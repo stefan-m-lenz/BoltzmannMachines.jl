@@ -182,17 +182,8 @@ BMPlots.crossvalidationcurve(monitor)
                predbm = true,
                epochs = epoch),
          epoch,
-         datadict)
+         datadict,
+         parallelized = false)
 
 monitor = BMs.crossvalidation(x, my_pretraining_monitoring, 10:10:200)
 BMPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)
-
-x = BMTest.createsamples(100, 20, 0.4)
-monitor = BMs.crossvalidation(x,
-      (monitor, datadict, x) ->
-            for epoch = 1:5:200
-               BoltzmannMachines.monitorlogproblowerbound!(
-                     monitor, my_fitdbm(x, epoch), epoch, datadict)
-            end)
-BMs.BMPlots.crossvalidationcurve(monitor)
-
