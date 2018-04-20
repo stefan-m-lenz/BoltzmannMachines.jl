@@ -109,9 +109,10 @@ function plotlogproblowerbound(monitor::BMs.Monitor; sdrange::Float64 = 0.0)
    plotdata = extractaisdata(monitor, BMs.monitorlogproblowerbound, sdrange)
    checkdata(plotdata)
    if sdrange != 0
-      plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax", color = "datasetname",
-         Geom.line, Geom.ribbon,
-         Guide.title(title))
+      plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax",
+            color = "datasetname",
+            Geom.line, Geom.ribbon,
+            Guide.title(title))
    else
       plot(plotdata, x = "epoch", y = "value", color = "datasetname",
             Geom.line, Guide.title(title))
@@ -176,9 +177,8 @@ function plotloglikelihood(monitor::BMs.Monitor; sdrange::Float64 = 2.0)
    checkdata(plotdata)
    title = "Average log-likelihood"
    if sdrange != 0
-      plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax", color = "datasetname",
-         Geom.line, Geom.ribbon,
-         Guide.title(title))
+      plot(plotdata, x = "epoch", y = "value", ymin = "ymin", ymax = "ymax",
+            color = "datasetname", Geom.line, Geom.ribbon, Guide.title(title))
    else
       plot(plotdata, x = "epoch", y = "value", color = "datasetname",
             Geom.line, Guide.title(title))
