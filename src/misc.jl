@@ -53,16 +53,18 @@ Performs k-fold cross-validation, given
 * the data set `x` and
 * `monitoredfit`: a function that fits and evaluates a model.
   As arguments it must accept:
-  - a `Monitor` object in which the evaluations are stored
-  - a `DataDict` containing the evaluation data
-  - a training data data set.
+  - a training data data set
+  - a `DataDict` containing the evaluation data.
 
-`crossvalidation` returns a combined `Monitor` object that is best viewed
+
+The return values of the calls to the `monitoredfit` function
+are concatenated with `vcat`.
+If the monitoredfit function returns `Monitor` objects,
+`crossvalidation` returns a combined `Monitor` object that can be displayed
 by creating a cross-validation plot via `BMPlots.crossvalidationplot`.
 
 # Optional named argument:
 * `kfold`: specifies the `k` in "`k`-fold" (defaults to 10).
-
 
     crossvalidation(x, monitoredfit, pars; ...)
 If additionaly a vector of parameters `pars` is given, `monitoredfit`
@@ -77,10 +79,8 @@ function crossvalidation(x::Matrix{Float64}, monitoredfit::Function;
          (mask, i) -> begin
             trainingdata = x[.!mask, :]
             evaluationdata = x[mask, :]
-            monitor = Monitor()
             datadict = DataDict(string(i) => evaluationdata)
-            monitoredfit(monitor, datadict, x)
-            monitor
+            monitoredfit(x, datadict)
          end,
       masks, 1:length(masks)))
 end
@@ -103,10 +103,8 @@ function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars;
          (mask, i, par) -> begin
             trainingdata = x[.!mask, :]
             evaluationdata = x[mask, :]
-            monitor = BoltzmannMachines.Monitor()
             datadict = BoltzmannMachines.DataDict(string(i) => evaluationdata)
-            monitoredfit(monitor, datadict, x, par)
-            monitor
+            monitoredfit(x, datadict, par)
          end,
          args_mask, args_i, args_par))
 end

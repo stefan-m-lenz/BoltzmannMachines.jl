@@ -67,6 +67,8 @@ function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       push!(monitor, MonitoringItem(monitorcordiff, epoch,
             norm(samplecor - datacor), datasetname))
    end
+
+   monitor
 end
 
 
@@ -84,6 +86,8 @@ function monitorexactloglikelihood!(monitor::Monitor, bm::AbstractBM,
       push!(monitor, MonitoringItem(BMs.monitorexactloglikelihood, epoch,
             exactloglikelihood(bm, x, logz), datasetname))
    end
+
+   monitor
 end
 
 
@@ -99,6 +103,8 @@ function monitorfreeenergy!(monitor::Monitor, rbm::AbstractRBM,
       push!(monitor, MonitoringItem(BMs.monitorfreeenergy, epoch,
             freeenergy(rbm, x), datasetname))
    end
+
+   monitor
 end
 
 
@@ -147,6 +153,8 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
       push!(monitor, MonitoringItem(BMs.monitorloglikelihood, epoch,
             BMs.loglikelihood(rbm, x, logz), datasetname))
    end
+
+   monitor
 end
 
 
@@ -196,6 +204,8 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::MultimodalDBM,
             logproblowerbound(dbm, x, logpartitionfunction = logz),
             datasetname))
    end
+
+   monitor
 end
 
 
@@ -209,6 +219,8 @@ function monitormeandiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       push!(monitor, MonitoringItem(monitormeandiff, epoch,
                norm(samplemean - datamean), datasetname))
    end
+
+   monitor
 end
 
 
@@ -225,6 +237,8 @@ function monitormeandiffpervariable!(monitor::Monitor, bm::AbstractBM, epoch::In
                samplemean[i] - datamean[i], datasetname * "/Var" * string(i)))
       end
    end
+
+   monitor
 end
 
 
@@ -252,6 +266,8 @@ function monitorreconstructionerror!(monitor::Monitor, rbm::AbstractRBM,
       push!(monitor, MonitoringItem(monitorreconstructionerror, epoch,
                reconstructionerror(rbm, x), datasetname))
    end
+
+   monitor
 end
 
 
@@ -263,6 +279,8 @@ function monitorsd!(monitor::Monitor,
       push!(monitor,
             MonitoringItem(monitorsd, epoch, gbrbm.sd[i], string(i)))
    end
+
+   monitor
 end
 
 
