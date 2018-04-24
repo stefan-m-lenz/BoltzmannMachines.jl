@@ -171,7 +171,7 @@ monitor = crossvalidation(x,
 BMPlots.crossvalidationcurve(monitor)
 
 
-# Determine the optimal nummber of pretraining epochs for a DBM,
+# Determine the optimal number of pretraining epochs for a DBM
 # given the other parameters
 
 @everywhere function my_pretraining_monitoring(

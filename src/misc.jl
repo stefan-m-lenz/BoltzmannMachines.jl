@@ -70,54 +70,89 @@ by creating a cross-validation plot via `BMPlots.crossvalidationplot`.
 If additionaly a vector of parameters `pars` is given, `monitoredfit`
 also expects an additional parameter from the parameter set.
 """
-function crossvalidation(x::Matrix{Float64}, monitoredfit::Function;
+function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars...;
       kfold::Int = 10)
 
-   masks = crossvalidationmasks(x, kfold)
-
-   reduce(vcat, pmap(
-         (mask, i) -> begin
-            trainingdata = x[.!mask, :]
-            evaluationdata = x[mask, :]
-            datadict = DataDict(string(i) => evaluationdata)
-            monitoredfit(x, datadict)
-         end,
-      masks, 1:length(masks)))
+   vcat(pmap(monitoredfit, crossvalidationargs(x, pars...)...)...)
 end
 
-function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars;
-      kfold::Int = 10)
+# struct CrossvalidationData
+#    x::Matrix{Float64}
+#    batchranges::Vector{UnitRange{Int}}
+# end
 
-   masks = BoltzmannMachines.crossvalidationmasks(x, kfold)
+# function CrossvalidationData(x::Matrix{Float64}; kfold::Int = 10)
+#    nsamples = size(x, 1)
+#    CrossvalidationData(x, ranges(mostevenbatches(nsamples, kfold)))
+# end
 
-   # parallelize over all combinations of masks and parameters
-   nmasks = length(masks)
-   npars = length(pars)
-   args_mask = repmat(masks, npars)
-   args_i = repmat(1:nmasks, npars)
-   args_par = repeat(pars; inner = nmasks)
+# Base.start(::CrossvalidationData) = 1
 
-   # hcat(args_mask, args_i, args_par)
+# function Base.next(c::CrossvalidationData, i)
+#    nsamples = size(c.x, 1)
+#    rng = c.batchranges[i]
+#    trainingdata = c.x[[!(j in rng) for j in 1:nsamples], :]
+#    evaluationdata = c.x[rng, :]
+#    datadict = DataDict(string(i) => evaluationdata)
+#    ((trainingdata, datadict), i + 1)
+# end
 
-   reduce(vcat, pmap(
-         (mask, i, par) -> begin
-            trainingdata = x[.!mask, :]
-            evaluationdata = x[mask, :]
-            datadict = BoltzmannMachines.DataDict(string(i) => evaluationdata)
-            monitoredfit(x, datadict, par)
-         end,
-         args_mask, args_i, args_par))
-end
+# Base.done(c::CrossvalidationData, i) = (i > length(c.batchranges))
 
+# function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars;
+#       kfold::Int = 10)
+
+#    vcat(pmap(
+#          (mask, i, par) -> begin
+#             trainingdata = x[.!mask, :]
+#             evaluationdata = x[mask, :]
+#             datadict = BoltzmannMachines.DataDict(string(i) => evaluationdata)
+#             monitoredfit(x, datadict, par)
+#          end,
+#          args_mask, args_i, args_par)...)
+# end
 
 """
-Returns an array of BitArrays to index the validation data sets
-for k-fold cross validation.
+    crossvalidationargs(x, pars...; )
+
+Returns a tuple of argument vectors containing the parameters for a function
+such as the `monitoredfit` argument in `crossvalidation`.
+
+Usage example:
+    map(monitoredfit, crossvalidationargs(x)...)
+
+# Optional named argument:
+* `kfold`: see `crossvalidation`.
 """
-function crossvalidationmasks(x::Matrix{Float64}, kfold::Int)
+function crossvalidationargs(x::Matrix{Float64}, pars ...; kfold::Int = 10)
+
    nsamples = size(x, 1)
-   batchranges = ranges(mostevenbatches(nsamples, kfold))
-   map(rng -> [i in rng for i in 1:nsamples], batchranges)
+   batchranges = BMs.ranges(BMs.mostevenbatches(nsamples, kfold))
+
+   args_data = Vector{Tuple{Matrix{Float64}, BMs.DataDict}}(kfold)
+   for i in eachindex(batchranges)
+      rng = batchranges[i]
+      trainingdata = x[[!(j in rng) for j in 1:nsamples], :]
+      evaluationdata = x[rng, :]
+      datadict = BMs.DataDict(string(i) => evaluationdata)
+      args_data[i] = (trainingdata, datadict)
+   end
+
+   # this implementation is inefficient and overly complicated
+
+   if isempty(pars)
+      args = map(arg -> (arg,), args_data)
+   else
+      args = (args_data, map(p -> collect(p), pars)...)
+      args = vec(collect(Iterators.product(args...)))
+   end
+
+   # vector of tuples to tuples of vectors
+   (
+      map(arg -> arg[1][1], args), # x
+      map(arg -> arg[1][2], args), # datadict
+      [map(arg -> arg[i], args) for i in 2:length(args[1])]...
+   )
 end
 
 
