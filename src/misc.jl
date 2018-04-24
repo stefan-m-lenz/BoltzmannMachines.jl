@@ -76,41 +76,6 @@ function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars...;
    vcat(pmap(monitoredfit, crossvalidationargs(x, pars...)...)...)
 end
 
-# struct CrossvalidationData
-#    x::Matrix{Float64}
-#    batchranges::Vector{UnitRange{Int}}
-# end
-
-# function CrossvalidationData(x::Matrix{Float64}; kfold::Int = 10)
-#    nsamples = size(x, 1)
-#    CrossvalidationData(x, ranges(mostevenbatches(nsamples, kfold)))
-# end
-
-# Base.start(::CrossvalidationData) = 1
-
-# function Base.next(c::CrossvalidationData, i)
-#    nsamples = size(c.x, 1)
-#    rng = c.batchranges[i]
-#    trainingdata = c.x[[!(j in rng) for j in 1:nsamples], :]
-#    evaluationdata = c.x[rng, :]
-#    datadict = DataDict(string(i) => evaluationdata)
-#    ((trainingdata, datadict), i + 1)
-# end
-
-# Base.done(c::CrossvalidationData, i) = (i > length(c.batchranges))
-
-# function crossvalidation(x::Matrix{Float64}, monitoredfit::Function, pars;
-#       kfold::Int = 10)
-
-#    vcat(pmap(
-#          (mask, i, par) -> begin
-#             trainingdata = x[.!mask, :]
-#             evaluationdata = x[mask, :]
-#             datadict = BoltzmannMachines.DataDict(string(i) => evaluationdata)
-#             monitoredfit(x, datadict, par)
-#          end,
-#          args_mask, args_i, args_par)...)
-# end
 
 """
     crossvalidationargs(x, pars...; )
