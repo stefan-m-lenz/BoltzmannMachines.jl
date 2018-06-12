@@ -15,6 +15,7 @@ export
          BernoulliGaussianRBM,
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
+         GaussianBernoulliRBM2,
          PartitionedRBM,
          fitrbm, freeenergy, initrbm,
          joinrbms, joindbms,

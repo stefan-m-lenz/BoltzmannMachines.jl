@@ -803,8 +803,9 @@ function visiblepotential!(v::M, rbm::Binomial2BernoulliRBM, h::M,
    v .*= 2.0
 end
 
-function visiblepotential!(v::Vector{Float64}, gbrbm::GaussianBernoulliRBM,
-      h::Vector{Float64}, factor::Float64 = 1.0)
+function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM,
+      h::M, factor::Float64 = 1.0
+      ) where{M <: AbstractArray{Float64,1}}
 
    A_mul_B!(v, gbrbm.weights, h)
    v .*= gbrbm.sd
@@ -819,9 +820,10 @@ function visiblepotential!(v::M, gbrbm::GaussianBernoulliRBM, h::M,
    broadcast!(+, v, v, gbrbm.visbias')
 end
 
-function visiblepotential!(v::Vector{Float64},
+function visiblepotential!(v::M,
       gbrbm::Union{GaussianBernoulliRBM2, GaussianMixtureRBM},
-      h::Vector{Float64}, factor::Float64 = 1.0)
+      h::M, factor::Float64 = 1.0
+      ) where{M <: AbstractArray{Float64,1}}
 
    A_mul_B!(v, gbrbm.weights, h)
    v .+= gbrbm.visbias
