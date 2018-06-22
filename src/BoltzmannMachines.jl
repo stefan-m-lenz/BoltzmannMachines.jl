@@ -52,6 +52,7 @@ include("dbmtraining.jl")
 include("weightsjoining.jl")
 include("evaluating.jl")
 include("monitoring.jl")
+include("beam.jl")
 include("misc.jl")
 
 include("BMPlots.jl")
