@@ -230,6 +230,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
       sdgradclipnorm::Float64 = 0.0,
+      sampling_autocorcoeff::Float64 = 0.9,
+      sampling_sd::Float64 = 0.9,
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
@@ -249,6 +251,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
 
    normalbatchsize = true
 
+   # go through all samples or thorugh all batches of samples
    for batchindex in eachindex(batchmasks)
       batchmask = batchmasks[batchindex]
 
@@ -269,6 +272,10 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       # Calculate potential induced by visible nodes, used for update
       hiddenpotential!(h, rbm, v, upfactor)
 
+      if sampling_autocorcoeff != 0.0
+         temperature = initgammaprocess(sampling_autocorcoeff, sampling_sd)
+      end
+
       # In case of CD, start Gibbs chain with the hidden state induced by the
       # sample. In case of PCD, start Gibbs chain with
       # previous state of the Gibbs chain.
@@ -279,9 +286,19 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       end
       samplehiddenpotential!(hmodel, rbm)
 
-      for step = 2:cdsteps
-         samplevisible!(vmodel, rbm, hmodel, downfactor)
-         samplehidden!(hmodel, rbm, vmodel, upfactor)
+      if sampling_autocorcoeff == 0
+         for step = 2:cdsteps
+            samplevisible!(vmodel, rbm, hmodel, downfactor)
+            samplehidden!(hmodel, rbm, vmodel, upfactor)
+         end
+      else
+         for step = 2:cdsteps
+            beta = updatebeta(temperature, sampling_autocorcoeff, sampling_sd)
+            gbrbm2 = BMs.GaussianBernoulliRBM2(rbm.weights, rbm.visbias, rbm.hidbias,
+                  copy(rbm.sd) / sqrt(temperature))
+            BMs.samplevisible!(vmodel, gbrbm2, hmodel)
+            BMs.samplehidden!(hmodel, rbm, vmodel, 1/temperature)
+         end
       end
 
       # Do not sample in last step to avoid unnecessary sampling noise
@@ -301,6 +318,26 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
    end
 
    rbm
+end
+
+function trainbeam!(rbm::AbstractRBM, x::Array{Float64,2};
+   chainstate::Matrix{Float64} = Matrix{Float64}(0, 0),
+   upfactor::Float64 = 1.0,
+   downfactor::Float64 = 1.0,
+   learningrate::Float64 = 0.005,
+   cdsteps::Int = 1,
+   batchsize::Int = 1,
+   sdlearningrate::Float64 = 0.0,
+   sdgradclipnorm::Float64 = 0.0,
+
+   # write-only arguments for reusing allocated space:
+   v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
+   h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+   hmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
+   vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
+   posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
+   negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
+
 end
 
 
