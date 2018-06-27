@@ -46,6 +46,7 @@ export
 
 include("bmtypes.jl")
 include("gibbssampling.jl")
+include("gradients.jl")
 include("rbmtraining.jl")
 include("rbmstacking.jl")
 include("dbmtraining.jl")

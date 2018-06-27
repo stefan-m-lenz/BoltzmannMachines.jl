@@ -174,6 +174,7 @@ function initvisiblebias(x::Array{Float64,2})
    initbias
 end
 
+
 """
     nomonitoring
 Accepts a model and a number of epochs and returns nothing.
@@ -228,18 +229,13 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
       batchsize::Int = 1,
-      sdlearningrate::Float64 = 0.0,
-      sdgradclipnorm::Float64 = 0.0,
-      sampling_autocorcoeff::Float64 = 0.9,
-      sampling_sd::Float64 = 0.9,
+      gradient::AbstractGradientStep = loglikelihoodgradientstep(rbm, learningrate),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
       h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
       hmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-      vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-      posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
-      negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
+      vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)))
 
    nsamples = size(x, 1)
 
@@ -272,10 +268,6 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       # Calculate potential induced by visible nodes, used for update
       hiddenpotential!(h, rbm, v, upfactor)
 
-      if sampling_autocorcoeff != 0.0
-         temperature = initgammaprocess(sampling_autocorcoeff, sampling_sd)
-      end
-
       # In case of CD, start Gibbs chain with the hidden state induced by the
       # sample. In case of PCD, start Gibbs chain with
       # previous state of the Gibbs chain.
@@ -286,19 +278,9 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       end
       samplehiddenpotential!(hmodel, rbm)
 
-      if sampling_autocorcoeff == 0
-         for step = 2:cdsteps
-            samplevisible!(vmodel, rbm, hmodel, downfactor)
-            samplehidden!(hmodel, rbm, vmodel, upfactor)
-         end
-      else
-         for step = 2:cdsteps
-            beta = updatebeta(temperature, sampling_autocorcoeff, sampling_sd)
-            gbrbm2 = BMs.GaussianBernoulliRBM2(rbm.weights, rbm.visbias, rbm.hidbias,
-                  copy(rbm.sd) / sqrt(temperature))
-            BMs.samplevisible!(vmodel, gbrbm2, hmodel)
-            BMs.samplehidden!(hmodel, rbm, vmodel, 1/temperature)
-         end
+      for step = 2:cdsteps
+         samplevisible!(vmodel, rbm, hmodel, downfactor)
+         samplehidden!(hmodel, rbm, vmodel, upfactor)
       end
 
       # Do not sample in last step to avoid unnecessary sampling noise
@@ -312,214 +294,9 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
          hmodel = hmodel[1:thisbatchsize, :]
       end
 
-      updateparameters!(rbm, v, vmodel, h, hmodel,
-            learningrate, sdlearningrate, sdgradclipnorm,
-            posupdate, negupdate)
+      computegradient!(gradient, rbm, v, vmodel, h, hmodel)
+      updateparameters!(rbm, gradient)
    end
 
    rbm
-end
-
-function trainbeam!(rbm::AbstractRBM, x::Array{Float64,2};
-   chainstate::Matrix{Float64} = Matrix{Float64}(0, 0),
-   upfactor::Float64 = 1.0,
-   downfactor::Float64 = 1.0,
-   learningrate::Float64 = 0.005,
-   cdsteps::Int = 1,
-   batchsize::Int = 1,
-   sdlearningrate::Float64 = 0.0,
-   sdgradclipnorm::Float64 = 0.0,
-
-   # write-only arguments for reusing allocated space:
-   v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-   h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-   hmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-   vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-   posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
-   negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
-
-end
-
-
-function trainrbm!(gmrbm::GaussianMixtureRBM, x::Array{Float64,2};
-      chainstate::Matrix{Float64} = Matrix{Float64}(0, 0), # ignored
-      upfactor::Float64 = 1.0,
-      downfactor::Float64 = 1.0,
-      learningrate::Float64 = 0.005,
-      cdsteps::Int = 1, # ignored
-      batchsize::Int = 1,
-      sdlearningrate::Float64 = 0.0,
-      sdgradclipnorm::Float64 = 0.0,
-
-      # write-only arguments for reusing allocated space:
-      v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-      h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-      hmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
-      vmodel::Matrix{Float64} = Matrix{Float64}(0, 0),
-      posupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)),
-      negupdate::Matrix{Float64} = Matrix{Float64}(size(rbm.weights)))
-
-
-   hiddeninput!(v, gmrbm, x)
-   v .*= -1.0
-   v .-= exp.(gmrbm.visbias)
-
-   gmrbm.visbias .+= learningrate * v
-
-
-end
-
-
-"""
-    updateparameters!(rbm, v, vmodel, h, hmodel, learningrate, sdlearningrate,
-            posupdate, negupdate)
-Updates the RBM `rbm` given the sample `v`,
-the hidden activation `h` induced by the sample
-the vectors `vmodel` and `hmodel` generated by Gibbs sampling, the `learningrate`,
-the learningrate for the standard deviation `learningratesd` (only relevant for
-GaussianBernoulliRBMs) and allocated space for the weights update
-as in form of the write-only arguments `posupdate` and `negupdate`.
-
-!!!  note
-     `hmodel` must not be changed by implementations of `updateparameters!`
-     since the persistent chain state is stored there.
-"""
-function updateparameters!(rbm::BernoulliRBM,
-      v::Matrix{Float64}, vmodel::Matrix{Float64},
-      h::Matrix{Float64}, hmodel::Matrix{Float64},
-      learningrate::Float64,
-      sdlearningrate::Float64,
-      sdgradclipnorm::Float64,
-      posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
-
-   At_mul_B!(posupdate, v, h)
-   At_mul_B!(negupdate, vmodel, hmodel)
-   posupdate .-= negupdate
-   posupdate .*= learningrate
-   rbm.weights .+= posupdate
-   rbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
-   rbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
-   nothing
-end
-
-
-function updateparameters!(rbm::Binomial2BernoulliRBM,
-      v::Matrix{Float64}, vmodel::Matrix{Float64},
-      h::Matrix{Float64}, hmodel::Matrix{Float64},
-      learningrate::Float64,
-      sdlearningrate::Float64,
-      sdgradclipnorm::Float64,
-      posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
-
-   # To train a Binomial2BernoulliRBM exactly like
-   # training a BernoulliRBM where each two nodes share the weights,
-   # use half the learning rate in the visible nodes.
-   learningratehidden = learningrate
-   learningrate /= 2.0
-
-   At_mul_B!(posupdate, v, h)
-   At_mul_B!(negupdate, vmodel, hmodel)
-   posupdate .-= negupdate
-   posupdate .*= learningrate
-   rbm.weights .+= posupdate
-   rbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
-   rbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningratehidden
-   nothing
-end
-
-function updateparameters!(gbrbm::GaussianBernoulliRBM,
-      v::Matrix{Float64}, vmodel::Matrix{Float64},
-      h::Matrix{Float64}, hmodel::Matrix{Float64},
-      learningrate::Float64,
-      sdlearningrate::Float64,
-      sdgradclipnorm::Float64,
-      posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
-
-   # See bottom of page 15 in [Krizhevsky, 2009].
-
-   if sdlearningrate > 0.0
-      sdgrad = sdupdateterm(gbrbm, v, h) - sdupdateterm(gbrbm, vmodel, hmodel)
-
-      v ./= gbrbm.sd'
-      vmodel ./= gbrbm.sd'
-
-      if sdgradclipnorm > 0.0
-         sdgradnorm = norm(sdgrad)
-         if sdgradnorm > sdgradclipnorm
-            rescaling = sdgradclipnorm / sdgradnorm
-            sdlearningrate *= rescaling
-            learningrate *= rescaling
-         end
-      end
-      sdgrad .*= sdlearningrate
-      gbrbm.sd .+= sdgrad
-      if any(gbrbm.sd .< 0.0)
-         warn("SD-Update leading to negative standard deviation not performed")
-         gbrbm.sd .-= sdgrad
-      end
-   else
-      v ./= gbrbm.sd'
-      vmodel ./= gbrbm.sd'
-   end
-
-   At_mul_B!(posupdate, v, h)
-   At_mul_B!(negupdate, vmodel, hmodel)
-   posupdate .-= negupdate
-   posupdate .*= learningrate
-   gbrbm.weights .+= posupdate
-   gbrbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
-   gbrbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd *
-         learningrate
-   nothing
-end
-
-function updateparameters!(gbrbm::GaussianBernoulliRBM2,
-      v::Matrix{Float64}, vmodel::Matrix{Float64},
-      h::Matrix{Float64}, hmodel::Matrix{Float64},
-      learningrate::Float64,
-      sdlearningrate::Float64,
-      sdgradclipnorm::Float64,
-      posupdate::Matrix{Float64}, negupdate::Matrix{Float64})
-
-   # See Cho,
-   # "Improved learning of Gaussian-Bernoulli restricted Boltzmann machines"
-   sdsq = gbrbm.sd .^ 2
-
-   if sdlearningrate > 0.0
-      sdgrads = vmodel .* (hmodel * gbrbm.weights')
-      sdgrads .-= v .* (h * gbrbm.weights')
-      sdgrads .*= 2.0
-      sdgrads .+= (v .- gbrbm.visbias') .^ 2
-      sdgrads .-= (vmodel .- gbrbm.visbias') .^ 2
-      sdgrad = vec(mean(sdgrads, 1))
-      sdgrad ./= sdsq
-      sdgrad ./= gbrbm.sd
-
-      if sdgradclipnorm > 0.0
-         sdgradnorm = norm(sdgrad)
-         if sdgradnorm > sdgradclipnorm
-            rescaling = sdgradclipnorm / sdgradnorm
-            sdlearningrate *= rescaling
-            learningrate *= rescaling
-         end
-      end
-      sdgrad .*= sdlearningrate
-      gbrbm.sd .+= sdgrad
-      if any(gbrbm.sd .< 0.0)
-         warn("SD-Update leading to negative standard deviation not performed")
-         gbrbm.sd .-= sdgrad
-      end
-   end
-
-   v ./= sdsq'
-   vmodel ./= sdsq'
-
-   At_mul_B!(posupdate, v, h)
-   At_mul_B!(negupdate, vmodel, hmodel)
-   posupdate .-= negupdate
-   posupdate .*= learningrate
-   gbrbm.weights .+= posupdate
-   gbrbm.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1)) * learningrate
-   gbrbm.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) * learningrate
-   nothing
 end
