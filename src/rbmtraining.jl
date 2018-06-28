@@ -217,7 +217,8 @@ Trains the given `rbm` for one epoch using the data set `x`.
 (See also function `fitrbm`.)
 
 # Optional keyword arguments:
-* `learningrate`, `cdsteps`, `sdlearningrate`, `upfactor`, `downfactor`:
+* `learningrate`, `cdsteps`, `sdlearningrate`, `upfactor`, `downfactor`,
+   `gradientstep`:
    See documentation of function `fitrbm`.
 * `chainstate`: a matrix for holding the states of the RBM's hidden nodes. If
    it is specified, PCD is used.
@@ -229,7 +230,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
       batchsize::Int = 1,
-      gradient::AbstractGradientStep = loglikelihoodgradientstep(rbm, learningrate),
+      gradientstep::AbstractGradientStep = loglikelihoodgradientstep(rbm, learningrate),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
@@ -294,8 +295,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
          hmodel = hmodel[1:thisbatchsize, :]
       end
 
-      computegradient!(gradient, rbm, v, vmodel, h, hmodel)
-      updateparameters!(rbm, gradient)
+      computegradient!(gradientstep, rbm, v, vmodel, h, hmodel)
+      updateparameters!(rbm, gradientstep)
    end
 
    rbm
