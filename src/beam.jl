@@ -19,7 +19,7 @@ function criticupdate!(criticupdate::M, rbm::AbstractRBM,
 end
 
 function criticupdate!(criticupdate::M, rbm::GaussianBernoulliRBM2,
-   vmodel::M, h, hmodel::M) where {M <: AbstractArray{Float64, 2}}
+   vmodel::M, h::M, hmodel::M) where {M <: AbstractArray{Float64, 2}}
 
    invoke(criticupdate, Tuple{M, AbstractRBM, M, M},
          rbm, vmodel, h, hmodel)

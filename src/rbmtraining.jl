@@ -56,8 +56,9 @@ function fitrbm(x::Matrix{Float64};
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
-      sdgradclipnorm::Float64 = 0.0,
-      sdinitfactor::Float64 = 0.0)
+      sdinitfactor::Float64 = 0.0,
+
+      gradientsteps::Vector{AbstractGradientStep} = Vector{AbstractGradientStep}())
 
    if startrbm === NoRBM()
       rbm = initrbm(x, nhidden, rbmtype)
@@ -74,6 +75,14 @@ function fitrbm(x::Matrix{Float64};
       rbm.sd .*= sdinitfactor
    end
 
+   if isempty(gradientsteps)
+      gradientsteps = fill(
+            LoglikelihoodGradientStep(rbm;
+                  learningrate = learningrate, sdlearningrate = sdlearningrate),
+            epochs)
+   end
+   assert_enoughvaluesforepochs("gradientsteps", gradientsteps, epochs)
+
    if pcd
       chainstate = rand(batchsize, nhidden)
    else
@@ -85,8 +94,6 @@ function fitrbm(x::Matrix{Float64};
    h = Matrix{Float64}(batchsize, nhidden)
    hmodel = Matrix{Float64}(batchsize, nhidden)
    vmodel = Matrix{Float64}(batchsize, nvisible)
-   posupdate = Matrix{Float64}(nvisible, nhidden)
-   negupdate = Matrix{Float64}(nvisible, nhidden)
 
    for epoch = 1:epochs
 
@@ -95,10 +102,9 @@ function fitrbm(x::Matrix{Float64};
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
-            sdgradclipnorm = sdgradclipnorm,
+            gradientstep = gradientsteps[epoch],
             batchsize = batchsize,
-            h = h, hmodel = hmodel, vmodel = vmodel,
-            posupdate = posupdate, negupdate = negupdate)
+            h = h, hmodel = hmodel, vmodel = vmodel)
 
       # Evaluation of learning after each training epoch
       monitoring(rbm, epoch)
@@ -230,7 +236,9 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       learningrate::Float64 = 0.005,
       cdsteps::Int = 1,
       batchsize::Int = 1,
-      gradientstep::AbstractGradientStep = loglikelihoodgradientstep(rbm, learningrate),
+      sdlearningrate::Float64 = 0.0,
+      gradientstep::AbstractGradientStep = LoglikelihoodGradientStep(rbm;
+            learningrate = learningrate, sdlearningrate = sdlearningrate),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
@@ -295,7 +303,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
          hmodel = hmodel[1:thisbatchsize, :]
       end
 
-      computegradient!(gradientstep, rbm, v, vmodel, h, hmodel)
+      computegradient!(gradientstep, v, vmodel, h, hmodel, rbm)
       updateparameters!(rbm, gradientstep)
    end
 
