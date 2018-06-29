@@ -5,6 +5,27 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
    end
 end
 
+function assertinitoptimizations(optimization::AbstractOptimization,
+      optimizations::Vector{AbstractOptimization}, rbm::R,
+      learningrate::Float64, sdlearningrate::Float64, epochs::Int
+      ) where {R<:AbstractRBM}
+
+   if isempty(optimizations)
+      if optimization === NoOptimization()
+         # default optimization algorithm
+         optimization = LoglikelihoodGradientStep(rbm;
+               learningrate = learningrate, sdlearningrate = sdlearningrate)
+      else
+         optimization = initialized(optimization, rbm)
+      end
+      optimizations = fill(optimization, epochs)
+   else
+      optimizations = map(opt -> initialized(opt, rbm), optimizations)
+   end
+   assert_enoughvaluesforepochs("optimizations", optimizations, epochs)
+   optimizations
+end
+
 
 """
     fitrbm(x; ...)
@@ -58,7 +79,8 @@ function fitrbm(x::Matrix{Float64};
       sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
       sdinitfactor::Float64 = 0.0,
 
-      gradientsteps::Vector{AbstractGradientStep} = Vector{AbstractGradientStep}())
+      optimization::AbstractOptimization = NoOptimization(),
+      optimizations::Vector{AbstractOptimization} = Vector{AbstractOptimization}())
 
    if startrbm === NoRBM()
       rbm = initrbm(x, nhidden, rbmtype)
@@ -75,13 +97,8 @@ function fitrbm(x::Matrix{Float64};
       rbm.sd .*= sdinitfactor
    end
 
-   if isempty(gradientsteps)
-      gradientsteps = fill(
-            LoglikelihoodGradientStep(rbm;
-                  learningrate = learningrate, sdlearningrate = sdlearningrate),
-            epochs)
-   end
-   assert_enoughvaluesforepochs("gradientsteps", gradientsteps, epochs)
+   optimizations = assertinitoptimizations(optimization, optimizations, rbm,
+         learningrate, sdlearningrate, epochs)
 
    if pcd
       chainstate = rand(batchsize, nhidden)
@@ -102,7 +119,7 @@ function fitrbm(x::Matrix{Float64};
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
-            gradientstep = gradientsteps[epoch],
+            optimization = optimizations[epoch],
             batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel)
 
@@ -237,7 +254,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       cdsteps::Int = 1,
       batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
-      gradientstep::AbstractGradientStep = LoglikelihoodGradientStep(rbm;
+      optimization::AbstractOptimization = LoglikelihoodGradientStep(rbm;
             learningrate = learningrate, sdlearningrate = sdlearningrate),
 
       # write-only arguments for reusing allocated space:
@@ -303,8 +320,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
          hmodel = hmodel[1:thisbatchsize, :]
       end
 
-      computegradient!(gradientstep, v, vmodel, h, hmodel, rbm)
-      updateparameters!(rbm, gradientstep)
+      computegradient!(optimization, v, vmodel, h, hmodel, rbm)
+      updateparameters!(rbm, optimization)
    end
 
    rbm

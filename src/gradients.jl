@@ -1,8 +1,11 @@
-abstract type AbstractGradientStep{R<:AbstractRBM}
+abstract type AbstractOptimization{R<:AbstractRBM}
 end
 
 abstract type
-      AbstractLoglikelihoodGradientStep{R<:AbstractRBM} <: AbstractGradientStep{R}
+      AbstractLoglikelihoodGradientStep{R<:AbstractRBM} <: AbstractOptimization{R}
+end
+
+struct NoOptimization <: AbstractOptimization{AbstractRBM}
 end
 
 mutable struct LoglikelihoodGradientStep{R<:AbstractRBM} <: AbstractLoglikelihoodGradientStep{R}
@@ -10,20 +13,24 @@ mutable struct LoglikelihoodGradientStep{R<:AbstractRBM} <: AbstractLoglikelihoo
    negupdate::Matrix{Float64}
    learningrate::Float64
    sdlearningrate::Float64
+end
 
-   function LoglikelihoodGradientStep{R}(rbm::R, learningrate::Float64, sdlearningrate::Float64) where R
-      new(deepcopy(rbm), Matrix{Float64}(size(rbm.weights)), learningrate, sdlearningrate)
-   end
+function LoglikelihoodGradientStep(;
+      learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0)
+
+   LoglikelihoodGradientStep(NoRBM(), Matrix{Float64}(0,0),
+         learningrate, sdlearningrate)
 end
 
 function LoglikelihoodGradientStep(rbm::R;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0) where {R<:AbstractRBM}
 
-   LoglikelihoodGradientStep{R}(rbm, learningrate, sdlearningrate)
+   LoglikelihoodGradientStep{R}(deepcopy(rbm), Matrix{Float64}(size(rbm.weights)),
+         learningrate, sdlearningrate)
 end
 
 
-struct BeamAdversarialGradientStep{R<: AbstractRBM} <: AbstractGradientStep{R}
+struct BeamAdversarialGradientStep{R<: AbstractRBM} <: AbstractOptimization{R}
    gradient::R
    negupdate::Matrix{Float64}
    learningrate::Float64
@@ -32,8 +39,8 @@ end
 
 
 struct CombinedGradientStep{R<: AbstractRBM,
-         G1 <: AbstractGradientStep{R},
-         G2 <: AbstractGradientStep{R}} <: AbstractGradientStep{R}
+         G1 <: AbstractOptimization{R},
+         G2 <: AbstractOptimization{R}} <: AbstractOptimization{R}
 
    part1::G1
    part2::G2
@@ -42,17 +49,42 @@ struct CombinedGradientStep{R<: AbstractRBM,
 end
 
 
-function beamgradientstep(rbm::R; learningrate::Float64 = 0.05,
+function beamoptimization(learningrate::Float64 = 0.05,
       sdlearningrate::Float64 = 0.0,
-      adversarialweight::Float64 = 0.1
+      adversarialweight::Float64 = 0.1)
+
+   llstep = LoglikelihoodGradientStep(
+         learningrate = learningrate, sdlearningrate = sdlearningrate)
+   advstep = BeamAdversarialGradientStep(
+         Matrix{Float64}(0,0), learningrate, sdlearningrate)
+
+   CombinedGradientStep(advstep, llstep, NoRBM(), adversarialweight)
+end
+
+
+function initialized(gradientstep::AbstractOptimization, rbm::AbstractRBM)
+   # do nothing
+end
+
+function initialized(gradientstep::LoglikelihoodGradientStep{R1}, rbm::R2
+      ) where {R1 <: AbstractRBM, R2 <: AbstractRBM}
+
+   LoglikelihoodGradientStep{R}(deepcopy(rbm), Matrix{Float64}(size(rbm.weights),
+         gradientstep.learningrate, gradientstep.sdlearningrate))
+end
+
+function initialized(gradientstep::CombinedGradientStep, rbm::R) where {R <: AbstractRBM}
+   CombinedGradientStep{R}(initialized(gradientstep.part1),
+         initialized(gradientstep.part2),
+         deepcopy(rbm),
+         gradientstep.weight1)
+end
+
+function initialized(gradientstep::BeamAdversarialGradientStep, rbm::R
       ) where {R <: AbstractRBM}
 
-   llstep = LoglikelihoodGradientStep(rbm;
-         learningrate = learningrate, sdlearningrate = sdlearningrate)
-   advstep = BeamAdversarialGradientStep(rbm,
-         Matrix{Float64}(size(rbm.weights)), learningrate, sdlearningrate)
-
-   CombinedGradientStep(advstep, llstep, deepcopy(rbm), adversarialweight)
+   BeamAdversarialGradientStep{R}(deepcopy(rbm), Matrix{Float64}(size(rbm.weights)),
+         gradientstep.learningrate, gradientstep.sdlearningrate)
 end
 
 
@@ -103,8 +135,8 @@ function computegradient!(
    At_mul_B!(gradientstep.negupdate, vmodel, hmodel)
    gradientstep.gradient.weights .-= gradientstep.negupdate
 
-   gradientstep.gradient.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1))
-   gradientstep.gradient.visbias .+= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd
+   gradientstep.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
+   gradientstep.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd
 
    gradient
 end
@@ -136,16 +168,16 @@ function computegradient!(
    At_mul_B!(gradientstep.negupdate, vmodel, hmodel)
    gradientstep.gradient.weights .-= gradientstep.negupdate
 
-   gradientstep.gradient.hidbias .+= vec(mean(h, 1) - mean(hmodel, 1))
-   gradientstep.gradient.visbias .+= vec(mean(v, 1) - mean(vmodel, 1))
+   gradientstep.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
+   gradientstep.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1))
 
    gradient
 end
 
 function computegradient!(
-      gradientstep::BeamAdversarialGradientStep{AbstractRBM},
+      gradientstep::BeamAdversarialGradientStep{R},
       v::M, vmodel::M, h::M, hmodel::M, rbm::AbstractRBM
-      ) where {M<: AbstractArray{Float64, 2}}
+      ) where {M<: AbstractArray{Float64, 2}, R <:AbstractRBM}
 
    critic = nearestneighbourcritic(h, hmodel)
 
@@ -159,6 +191,7 @@ function computegradient!(
       end
    end
 
+   # TODO check if standard deviation needed
    for i = 1:nvisible
       gradientstep.gradient.visbias[i] = cov(critic, vmodel[:, i])
    end
@@ -176,8 +209,8 @@ function computegradient!(
       ) where {M<: AbstractArray{Float64, 2}}
 
    invoke(computegradient!,
-         Tuple{BeamAdversarialGradientStep{AbstractRBM}, M, M, M, M, AbstractRBM},
-         rbm, v, vmodel, h, hmodel)
+         Tuple{BeamAdversarialGradientStep{GaussianBernoulliRBM2}, M, M, M, M, AbstractRBM},
+         v, vmodel, h, hmodel, rbm)
 
    sdsq = rbm.sd .^ 2
    gradientstep.gradient.weights ./= sdsq
@@ -185,9 +218,9 @@ function computegradient!(
    gradient
 end
 
-function computegradient!(gradientstep::CombinedGradientStep{AbstractRBM},
+function computegradient!(gradientstep::CombinedGradientStep{R},
       v::M, vmodel::M, h::M, hmodel::M, rbm::AbstractRBM
-      ) where {M<: AbstractArray{Float64, 2}}
+      ) where {M<: AbstractArray{Float64, 2}, R <:AbstractRBM}
 
    computegradient!(gradientstep.part1, copy(v), copy(vmodel), copy(h), hmodel, rbm)
    computegradient!(gradientstep.part2, v, vmodel, h, hmodel, rbm)
@@ -211,12 +244,12 @@ function computegradient!(gradientstep::CombinedGradientStep{AbstractRBM},
 end
 
 function computegradient!(gradientstep::CombinedGradientStep{R},
-   v::M, vmodel::M, h::M, hmodel::M, rbm::R
-   ) where {M<: AbstractArray{Float64, 2},
-         R <:Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
+      v::M, vmodel::M, h::M, hmodel::M, rbm::R
+      ) where {M<: AbstractArray{Float64, 2},
+            R <:Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
 
    invoke(computegradient!,
-         Tuple{CombinedGradientStep{AbstractRBM}, M, M, M, M, AbstractRBM},
+         Tuple{CombinedGradientStep{R}, M, M, M, M, AbstractRBM},
          gradientstep, v, vmodel, h, hmodel, rbm)
 
    gradientstep.gradient.sd .=
@@ -227,22 +260,19 @@ function computegradient!(gradientstep::CombinedGradientStep{R},
 end
 
 
-
-
-
 """
     updateparameters!(rbm, gradientstep)
 Updates the RBM by walking a step in the direction of the gradient that
 has been computed by calling `computegradient!` on `gradientstep`.
 """
 function updateparameters!(rbm::AbstractRBM,
-      gradientstep::AbstractGradientStep{R}) where {R <: AbstractRBM}
+      gradientstep::AbstractOptimization{R}) where {R <: AbstractRBM}
 
    updateweightsandbiases!(rbm, gradientstep)
 end
 
 function updateparameters!(rbm::Binomial2BernoulliRBM,
-      gradientstep::AbstractGradientStep{Binomial2BernoulliRBM})
+      gradientstep::AbstractOptimization{Binomial2BernoulliRBM})
 
    # To train a Binomial2BernoulliRBM exactly like
    # training a BernoulliRBM where each two nodes share the weights,
@@ -259,7 +289,7 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
    rbm
 end
 
-function updateparameters!(rbm::R, gradientstep::AbstractGradientStep{R}
+function updateparameters!(rbm::R, gradientstep::AbstractOptimization{R}
       ) where {R <: Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
 
    updateweightsandbiases!(rbm, gradientstep)
@@ -273,7 +303,7 @@ end
 
 
 function updateweightsandbiases!(rbm::R,
-      gradientstep::AbstractGradientStep{R}) where {R <: AbstractRBM}
+      gradientstep::AbstractOptimization{R}) where {R <: AbstractRBM}
 
    gradientstep.gradient.weights .*= gradientstep.learningrate
    gradientstep.gradient.visbias .*= gradientstep.learningrate
