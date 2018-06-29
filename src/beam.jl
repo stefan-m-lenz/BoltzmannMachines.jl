@@ -1,33 +1,6 @@
 # This file implements methods from the paper
 # "Boltzmann Encoded Adversarial Machines" of Fisher et al. (2018)
 
-function criticupdate!(criticupdate::M, rbm::AbstractRBM,
-      vmodel::M, h, hmodel::M) where {M <: AbstractArray{Float64, 2}}
-
-   critic = nearestneighbourcritic(h, hmodel)
-
-   nvisible = nvisiblenodes(rbm)
-   nhidden = nhiddennodes(rbm)
-
-   for i = 1:nhidden
-      for j = 1:nvisible
-         criticupdate[i, j] = cov(critic, vmodel[:, i] .* hmodel[:, j])
-      end
-   end
-
-   criticupdate
-end
-
-function criticupdate!(criticupdate::M, rbm::GaussianBernoulliRBM2,
-   vmodel::M, h::M, hmodel::M) where {M <: AbstractArray{Float64, 2}}
-
-   invoke(criticupdate, Tuple{M, AbstractRBM, M, M},
-         rbm, vmodel, h, hmodel)
-
-   sdsq = rbm.sd .^ 2
-   criticupdate ./= sdsq
-end
-
 
 function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 5;
       autocorrcoeff::Float64 = 0.9, betasd::Float64 = 0.9)
@@ -67,11 +40,12 @@ function nearestneighbourcritic(xdata::M, xmodel::M, k::Int,
 
    # Distancematrix is filled with the distances
    # between all combinations of samples in x.
-   distancematrix = zeros(nsamples, nsamples)
+   distancematrix = Matrix{Float64}(nsamples, nsamples)
    for i = 1:nsamples
       for j = (i+1):nsamples
          distancematrix[i, j] = distancematrix[j, i] = norm(x[j, :] - x[i, :])
       end
+      distancematrix[i, i] = 0.0
    end
 
    ret = Vector{Float64}(ndatasamples)

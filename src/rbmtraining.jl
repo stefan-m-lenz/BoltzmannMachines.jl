@@ -5,6 +5,7 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
    end
 end
 
+# TODO learningrates instead of learningrate
 function assertinitoptimizations(optimization::AbstractOptimization,
       optimizations::Vector{AbstractOptimization}, rbm::R,
       learningrate::Float64, sdlearningrate::Float64, epochs::Int
