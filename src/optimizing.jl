@@ -126,7 +126,7 @@ function computegradient!(
 
    optimizer.gradient.hidbias .= vec(mean(h, 1))
    optimizer.gradient.hidbias .-= vec(mean(hmodel, 1))
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(
@@ -151,7 +151,7 @@ function computegradient!(
    optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
    optimizer.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd
 
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(
@@ -184,7 +184,7 @@ function computegradient!(
    optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
    optimizer.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1))
 
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(
@@ -213,7 +213,7 @@ function computegradient!(
       optimizer.gradient.hidbias[j] = cov(optimizer.critic, hmodel[:, j])
    end
 
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(
@@ -242,7 +242,7 @@ function computegradient!(
       end
    end
 
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
@@ -267,7 +267,7 @@ function computegradient!(optimizer::CombinedOptimizer{R},
          grad1.hidbias * optimizer.weight1 +
          grad2.hidbias * (1 - optimizer.weight1)
 
-   gradient
+   optimizer.gradient
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
@@ -280,10 +280,10 @@ function computegradient!(optimizer::CombinedOptimizer{R},
          optimizer, v, vmodel, h, hmodel, rbm)
 
    optimizer.gradient.sd .=
-         optimizer.part1.gradient.sd * optimizer.weight1 +
-         optimizer.part2.gradient.sd * (1 - optimizer.weight1)
+         optimizer.part1.gradient.sd .* optimizer.weight1 .+
+         optimizer.part2.gradient.sd .* (1 - optimizer.weight1)
 
-   gradient
+   optimizer.gradient
 end
 
 
