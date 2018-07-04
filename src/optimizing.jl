@@ -281,7 +281,7 @@ function computegradient!(optimizer::CombinedOptimizer{R},
 
    optimizer.gradient.sd .=
          optimizer.part1.gradient.sd * optimizer.weight1 +
-         optimizer.part1.gradient.sd * (1 - optimizer.weight1)
+         optimizer.part2.gradient.sd * (1 - optimizer.weight1)
 
    gradient
 end
