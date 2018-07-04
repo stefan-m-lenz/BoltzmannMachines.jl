@@ -6,25 +6,25 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
 end
 
 # TODO learningrates instead of learningrate
-function assertinitoptimizations(optimization::AbstractOptimization,
-      optimizations::Vector{AbstractOptimization}, rbm::R,
+function assertinitoptimizers(optimizer::AbstractOptimizer,
+      optimizers::Vector{AbstractOptimizer}, rbm::R,
       learningrate::Float64, sdlearningrate::Float64, epochs::Int
       ) where {R<:AbstractRBM}
 
-   if isempty(optimizations)
-      if optimization === NoOptimization()
+   if isempty(optimizers)
+      if optimizer === NoOptimizer()
          # default optimization algorithm
-         optimization = LoglikelihoodGradientStep(rbm;
+         optimizer = LoglikelihoodOptimizer(rbm;
                learningrate = learningrate, sdlearningrate = sdlearningrate)
       else
-         optimization = initialized(optimization, rbm)
+         optimizer = initialized(optimizer, rbm)
       end
-      optimizations = fill(optimization, epochs)
+      optimizers = fill(optimizer, epochs)
    else
-      optimizations = map(opt -> initialized(opt, rbm), optimizations)
+      optimizers = map(opt -> initialized(opt, rbm), optimizers)
    end
-   assert_enoughvaluesforepochs("optimizations", optimizations, epochs)
-   optimizations
+   assert_enoughvaluesforepochs("optimizers", optimizers, epochs)
+   optimizers
 end
 
 
@@ -42,7 +42,7 @@ with Contrastive Divergence (CD), and returns it.
    can be specified as single value, used throughout all epochs, or as a vector
    of `learningrates` that contains a value for each epoch. Defaults to 0.005.
 * `batchsize`: number of samples that are used for making one step in the
-   stochastic gradient descent optimization algorithm. Default is 1.
+   stochastic gradient descent optimizer algorithm. Default is 1.
 * `pcd`: indicating whether Persistent Contrastive Divergence (PCD) is to
    be used (true, default) or simple CD that initializes the Gibbs Chain with
    the training sample (false)
@@ -80,8 +80,8 @@ function fitrbm(x::Matrix{Float64};
       sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
       sdinitfactor::Float64 = 0.0,
 
-      optimization::AbstractOptimization = NoOptimization(),
-      optimizations::Vector{AbstractOptimization} = Vector{AbstractOptimization}())
+      optimizer::AbstractOptimizer = NoOptimizer(),
+      optimizers::Vector{AbstractOptimizer} = Vector{AbstractOptimizer}())
 
    if startrbm === NoRBM()
       rbm = initrbm(x, nhidden, rbmtype)
@@ -98,7 +98,7 @@ function fitrbm(x::Matrix{Float64};
       rbm.sd .*= sdinitfactor
    end
 
-   optimizations = assertinitoptimizations(optimization, optimizations, rbm,
+   optimizers = assertinitoptimizers(optimizer, optimizers, rbm,
          learningrate, sdlearningrate, epochs)
 
    if pcd
@@ -120,7 +120,7 @@ function fitrbm(x::Matrix{Float64};
             upfactor = upfactor, downfactor = downfactor,
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
-            optimization = optimizations[epoch],
+            optimizer = optimizers[epoch],
             batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel)
 
@@ -242,7 +242,7 @@ Trains the given `rbm` for one epoch using the data set `x`.
 
 # Optional keyword arguments:
 * `learningrate`, `cdsteps`, `sdlearningrate`, `upfactor`, `downfactor`,
-   `gradientstep`:
+   `optimizer`:
    See documentation of function `fitrbm`.
 * `chainstate`: a matrix for holding the states of the RBM's hidden nodes. If
    it is specified, PCD is used.
@@ -255,7 +255,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       cdsteps::Int = 1,
       batchsize::Int = 1,
       sdlearningrate::Float64 = 0.0,
-      optimization::AbstractOptimization = LoglikelihoodGradientStep(rbm;
+      optimizer::AbstractOptimizer = LoglikelihoodOptimizer(rbm;
             learningrate = learningrate, sdlearningrate = sdlearningrate),
 
       # write-only arguments for reusing allocated space:
@@ -321,8 +321,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
          hmodel = hmodel[1:thisbatchsize, :]
       end
 
-      computegradient!(optimization, v, vmodel, h, hmodel, rbm)
-      updateparameters!(rbm, optimization)
+      computegradient!(optimizer, v, vmodel, h, hmodel, rbm)
+      updateparameters!(rbm, optimizer)
    end
 
    rbm
