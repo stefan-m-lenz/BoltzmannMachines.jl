@@ -1,5 +1,7 @@
 module BoltzmannMachines
 
+using Distributions
+
 const BMs = BoltzmannMachines
 
 export
@@ -46,7 +48,8 @@ export
 
 include("bmtypes.jl")
 include("gibbssampling.jl")
-include("optimizing.jl")
+include("samplers.jl")
+include("optimizers.jl")
 include("rbmtraining.jl")
 include("rbmstacking.jl")
 include("dbmtraining.jl")

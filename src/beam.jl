@@ -3,7 +3,7 @@
 
 
 function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 5;
-      autocorrcoeff::Float64 = 0.9, betasd::Float64 = 0.9)
+      autocorcoeff::Float64 = 0.9, betasd::Float64 = 0.9)
 
    nsamples = size(particles[1], 1)
    vs = map(i -> view(particles[1], i, :), 1:nsamples)
@@ -12,10 +12,10 @@ function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, 
    for k = 1:nsamples
       v = vs[k]
       h = hs[k]
-      beta = initgammaprocess(autocorrcoeff, betasd)
+      beta = initgammaprocess(autocorcoeff, betasd)
 
       for i = 1:nsteps
-         beta = samplegammaprocess(beta, autocorrcoeff, betasd)
+         beta = samplegammaprocess(beta, autocorcoeff, betasd)
          gbrbm2 = GaussianBernoulliRBM2(gbrbm.weights, gbrbm.visbias, gbrbm.hidbias,
                copy(gbrbm.sd) / sqrt(beta))
          samplevisible!(v, gbrbm2, h)

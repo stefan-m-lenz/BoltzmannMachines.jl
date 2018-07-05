@@ -59,10 +59,12 @@ Performs Gibbs sampling on the `particles` in the Boltzmann machine model
 When sampling in multimodal deep Boltzmann machines,
 in-between layers are assumed to contain only Bernoulli-distributed nodes.
 """
-function gibbssample!(particles::Particles, rbm::AbstractRBM, nsteps::Int = 5)
+function gibbssample!(particles::Particles, rbm::AbstractRBM, nsteps::Int = 5,
+      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+
    for i = 1:nsteps
-      samplevisible!(particles[1], rbm, particles[2])
-      samplehidden!(particles[2], rbm, particles[1])
+      samplevisible!(particles[1], rbm, particles[2], downfactor)
+      samplehidden!(particles[2], rbm, particles[1], upfactor)
    end
    particles
 end

@@ -81,7 +81,8 @@ function fitrbm(x::Matrix{Float64};
       sdinitfactor::Float64 = 0.0,
 
       optimizer::AbstractOptimizer = NoOptimizer(),
-      optimizers::Vector{AbstractOptimizer} = Vector{AbstractOptimizer}())
+      optimizers::Vector{AbstractOptimizer} = Vector{AbstractOptimizer}(),
+      sampler::AbstractSampler = NoSampler())
 
    if startrbm === NoRBM()
       rbm = initrbm(x, nhidden, rbmtype)
@@ -121,6 +122,7 @@ function fitrbm(x::Matrix{Float64};
             learningrate = learningrates[epoch],
             sdlearningrate = sdlearningrates[epoch],
             optimizer = optimizers[epoch],
+            sampler = sampler,
             batchsize = batchsize,
             h = h, hmodel = hmodel, vmodel = vmodel)
 
@@ -257,6 +259,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       optimizer::AbstractOptimizer = LoglikelihoodOptimizer(rbm;
             learningrate = learningrate, sdlearningrate = sdlearningrate),
+      sampler::AbstractSampler = NoSampler(),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
@@ -305,10 +308,8 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       end
       samplehiddenpotential!(hmodel, rbm)
 
-      for step = 2:cdsteps
-         samplevisible!(vmodel, rbm, hmodel, downfactor)
-         samplehidden!(hmodel, rbm, vmodel, upfactor)
-      end
+      # Additional sampling steps, may be customized
+      sample!(vmodel, hmodel, sampler, rbm, upfactor, downfactor)
 
       # Do not sample in last step to avoid unnecessary sampling noise
       visiblepotential!(vmodel, rbm, hmodel, downfactor)
