@@ -82,7 +82,7 @@ function fitrbm(x::Matrix{Float64};
 
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{AbstractOptimizer} = Vector{AbstractOptimizer}(),
-      sampler::AbstractSampler = NoSampler())
+      sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)))
 
    if startrbm === NoRBM()
       rbm = initrbm(x, nhidden, rbmtype)
@@ -259,7 +259,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       optimizer::AbstractOptimizer = LoglikelihoodOptimizer(rbm;
             learningrate = learningrate, sdlearningrate = sdlearningrate),
-      sampler::AbstractSampler = NoSampler(),
+      sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)),
 
       # write-only arguments for reusing allocated space:
       v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
