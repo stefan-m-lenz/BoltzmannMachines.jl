@@ -2,7 +2,7 @@
 # "Boltzmann Encoded Adversarial Machines" of Fisher et al. (2018)
 
 
-function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 5;
+function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 10;
       autocorcoeff::Float64 = 0.9, betasd::Float64 = 0.9)
 
    nsamples = size(particles[1], 1)

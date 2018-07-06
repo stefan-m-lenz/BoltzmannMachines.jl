@@ -8,18 +8,21 @@ end
 # TODO learningrates instead of learningrate
 function assertinitoptimizers(optimizer::AbstractOptimizer,
       optimizers::Vector{AbstractOptimizer}, rbm::R,
-      learningrate::Float64, sdlearningrate::Float64, epochs::Int
+      learningrates::Vector{Float64}, sdlearningrates::Vector{Float64},
+      epochs::Int
       ) where {R<:AbstractRBM}
 
    if isempty(optimizers)
       if optimizer === NoOptimizer()
          # default optimization algorithm
-         optimizer = LoglikelihoodOptimizer(rbm;
-               learningrate = learningrate, sdlearningrate = sdlearningrate)
+         optimizers = map(
+               i -> LoglikelihoodOptimizer(rbm;
+                     learningrate = learningrates[i],
+                     sdlearningrate = sdlearningrates[i]),
+               1:length(learningrates))
       else
-         optimizer = initialized(optimizer, rbm)
+         optimizers = fill(initialized(optimizer, rbm), epochs)
       end
-      optimizers = fill(optimizer, epochs)
    else
       optimizers = map(opt -> initialized(opt, rbm), optimizers)
    end
@@ -100,7 +103,7 @@ function fitrbm(x::Matrix{Float64};
    end
 
    optimizers = assertinitoptimizers(optimizer, optimizers, rbm,
-         learningrate, sdlearningrate, epochs)
+         learningrates, sdlearningrates, epochs)
 
    if pcd
       chainstate = rand(batchsize, nhidden)
