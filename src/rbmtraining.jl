@@ -7,7 +7,7 @@ end
 
 # TODO learningrates instead of learningrate
 function assertinitoptimizers(optimizer::AbstractOptimizer,
-      optimizers::Vector{AbstractOptimizer}, rbm::R,
+      optimizers::Vector{<:AbstractOptimizer}, rbm::R,
       learningrates::Vector{Float64}, sdlearningrates::Vector{Float64},
       epochs::Int
       ) where {R<:AbstractRBM}
@@ -84,7 +84,7 @@ function fitrbm(x::Matrix{Float64};
       sdinitfactor::Float64 = 0.0,
 
       optimizer::AbstractOptimizer = NoOptimizer(),
-      optimizers::Vector{AbstractOptimizer} = Vector{AbstractOptimizer}(),
+      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
       sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)))
 
    if startrbm === NoRBM()

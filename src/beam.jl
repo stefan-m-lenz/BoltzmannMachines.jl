@@ -99,13 +99,13 @@ function samplegammaprocess(beta_sample::Float64, autocorr_coeff::Float64,
 
    # h_t ~ Possion( phi/c * h_{t-1})
    lambda = beta_sample*autocorr_coeff/c
-   z = map(Poisson,lambda)
+   z = Poisson(lambda)
    z_sample = rand(z)
 
    # beta_t ~ Gamma(nu + z_t, c)
    a = nu + z_sample
    b = c
-   beta = map(Gamma,a,b)
+   beta = Gamma(a,b)
    beta_sample = rand(beta)
 
    beta_sample
