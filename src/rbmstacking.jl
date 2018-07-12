@@ -22,6 +22,8 @@ mutable struct TrainLayer <: AbstractTrainLayer
    pcd::Bool
    cdsteps::Int
    startrbm::AbstractRBM
+   optimizer::AbstractOptimizer
+   optimizers::Vector{AbstractOptimizer}
 end
 
 
@@ -56,7 +58,9 @@ function TrainLayer(;
       batchsize::Int = 1,
       pcd::Bool = true,
       cdsteps::Int = 1,
-      startrbm::AbstractRBM = NoRBM())
+      startrbm::AbstractRBM = NoRBM(),
+      optimizer::AbstractOptimizer = NoOptimizer(),
+      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
    usedefaultepochs = (epochs < 0)
    usedefaultlearningrate = (learningrate < 0 && isempty(learningrates))
@@ -70,7 +74,8 @@ function TrainLayer(;
          monitoring, rbmtype, nhidden, nvisible,
          batchsize,
          pcd, cdsteps,
-         startrbm)
+         startrbm,
+         optimizer, optimizers)
 end
 
 """
@@ -361,7 +366,9 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          sdlearningrate = trainlayer.sdlearningrate,
          sdlearningrates = trainlayer.sdlearningrates,
          monitoring = monitoring,
-         startrbm = trainlayer.startrbm)
+         startrbm = trainlayer.startrbm,
+         optimizer = trainlayer.optimizer,
+         optimizers = trainlayer.optimizers)
 end
 
 """ Trains a partitioned layer for `stackrbms`. """
