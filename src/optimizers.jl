@@ -174,7 +174,6 @@ function computegradient!(
       sdgrads .-= (vmodel .- gbrbm.visbias') .^ 2
       optimizer.gradient.sd .= vec(mean(sdgrads, 1))
       optimizer.gradient.sd ./= sdsq
-      optimizer.gradient.sd ./= gbrbm.sd
    end
 
    v = v ./ sdsq'
@@ -245,7 +244,7 @@ function computegradient!(
       end
    end
 
-   optimizer.gradient.sd ./= sdsq .* rbm.sd
+   optimizer.gradient.sd ./= sdsq
 
    optimizer.gradient
 end
@@ -321,7 +320,7 @@ function updateparameters!(rbm::Binomial2BernoulliRBM,
 end
 
 function updateparameters!(rbm::R, optimizer::AbstractOptimizer{R}
-      ) where {R <: Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
+      ) where {R <: Union{GaussianBernoulliRBM}}
 
    updateweightsandbiases!(rbm, optimizer)
 
@@ -331,6 +330,16 @@ function updateparameters!(rbm::R, optimizer::AbstractOptimizer{R}
    rbm
 end
 
+function updateparameters!(rbm::R, optimizer::AbstractOptimizer{R}
+      ) where {R <: Union{GaussianBernoulliRBM2}}
+
+   updateweightsandbiases!(rbm, optimizer)
+   if optimizer.sdlearningrate > 0.0
+      rbm.sd .+= (rbm.sd .^ 2)  .*
+            (exp.(optimizer.sdlearningrate .* optimizer.gradient.sd) .- 1.0)
+   end
+   rbm
+end
 
 function updateweightsandbiases!(rbm::R,
       optimizer::AbstractOptimizer{R}) where {R <: AbstractRBM}
