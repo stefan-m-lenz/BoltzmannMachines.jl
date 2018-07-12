@@ -63,6 +63,13 @@ with Contrastive Divergence (CD), and returns it.
    is not learned.
 * `startrbm`: start training with the parameters of the given RBM.
    If this argument is specified, `nhidden` and `rbmtype` are ignored.
+* `optimizer`/`optimizers`: an object of type `AbstractOptimizer` or a vector of
+   them for each epoch. If specified, the optimization is performed as implemented
+   by the given optimizer type. By default, the `LoglikelihoodOptimizer`
+   with the `learningrate`/`learningrates` and `sdlearningrate`/`sdlearningrates`
+   is used. For other types of optimizers, the learning rates must be specified
+   in the `optimizer`. For more information on how to write your own optimizer,
+   see `AbstractOptimizer`.
 """
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),

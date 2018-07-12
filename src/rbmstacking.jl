@@ -33,8 +33,8 @@ Specify parameters for training one RBM-layer in a DBM.
 # Optional keyword arguments:
 * The optional keyword arguments `rbmtype`, `nhidden`, `epochs`,
   `learningrate`/`learningrates`, `sdlearningrate`/`sdlearningrates`,
-  `batchsize`, `pcd`, `cdsteps`, and `startrbm` are passed to `fitrbm`.
-  For a detailed description, see there.
+  `batchsize`, `pcd`, `cdsteps`, `startrbm` and `optimizer`/`optimizers`
+  are passed to `fitrbm`. For a detailed description, see there.
   If a negative value is specified for `learningrate` or `epochs`, this indicates
   that a corresponding default value should be used
   (parameter defined by call to `stackrbms`).
