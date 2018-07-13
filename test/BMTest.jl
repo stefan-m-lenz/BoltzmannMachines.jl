@@ -170,26 +170,30 @@ function test_stackrbms_preparetrainlayers()
    learningrate2 = 0.017
    epochs1 = 27
    epochs2 = 17
+   batchsize = 5
+   batchsize1 = 1
+   batchsize2 = 4
 
    # no layer-specific instructions
    trainlayers = Vector{BMs.TrainLayer}()
    trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, nhiddens)
+         learningrate, nhiddens, batchsize)
    @test length(trainlayers) == length(nhiddens)
    @test all(map(t -> t.learningrate == learningrate, trainlayers))
    @test all(map(t -> t.epochs == epochs, trainlayers))
    @test map(t-> t.nhidden, trainlayers) == nhiddens
+   @test all(map(t-> t.batchsize == batchsize, trainlayers))
 
    # layer-specific instructions without partitioning
    trainlayers = [
          BMs.TrainLayer(learningrate = learningrate1, epochs = epochs1,
-               nhidden = nhiddens[1]);
+               batchsize = batchsize1, nhidden = nhiddens[1]);
          BMs.TrainLayer(learningrate = learningrate2, epochs = epochs2,
-               nhidden = nhiddens[2]);
+               batchsize = batchsize2, nhidden = nhiddens[2]);
          BMs.TrainLayer(nhidden = nhiddens[3])
    ]
    trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, Vector{Int}())
+         learningrate, Vector{Int}(), batchsize)
    @test length(trainlayers) == length(nhiddens)
    @test trainlayers[1].learningrate == learningrate1
    @test trainlayers[2].learningrate == learningrate2
@@ -198,6 +202,9 @@ function test_stackrbms_preparetrainlayers()
    @test trainlayers[2].epochs == epochs2
    @test trainlayers[3].epochs == epochs
    @test map(t-> t.nhidden, trainlayers) == nhiddens
+   @test trainlayers[1].batchsize == batchsize1
+   @test trainlayers[2].batchsize == batchsize2
+   @test trainlayers[3].batchsize == batchsize
 
    # partitioning
    trainlayers = [
@@ -211,7 +218,7 @@ function test_stackrbms_preparetrainlayers()
          BMs.TrainLayer(nhidden = 5)
    ]
    trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, Vector{Int}())
+         learningrate, Vector{Int}(), batchsize)
    @test length(trainlayers) == length(nhiddens)
    @test trainlayers[1].parts[1].learningrate == learningrate1
    @test trainlayers[1].parts[2].learningrate == learningrate
@@ -226,7 +233,7 @@ function test_stackrbms_preparetrainlayers()
    # incorrect partitioning must not be allowed
    trainlayers[1].parts[1].nvisible = 20
    @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
-         x, epochs, learningrate, Vector{Int}())
+         x, epochs, learningrate, Vector{Int}(), batchsize)
 
    nothing
 end
@@ -262,14 +269,14 @@ end
 
 function testsummingoutforexactloglikelihood(nunits::Vector{Int})
    x = BMTest.createsamples(1000, nunits[1]);
-   dbm = BMs.stackrbms(x, nhiddens = nunits[2:end],
+   dbm = BMs.stackrbms(x, nhiddens = nunits[2:end], batchsize = 5,
          epochs = 50, predbm = true, learningrate = 0.001);
    dbm = BMs.traindbm!(dbm, x,
          learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)],
          epochs = 30);
    logz = BMs.exactlogpartitionfunction(dbm)
    @test isapprox(BMs.exactloglikelihood(dbm, x, logz),
-         exactloglikelihoodwithoutsummingout(dbm, x, logz))
+         BMTest.exactloglikelihoodwithoutsummingout(dbm, x, logz))
 end
 
 function exactloglikelihoodwithoutsummingout(dbm::BMs.BasicDBM, x::Array{Float64,2},

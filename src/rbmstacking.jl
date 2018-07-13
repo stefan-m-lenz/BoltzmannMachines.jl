@@ -19,6 +19,7 @@ mutable struct TrainLayer <: AbstractTrainLayer
    nhidden::Int
    nvisible::Int
    batchsize::Int
+   usedefaultbatchsize::Bool
    pcd::Bool
    cdsteps::Int
    startrbm::AbstractRBM
@@ -55,7 +56,7 @@ function TrainLayer(;
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
       nvisible::Int = -1,
-      batchsize::Int = 1,
+      batchsize::Int = -1,
       pcd::Bool = true,
       cdsteps::Int = 1,
       startrbm::AbstractRBM = NoRBM(),
@@ -64,6 +65,7 @@ function TrainLayer(;
 
    usedefaultepochs = (epochs < 0)
    usedefaultlearningrate = (learningrate < 0 && isempty(learningrates))
+   usedefaultbatchsize = (batchsize <= 0)
    TrainLayer(
          (usedefaultepochs ? 10 : epochs),
          usedefaultepochs,
@@ -72,7 +74,8 @@ function TrainLayer(;
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
          monitoring, rbmtype, nhidden, nvisible,
-         batchsize,
+         (usedefaultbatchsize ? 1 : batchsize),
+         usedefaultbatchsize,
          pcd, cdsteps,
          startrbm,
          optimizer, optimizers)
@@ -131,7 +134,7 @@ end
 
 
 function setdefaultsforunspecified!(trainlayer::TrainLayer,
-         learningrate::Float64, epochs::Int)
+         learningrate::Float64, epochs::Int, batchsize::Int)
 
    if trainlayer.usedefaultlearningrate
       trainlayer.learningrate = learningrate
@@ -139,6 +142,10 @@ function setdefaultsforunspecified!(trainlayer::TrainLayer,
    if trainlayer.usedefaultepochs
       trainlayer.epochs = epochs
    end
+   if trainlayer.usedefaultbatchsize
+      trainlayer.batchsize = batchsize
+   end
+
    if isempty(trainlayer.learningrates)
       # learning rates for each epoch have neither been explicitly specified
       # --> set same value for each epoch
@@ -154,16 +161,18 @@ function setdefaultsforunspecified!(trainlayer::TrainLayer,
 end
 
 function setdefaultsforunspecified!(trainpartitionedlayer::TrainPartitionedLayer,
-      learningrate::Float64, epochs::Int)
+      learningrate::Float64, epochs::Int, batchsize::Int)
 
-   setdefaultsforunspecified!(trainpartitionedlayer.parts, learningrate, epochs)
+   setdefaultsforunspecified!(trainpartitionedlayer.parts,
+         learningrate, epochs, batchsize)
 end
 
 function setdefaultsforunspecified!(trainlayers::Vector{T},
-      learningrate::Float64, epochs::Int) where {T <: AbstractTrainLayer}
+      learningrate::Float64, epochs::Int, batchsize::Int
+      ) where {T <: AbstractTrainLayer}
 
    for trainlayer in trainlayers
-      setdefaultsforunspecified!(trainlayer, learningrate, epochs)
+      setdefaultsforunspecified!(trainlayer, learningrate, epochs, batchsize)
    end
    trainlayers
 end
@@ -182,6 +191,7 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    the i'th entry
 * `epochs`: number of training epochs
 * `learningrate`: learningrate, default 0.005
+* `batchsize`: size of minibatches, defaults to 1
 * `trainlayers`: a vector of `TrainLayer` objects. With this argument it is possible
    to specify the training parameters for each layer/RBM individually.
    If the number of training epochs and the learning rate are not specified
@@ -202,13 +212,14 @@ function stackrbms(x::Array{Float64,2};
       predbm::Bool = false,
       samplehidden::Bool = false,
       learningrate::Float64 = 0.005,
+      batchsize::Int = 1,
       trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoringdata::DataDict = DataDict())
 
    stackrbms_checkmonitoringdata(x, monitoringdata)
 
    trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, nhiddens)
+         learningrate, nhiddens, batchsize)
 
    nrbms = length(trainlayers)
    dbmn = Vector{AbstractRBM}(nrbms)
@@ -266,7 +277,8 @@ function stackrbms_preparetrainlayers(
       x::Matrix{Float64},
       epochs::Int,
       learningrate::Float64,
-      nhiddens::Vector{Int})
+      nhiddens::Vector{Int},
+      batchsize::Int)
 
    if isempty(trainlayers)
       # construct default "trainlayers"
@@ -274,7 +286,7 @@ function stackrbms_preparetrainlayers(
          nhiddens = fill(size(x,2), 2) # default value for nhiddens
       end
       trainlayers = map(n -> TrainLayer(nhidden = n), nhiddens)
-      setdefaultsforunspecified!(trainlayers, learningrate, epochs)
+      setdefaultsforunspecified!(trainlayers, learningrate, epochs, batchsize)
       return trainlayers
    end
 
@@ -288,7 +300,7 @@ function stackrbms_preparetrainlayers(
       warn("Argument `nhiddens` not used.")
    end
 
-   setdefaultsforunspecified!(trainlayers, learningrate, epochs)
+   setdefaultsforunspecified!(trainlayers, learningrate, epochs, batchsize)
 
    function derive_nvisibles!(layer::AbstractTrainLayer,
          prevlayer::AbstractTrainLayer)
