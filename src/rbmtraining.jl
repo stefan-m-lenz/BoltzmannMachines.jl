@@ -5,29 +5,44 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
    end
 end
 
-# TODO learningrates instead of learningrate
+
 function assertinitoptimizers(optimizer::AbstractOptimizer,
-      optimizers::Vector{<:AbstractOptimizer}, rbm::R,
+      optimizers::Vector{<:AbstractOptimizer}, bm::BM,
       learningrates::Vector{Float64}, sdlearningrates::Vector{Float64},
       epochs::Int
-      ) where {R<:AbstractRBM}
+      ) where {BM<:AbstractBM}
 
    if isempty(optimizers)
       if optimizer === NoOptimizer()
          # default optimization algorithm
          optimizers = map(
-               i -> LoglikelihoodOptimizer(rbm;
-                     learningrate = learningrates[i],
-                     sdlearningrate = sdlearningrates[i]),
-               1:length(learningrates))
+               i -> defaultoptimizer(bm, learningrates[i], sdlearningrates[i]),
+               1:epochs)
       else
-         optimizers = fill(initialized(optimizer, rbm), epochs)
+         optimizers = fill(initialized(optimizer, bm), epochs)
       end
    else
-      optimizers = map(opt -> initialized(opt, rbm), optimizers)
+      optimizers = map(opt -> initialized(opt, bm), optimizers)
+      assert_enoughvaluesforepochs("optimizers", optimizers, epochs)
    end
-   assert_enoughvaluesforepochs("optimizers", optimizers, epochs)
+
    optimizers
+end
+
+
+function defaultoptimizer(rbm::R,
+      learningrate::Float64, sdlearningrate::Float64) where {R<: AbstractRBM}
+
+   loglikelihoodoptimizer(rbm; learningrate = learningrate,
+         sdlearningrate = sdlearningrate)
+end
+
+function defaultoptimizer(dbm::MultimodalDBM, learningrate::Float64,
+      sdlearningrate::Float64)
+
+   StackedOptimizer(map(
+         rbm -> defaultoptimizer(rbm, learningrate, sdlearningrate),
+         dbm))
 end
 
 

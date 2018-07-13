@@ -1,13 +1,21 @@
-abstract type AbstractOptimizer{R<:AbstractRBM}
+"""
+An `AbstractOptimizer` needs to implement the functions `computegradient!`.
+It may also override the behaviour of `updateparameters!` (see there).
+"""
+abstract type AbstractOptimizer{R<:AbstractBM}
 end
+
 
 abstract type
       AbstractLoglikelihoodOptimizer{R<:AbstractRBM} <: AbstractOptimizer{R}
 end
 
-struct NoOptimizer <: AbstractOptimizer{AbstractRBM}
+
+struct NoOptimizer <: AbstractOptimizer{AbstractBM}
 end
 
+
+# TODO document
 mutable struct LoglikelihoodOptimizer{R<:AbstractRBM} <: AbstractLoglikelihoodOptimizer{R}
    gradient::R
    negupdate::Matrix{Float64}
@@ -15,18 +23,33 @@ mutable struct LoglikelihoodOptimizer{R<:AbstractRBM} <: AbstractLoglikelihoodOp
    sdlearningrate::Float64
 end
 
-function LoglikelihoodOptimizer(;
+
+function loglikelihoodoptimizer(;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0)
 
    LoglikelihoodOptimizer(NoRBM(), Matrix{Float64}(0,0),
          learningrate, sdlearningrate)
 end
 
-function LoglikelihoodOptimizer(rbm::R;
+function loglikelihoodoptimizer(rbm::R;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0) where {R<:AbstractRBM}
 
    LoglikelihoodOptimizer{R}(deepcopy(rbm), Matrix{Float64}(size(rbm.weights)),
          learningrate, sdlearningrate)
+end
+
+function loglikelihoodoptimizer(prbm::PartitionedRBM;
+      learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0)
+
+   PartitionedOptimizer(map(
+         rbm -> loglikelihoodoptimizer(rbm;
+               learningrate = learningrate, sdlearningrate = sdlearningrate),
+         prbm.rbms))
+end
+
+
+struct PartitionedOptimizer <: AbstractOptimizer{PartitionedRBM}
+   optimizers::Vector{AbstractOptimizer}
 end
 
 
@@ -40,6 +63,17 @@ mutable struct BeamAdversarialOptimizer{R<: AbstractRBM} <: AbstractOptimizer{R}
 end
 
 
+"""
+    StackedOptimizer(optimizers)
+Can be used for optimizing a stack of RBMs / a DBM by using the given the vector
+of `optimizers` (one for each RBM).
+For more information about the concept of optimizers, see `AbstractOptimizer`.
+"""
+struct StackedOptimizer <: AbstractOptimizer{MultimodalDBM}
+   optimizers::Vector{AbstractOptimizer{<:AbstractRBM}}
+end
+
+
 struct CombinedOptimizer{R<: AbstractRBM,
          G1 <: AbstractOptimizer{R},
          G2 <: AbstractOptimizer{R}} <: AbstractOptimizer{R}
@@ -48,23 +82,26 @@ struct CombinedOptimizer{R<: AbstractRBM,
    part2::G2
    gradient::R
    weight1::Float64
+   weight2::Float64
    learningrate::Float64
    sdlearningrate::Float64
 end
 
 
+# TODO document
 function beamoptimizer(;learningrate::Float64 = 0.05,
       sdlearningrate::Float64 = 0.0,
       adversarialweight::Float64 = 0.1,
       knearest::Int = 5)
 
-   llstep = LoglikelihoodOptimizer(
+   llstep = loglikelihoodoptimizer(
          learningrate = learningrate, sdlearningrate = sdlearningrate)
    advstep = BeamAdversarialOptimizer(
          NoRBM(), Matrix{Float64}(0,0), Vector{Float64}(),
          learningrate, sdlearningrate, knearest)
 
-   CombinedOptimizer(advstep, llstep, NoRBM(), adversarialweight,
+   CombinedOptimizer(advstep, llstep, NoRBM(),
+         adversarialweight, 1.0 - adversarialweight,
          learningrate, sdlearningrate)
 end
 
@@ -75,7 +112,7 @@ Returns an `AbstractOptimizer` similar to the given `optimizer`
 that can be used to optimize the `AbstractRBM` `rbm`.
 """
 function initialized(optimizer::AbstractOptimizer, rbm::AbstractRBM)
-   # do nothing
+   optimizer
 end
 
 function initialized(optimizer::LoglikelihoodOptimizer, rbm::R
@@ -92,7 +129,8 @@ function initialized(optimizer::CombinedOptimizer, rbm::R
    CombinedOptimizer(initialized(optimizer.part1, rbm),
          initialized(optimizer.part2, rbm),
          deepcopy(rbm),
-         optimizer.weight1, optimizer.learningrate, optimizer.sdlearningrate)
+         optimizer.weight1, optimizer.weight2,
+         optimizer.learningrate, optimizer.sdlearningrate)
 end
 
 function initialized(optimizer::BeamAdversarialOptimizer{R1}, rbm::R2
@@ -103,6 +141,24 @@ function initialized(optimizer::BeamAdversarialOptimizer{R1}, rbm::R2
          Vector{Float64}(),
          optimizer.learningrate, optimizer.sdlearningrate,
          optimizer.knearest)
+end
+
+function initialized(optimizer::PartitionedOptimizer, prbm::PartitionedRBM)
+   PartitionedOptimizer(map(
+         i -> initialized(optimizer.optimizers[i], prbm.rbms[i]),
+         eachindex(prbm)))
+end
+
+function initialized(optimizer::AbstractOptimizer{R}, dbm::MultimodalDBM
+      ) where {R <: AbstractRBM}
+   # transform optimizer for RBM into stacked optimizer for DBM
+   StackedOptimizer(map(rbm -> initialized(optimizer, rbm), dbm))
+end
+
+function initialized(stackedoptimizer::StackedOptimizer, dbm::MultimodalDBM)
+   StackedOptimizer(map(
+         i -> initialized(stackedoptimizer.optimizers[i], dbm[i],
+         eachindex(dbm))))
 end
 
 
@@ -120,16 +176,7 @@ function computegradient!(
       v::M, vmodel::M, h::M, hmodel::M, rbm::R
       ) where {R <: AbstractRBM, M <: AbstractArray{Float64, 2}}
 
-   At_mul_B!(optimizer.gradient.weights, v, h)
-   At_mul_B!(optimizer.negupdate, vmodel, hmodel)
-   optimizer.gradient.weights .-= optimizer.negupdate
-
-   optimizer.gradient.visbias .= vec(mean(v, 1))
-   optimizer.gradient.visbias .-= vec(mean(vmodel, 1))
-
-   optimizer.gradient.hidbias .= vec(mean(h, 1))
-   optimizer.gradient.hidbias .-= vec(mean(hmodel, 1))
-   optimizer.gradient
+   computegradientsweightsandbiases!(optimizer, v, vmodel, h, hmodel, rbm)
 end
 
 function computegradient!(
@@ -147,14 +194,10 @@ function computegradient!(
    v = v ./ gbrbm.sd'
    vmodel = vmodel ./ gbrbm.sd'
 
-   At_mul_B!(optimizer.gradient.weights, v, h)
-   At_mul_B!(optimizer.negupdate, vmodel, hmodel)
-   optimizer.gradient.weights .-= optimizer.negupdate
+   computegradientsweightsandbiases!(optimizer, v, vmodel, h, hmodel, gbrbm)
+   optimizer.gradient.visbias ./= gbrbm.sd
 
-   optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
-   optimizer.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1)) ./ gbrbm.sd
-
-   optimizer.gradient
+   nothing
 end
 
 function computegradient!(
@@ -180,14 +223,25 @@ function computegradient!(
    v = v ./ sdsq'
    vmodel = vmodel ./ sdsq'
 
+   computegradientsweightsandbiases!(optimizer, v, vmodel, h, hmodel, gbrbm)
+end
+
+function computegradientsweightsandbiases!(
+      optimizer::AbstractLoglikelihoodOptimizer,
+      v::M, vmodel::M, h::M, hmodel::M, rbm::R
+      ) where {M<: AbstractArray{Float64, 2}, R <: AbstractRBM}
+
+   npossamples = size(v, 1)
+   nnegsamples = size(vmodel, 2)
    At_mul_B!(optimizer.gradient.weights, v, h)
+   optimizer.gradient.weights ./= npossamples
    At_mul_B!(optimizer.negupdate, vmodel, hmodel)
+   optimizer.negupdate ./= npossamples
    optimizer.gradient.weights .-= optimizer.negupdate
 
    optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
    optimizer.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1))
-
-   optimizer.gradient
+   nothing
 end
 
 function computegradient!(
@@ -216,7 +270,7 @@ function computegradient!(
       optimizer.gradient.hidbias[j] = cov(optimizer.critic, hmodel[:, j])
    end
 
-   optimizer.gradient
+   nothing
 end
 
 function computegradient!(
@@ -247,7 +301,7 @@ function computegradient!(
 
    optimizer.gradient.sd ./= sdsq .* rbm.sd
 
-   optimizer.gradient
+   nothing
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
@@ -262,17 +316,17 @@ function computegradient!(optimizer::CombinedOptimizer{R},
 
    optimizer.gradient.weights .=
          grad1.weights .* optimizer.weight1 .+
-         grad2.weights .* (1 - optimizer.weight1)
+         grad2.weights .* optimizer.weight2
 
    optimizer.gradient.visbias .=
          grad1.visbias .* optimizer.weight1 .+
-         grad2.visbias .* (1 - optimizer.weight1)
+         grad2.visbias .* optimizer.weight2
 
    optimizer.gradient.hidbias .=
          grad1.hidbias .* optimizer.weight1 .+
-         grad2.hidbias .* (1 - optimizer.weight1)
+         grad2.hidbias .* optimizer.weight2
 
-   optimizer.gradient
+   nothing
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
@@ -287,10 +341,38 @@ function computegradient!(optimizer::CombinedOptimizer{R},
    if optimizer.sdlearningrate > 0.0
       optimizer.gradient.sd .=
             optimizer.part1.gradient.sd .* optimizer.weight1 .+
-            optimizer.part2.gradient.sd .* (1 - optimizer.weight1)
+            optimizer.part2.gradient.sd .* optimizer.weight2
    end
 
-   optimizer.gradient
+   nothing
+end
+
+function computegradient!(optimizer::PartitionedOptimizer,
+      v::M, vmodel::M, h::M, hmodel::M, prbm::PartitionedRBM
+      ) where {M<: AbstractArray{Float64, 2}}
+
+   for i in eachindex(prbm.rbms)
+      computegradient!(optimizer.optimizers[i],
+            view(v, :, prbm.visranges[i]),
+            view(vmodel, :, prbm.visranges[i]),
+            view(h, :, prbm.hidranges[i]),
+            view(hmodel, :, prbm.hidranges[i]),
+            prbm.rbms[i])
+   end
+   nothing
+end
+
+function computegradient!(stackedoptimizer::StackedOptimizer,
+      meanfieldparticles::Particles, gibbsparticles::Particles,
+      dbm::MultimodalDBM)
+
+   for i in eachindex(dbm)
+      computegradient!(stackedoptimizer.optimizers[i],
+            meanfieldparticles[i], gibbsparticles[i],
+            meanfieldparticles[i + 1], gibbsparticles[i + 1],
+            dbm[i])
+   end
+   nothing
 end
 
 
@@ -329,6 +411,20 @@ function updateparameters!(rbm::R, optimizer::AbstractOptimizer{R}
       rbm.sd .+= optimizer.sdlearningrate * optimizer.gradient.sd
    end
    rbm
+end
+
+function updateparameters!(prbm::PartitionedRBM, optimizer::PartitionedOptimizer)
+   for i in eachindex(prbm.rbms)
+      updateparameters!(prbm.rbms[i], optimizer.optimizers[i])
+   end
+   prbm
+end
+
+function updateparameters!(dbm::MultimodalDBM, stackedoptimizer::StackedOptimizer)
+   for i in eachindex(dbm)
+      updateparameters!(dbm[i], stackedoptimizer.optimizers[i])
+   end
+   dbm
 end
 
 

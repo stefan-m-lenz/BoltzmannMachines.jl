@@ -102,11 +102,16 @@ function fitdbm(x::Matrix{Float64};
       learningrate::Float64 = 0.005,
       learningrates::Vector{Float64} =
             defaultfinetuninglearningrates(learningrate, epochs),
+      sdlearningrate::Float64 = 0.0,
+      sdlearningrates::Vector{Float64} =
+            defaultfinetuninglearningrates(sdlearningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
       pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoring::Function = nomonitoring,
-      monitoringdatapretraining::DataDict = DataDict())
+      monitoringdatapretraining::DataDict = DataDict(),
+      optimizer::AbstractOptimizer = NoOptimizer(),
+      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
    if isempty(pretraining) && isempty(nhiddens)
       # set default only if there is not any more detailed info
@@ -114,14 +119,19 @@ function fitdbm(x::Matrix{Float64};
       nhiddens = [nvariables; nvariables]
    end
 
+   # Layerwise pre-training
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
          learningrate = learningratepretraining,
          trainlayers = pretraining,
          monitoringdata = monitoringdatapretraining)
 
+   # Fine-tuning using mean-field approximation in algorithm for
+   # training a general Boltzmann machine
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
          learningrate = learningrate, learningrates = learningrates,
+         sdlearningrate = sdlearningrate, sdlearningrates = sdlearningrates,
+         optimizer = optimizer, optimizers = optimizers,
          monitoring = monitoring)
 end
 
@@ -228,18 +238,23 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
-      learningrates::Array{Float64,1} =
+      learningrates::Vector{Float64} =
             defaultfinetuninglearningrates(learningrate, epochs),
-      monitoring::Function = nomonitoring)
+      sdlearningrate::Float64 = 0.0,
+      sdlearningrates::Vector{Float64} =
+            defaultfinetuninglearningrates(sdlearningrate, epochs),
+      monitoring::Function = nomonitoring,
+      optimizer::AbstractOptimizer = NoOptimizer(),
+      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
-   if length(learningrates) < epochs
-      error("Not enough learning rates for training epochs")
-   end
+   assert_enoughvaluesforepochs("learningrates", learningrates, epochs)
+   optimizers = assertinitoptimizers(optimizer, optimizers, dbm,
+         learningrates, sdlearningrates, epochs)
 
    particles = initparticles(dbm, nparticles)
 
-   for epoch=1:epochs
-      traindbm!(dbm, x, particles, learningrates[epoch])
+   for epoch = 1:epochs
+      traindbm!(dbm, x, particles, optimizers[epoch])
 
       # monitoring the learning process at the end of epoch
       monitoring(dbm, epoch)
@@ -254,103 +269,13 @@ end
 Trains the given `dbm` for one epoch.
 """
 function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2}, particles::Particles,
-      learningrate::Float64)
+      optimizer::AbstractOptimizer)
 
    gibbssample!(particles, dbm)
    mu = meanfield(dbm, x)
 
-   for i in eachindex(dbm)
-      updatedbmpart!(dbm[i], learningrate,
-            particles[i], particles[i+1], mu[i], mu[i+1])
-   end
+   computegradient!(optimizer, mu, particles, dbm)
+   updateparameters!(dbm, optimizer)
 
    dbm
-end
-
-
-function updatedbmpart!(dbmpart::BernoulliRBM,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   updatedbmpartcore!(dbmpart, learningrate,
-         vgibbs, hgibbs, vmeanfield, hmeanfield)
-end
-
-function updatedbmpart!(dbmpart::Binomial2BernoulliRBM,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   vmeanfield /= 2
-   vgibbs /= 2
-
-   updatedbmpartcore!(dbmpart, learningrate,
-         vgibbs, hgibbs, vmeanfield, hmeanfield)
-end
-
-function updatedbmpart!(dbmpart::GaussianBernoulliRBM,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   # For respecting standard deviation in update rule
-   # see [Srivastava+Salakhutdinov, 2014], p. 2962
-   vmeanfield = broadcast(/, vmeanfield, dbmpart.sd')
-   vgibbs = broadcast(/, vgibbs, dbmpart.sd')
-
-   updatedbmpartcore!(dbmpart, learningrate,
-         vgibbs, hgibbs, vmeanfield, hmeanfield)
-end
-
-function updatedbmpart!(dbmpart::GaussianBernoulliRBM2,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   # For respecting standard deviation in update rule
-   # see [Srivastava+Salakhutdinov, 2014], p. 2962
-   sdsq = dbmpart.sd.^2
-   vmeanfield = broadcast(/, vmeanfield, sdsq')
-   vgibbs = broadcast(/, vgibbs, sdsq')
-
-   updatedbmpartcore!(dbmpart, learningrate,
-         vgibbs, hgibbs, vmeanfield, hmeanfield)
-end
-
-function updatedbmpart!(dbmpart::PartitionedRBM,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   for i in eachindex(dbmpart.rbms)
-      visrange = dbmpart.visranges[i]
-      hidrange = dbmpart.hidranges[i]
-      # TODO does not work with views
-      updatedbmpart!(dbmpart.rbms[i], learningrate,
-            vgibbs[:, visrange], hgibbs[:, hidrange],
-            vmeanfield[:, visrange], hmeanfield[:, hidrange])
-   end
-end
-
-function updatedbmpartcore!(dbmpart::AbstractRBM,
-      learningrate::Float64,
-      vgibbs::M, hgibbs::M, vmeanfield::M, hmeanfield::M
-      ) where {M<:AbstractArray{Float64,2}}
-
-   nsamples = size(vmeanfield, 1)
-   nparticles = size(vgibbs, 1)
-
-   leftw = vmeanfield' * hmeanfield / nsamples
-   lefta = mean(vmeanfield, 1)[:]
-   leftb = mean(hmeanfield, 1)[:]
-
-   rightw = vgibbs' * hgibbs / nparticles
-   righta = mean(vgibbs, 1)[:]
-   rightb = mean(hgibbs, 1)[:]
-
-   dbmpart.weights .+= learningrate*(leftw - rightw)
-   dbmpart.visbias .+= learningrate*(lefta - righta)
-   dbmpart.hidbias .+= learningrate*(leftb - rightb)
-   nothing
 end
