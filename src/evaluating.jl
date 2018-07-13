@@ -772,11 +772,6 @@ function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
    freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
 
-function freeenergy(gmrbm::GaussianMixtureRBM, v::Vector{Float64})
-   sum(((v - gmrbm.visbias) ./ gmrbm.sd).^2) / 2.0 -
-         log1pexp(gmrbm.hidbias + hiddeninput(gmrbm, v))
-end
-
 
 """
     freeeenergydiffs(rbm1, rbm2, x)

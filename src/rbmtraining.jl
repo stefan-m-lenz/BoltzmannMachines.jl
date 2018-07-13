@@ -198,10 +198,6 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       visbias = initvisiblebias(x/2)
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
-   elseif rbmtype == GaussianMixtureRBM
-      visbias = vec(mean(x, 1))
-      sd = vec(std(x, 1))
-      GaussianMixtureRBM(weights, visbias, hidbias, sd)
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end

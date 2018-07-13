@@ -77,14 +77,6 @@ struct Binomial2BernoulliRBM <: AbstractXBernoulliRBM
 end
 
 
-struct GaussianMixtureRBM <: AbstractXBernoulliRBM
-   weights::Matrix{Float64}
-   visbias::Vector{Float64}
-   hidbias::Vector{Float64}
-   sd::Vector{Float64}
-end
-
-
 """
     ranges(numbers)
 Returns a vector of consecutive integer ranges, the first starting with 1.
