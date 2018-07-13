@@ -10,17 +10,24 @@ This Julia package implements algorithms for training and evaluating several typ
 
 ## Types of Boltzmann Machines
 
-The package contains the following types of RBMs:
+### Restricted Boltzmann Machines
+The package contains the following types of RBMs (subtypes of `AbstractRBM`):
 
 Type                    | Distribution of visible units    | Distribution of hidden units
 ------------------------|----------------------------------|-----------------------------
 `BernoulliRBM`          | Bernoulli                        | Bernoulli
-`GaussianBernoulliRBM`  | Gaussian                         | Bernoulli
+`GaussianBernoulliRBM`, `GaussianBernoulliRBM2` ([6])  | Gaussian                         | Bernoulli
 `Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
 `BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
-It also contains the type `BasicDBM`, encapsulating the parameters of a DBM with Bernoulli-distributed units. (In the next release, it is planned to provide Multimodal DBMs.)
+### (Multimodal) Deep Boltzmann Machines
 
+DBMs are implemented as vectors of RBMs. `BasicDBM`s have only Bernoulli distributed nodes and therefore consist of a vector of `BernoulliRBM`s.
+DBMs with different types of visible units can be constructed
+by using the corresponding RBM type in the first layer.
+Actual `MultimodalDBM`s can be formed by using `PartitionedRBM`s, which is a type of `AbstractRBM` that is able to encapsulate non-connected RBMs of different types into an RBM-like layer.
+
+All these types of DBMs can be trained using layerwise pre-training and fine-tuning employing the mean-field approximation. It is also possible to estimate or calculate the likelihood for these DBM types.
 
 ## Overview of functions
 
@@ -35,16 +42,15 @@ Function name    | Short description
 `initrbm`        | Initializes an RBM model.
 `trainrbm!`      | Performs CD-learning on an RBM model.
 `fitrbm`         | Fits a RBM model to a dataset using CD. (Wraps `initrbm` and `trainrbm!`)
-`samplevisible` (`samplehidden`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
-`visiblepotential` (`hiddenpotential`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
-`visibleinput` (`hiddeninput`) | Computes the total input received by the visible (hidden) layer of an RBM.
+`samplevisible`, `samplevisible!` (`samplehidden`, `samplehidden!`) | Gibbs sampling of visible (hidden) nodes' states given the hidden (visible) nodes' states in an RBM.
+`visiblepotential`, `visiblepotential!` (`hiddenpotential`, `hiddenpotential!`) | Computes the deterministic potential for the activation of the visible (hidden) nodes of an RBM.
+`visibleinput`, `visibleinput!` (`hiddeninput`, `hiddeninput!`) | Computes the total input received by the visible (hidden) layer of an RBM.
 
 
 #### Training of DBMs
 
 Function name    | Short description
 ---------------- | -----------------
-`addlayer!`      | Adds an additional layer of nodes to a DBM and pre-trains the new weights.
 `fitdbm`         | Fits a DBM model to a dataset. This includes pre-training, followed by the general Boltzmann Machine learning procedure for fine-tuning.
 `gibbssample!`   | Performs Gibbs sampling in a DBM.
 `meanfield`      | Computes the mean-field inference of the hidden nodes' activations in a DBM.
@@ -72,7 +78,7 @@ Function name          | Short description
 `logpartitionfunction` | Estimates the log of the partition function of a BM.
 `logproblowerbound`    | Estimates the mean lower bound of the log probability of a dataset in a DBM model.
 `reconstructionerror`  | Computes the mean reconstruction error of a dataset in an RBM model.
-`sampleparticles`      | Generates samples from the distribution defined by a BM model.
+`samples`              | Generates samples from the distribution defined by a BM model.
 
 
 ### Monitoring the learning process
@@ -119,4 +125,6 @@ The code for the analyses presented there is available in the article supplement
 [4] Krizhevsky, A., Hinton, G. (2009). *Learning Multiple Layers of Features from Tiny Images*.
 
 [5] Srivastava, N., Salakhutdinov R. (2014). *Multimodal Learning with Deep Boltzmann Machines*. Journal of Machine Learning Research, 15, 2949-2980.
+
+[6] Cho, K., Ilin A., Raiko, T. (2011) *Improved learning of Gaussian-Bernoulli restricted Boltzmann machines*. Artificial Neural Networks and Machine Learning – ICANN 2011.
 

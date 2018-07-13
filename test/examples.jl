@@ -142,13 +142,6 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 
 # ==============================================================================
-# Training a Multimodal Deep Boltzmann machine on a data set with
-# binary and continuously valued variables
-# ------------------------------------------------------------------------------
-
-# TODO
-
-# ==============================================================================
 # Examples for cross-validation
 # ------------------------------------------------------------------------------
 

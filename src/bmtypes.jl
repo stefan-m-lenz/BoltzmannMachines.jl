@@ -1,3 +1,4 @@
+""" Abstract supertype for all RBMs """
 abstract type AbstractRBM end
 
 """
@@ -111,7 +112,7 @@ struct PartitionedRBM{R<:AbstractRBM} <: AbstractRBM
 end
 
 
-""" Singleton-Placeholder mutable struct for `AbstractRBM`s """
+""" Singleton-Placeholder for `AbstractRBM`s """
 struct NoRBM <: AbstractRBM
 end
 

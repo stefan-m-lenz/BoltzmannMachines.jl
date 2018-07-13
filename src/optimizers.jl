@@ -261,7 +261,6 @@ function computegradient!(
       end
    end
 
-   # TODO check if standard deviation needed
    for i = 1:nvisible
       optimizer.gradient.visbias[i] = cov(optimizer.critic, vmodel[:, i])
    end
