@@ -236,7 +236,7 @@ function computegradientsweightsandbiases!(
    At_mul_B!(optimizer.gradient.weights, v, h)
    optimizer.gradient.weights ./= npossamples
    At_mul_B!(optimizer.negupdate, vmodel, hmodel)
-   optimizer.negupdate ./= npossamples
+   optimizer.negupdate ./= nnegsamples
    optimizer.gradient.weights .-= optimizer.negupdate
 
    optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
