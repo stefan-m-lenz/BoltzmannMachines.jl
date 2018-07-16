@@ -642,15 +642,15 @@ end
 
 
 function sigm(x::Float64)
-   1./(1 + exp(-x))
+   1 ./ (1 + exp(-x))
 end
 
 function sigm(x::Array{Float64,1})
-   1./(1 + exp.(-x))
+   1 ./ (1 + exp.(-x))
 end
 
 function sigm(x::Array{Float64,2})
-   1./(1 + exp.(-x))
+   1 ./ (1 + exp.(-x))
 end
 
 function sigm!(x::M) where{M <:AbstractArray{Float64}}

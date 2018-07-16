@@ -221,7 +221,7 @@ function plotcurvebundles(x::Matrix{Float64};
             Guide.colorkey("Sample"), Guide.xlabel("Variable index"),
             Guide.ylabel("Value"), Scale.x_discrete, Scale.color_discrete)
    else
-      powersoftwo = 2.^(0:(nlabelvars-1))
+      powersoftwo = 2 .^ (0:(nlabelvars-1))
       labels = vec(mapslices(
             row -> sum(powersoftwo[convert(Vector{Bool}, row)]) + 1,
             x[:, 1:nlabelvars], 2))

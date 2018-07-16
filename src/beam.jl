@@ -81,11 +81,11 @@ Gamma(nu, var) = Gamma(1/var, var)
 function initgammaprocess(autocorr_coeff::Float64,betasd::Float64)
 
    var = betasd.^2
-   nu = 1./var
+   nu = 1 ./ var
    c = (1-autocorr_coeff).*var
 
    # beta_0 ~ Gamma(nu,c/(1-phi)) = Gamma(1/var, var)
-   beta = Gamma(nu,c./(1-autocorr_coeff))
+   beta = Gamma(nu,c ./ (1-autocorr_coeff))
    beta_sample = rand(beta)
 end
 
