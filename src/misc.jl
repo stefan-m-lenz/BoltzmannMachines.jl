@@ -38,7 +38,7 @@ on all the available workers and reduces the results with the operator `op`.
 function batchparallelized(f::Function, n::Int, op::Function)
    batches = mostevenbatches(n)
    if length(batches) > 1
-      return @sync @parallel (op) for batch in batches
+      return @sync @distributed (op) for batch in batches
          f(batch)
       end
    else
@@ -61,7 +61,8 @@ The return values of the calls to the `monitoredfit` function
 are concatenated with `vcat`.
 If the monitoredfit function returns `Monitor` objects,
 `crossvalidation` returns a combined `Monitor` object that can be displayed
-by creating a cross-validation plot via `BMPlots.crossvalidationplot`.
+by creating a cross-validation plot via
+`BoltzmannMachinesPlots.crossvalidationplot`.
 
 # Optional named argument:
 * `kfold`: specifies the `k` in "`k`-fold" (defaults to 10).
@@ -189,7 +190,7 @@ To quickly grasp the idea, plot generated samples against the variable index:
     x = BMs.curvebundles(nvariables = 10, nbundles = 3,
                        nperbundle = 4, noisesd = 0.03,
                        addlabels = true)
-    BMs.BMPlots.plotcurvebundles(x)
+    BoltzmannMachinesPlots.plotcurvebundles(x)
 """
 function curvebundles(;
       nbundles::Int = 3,

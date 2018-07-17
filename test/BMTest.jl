@@ -627,7 +627,7 @@ function test_mdbm_gaussianvisibles()
    srand(seed)
    dbm1 = BMs.stackrbms(x, epochs = 20, predbm = true, learningrate = 0.001,
          trainlayers = trainlayers)
-   # BMs.BMPlots.plotevaluation(monitor1, BMs.monitorexactloglikelihood)
+   # BoltzmannMachinesPlots.plotevaluation(monitor1, BMs.monitorexactloglikelihood)
    dbm1 = BMs.traindbm!(dbm1, x,
          learningrates = learningrates,
          epochs = 30);

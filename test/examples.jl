@@ -1,4 +1,5 @@
 using BoltzmannMachines
+import BoltzmannMachinesPlots # only needed for plotting capabilities
 
 # ==============================================================================
 # Binary data: BernoulliRBM and BasicDBM
@@ -24,8 +25,8 @@ rbm = fitrbm(x; nhidden = 12,
       end);
 
 # Plot the collected data (requires Gadfly)
-BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
-BMPlots.plotevaluation(monitor, monitorreconstructionerror)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorreconstructionerror)
 
 
 # DBM-Fitting approach 1 - Step 1: Pre-training, adding layer by layer.
@@ -40,7 +41,7 @@ addlayer!(dbm, x;
       nhidden = 6, epochs = 20, learningrate = 0.05,
       monitoring = (rbm, epoch) ->
             monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
-BMPlots.plotevaluation(monitor1, monitorreconstructionerror)
+BoltzmannMachinesPlots.plotevaluation(monitor1, monitorreconstructionerror)
 
 monitor2  = Monitor()
 datadict2 = propagateforward(dbm[1], datadict, 2.0);
@@ -48,7 +49,7 @@ addlayer!(dbm, x; islast = true,
       nhidden = 2, epochs = 20, learningrate = 0.05,
       monitoring = (rbm, epoch) ->
             monitorreconstructionerror!(monitor2, rbm, epoch, datadict2));
-BMPlots.plotevaluation(monitor2, monitorreconstructionerror)
+BoltzmannMachinesPlots.plotevaluation(monitor2, monitorreconstructionerror)
 
 # DBM-Fitting approach 1 - Step 2: Fine-Tuning
 monitor = Monitor();
@@ -56,7 +57,7 @@ traindbm!(dbm, x; epochs = 50, learningrate = 0.05,
       monitoring = (dbm, epoch) ->
             monitorexactloglikelihood!(monitor, dbm, epoch, datadict));
 
-BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 # DBM-Fitting approach 2: Pretraining and Fine-Tuning combined in one function
 dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, epochspretraining = 20,
@@ -77,7 +78,7 @@ rbm = fitrbm(x, nhidden = 36, epochs = 100,
       monitoring = (rbm, epoch) ->
             monitorloglikelihood!(monitor, rbm, epoch, datadict));
 
-BMPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3.0)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3.0)
 
 
 # In the DBM, the estimation of the log likelihood is much slower than in the
@@ -93,7 +94,7 @@ traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
       monitoring = (rbm, epoch) ->
             monitorlogproblowerbound!(monitor, rbm, epoch, datadict));
 
-BMPlots.plotevaluation(monitor, monitorlogproblowerbound; sdrange = 3.0)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorlogproblowerbound; sdrange = 3.0)
 
 # Evaluate final result with AIS-estimated likelihood
 loglikelihood(dbm, xtest)
@@ -116,7 +117,7 @@ rbm = fitrbm(x, rbmtype = GaussianBernoulliRBM,
       monitoring = (rbm, epoch) ->
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict));
 
-BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 
 # ==============================================================================
@@ -138,7 +139,7 @@ rbm = fitrbm(x, rbmtype = Binomial2BernoulliRBM,
       monitoring = (rbm, epoch) ->
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict));
 
-BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
+BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 
 # ==============================================================================
@@ -161,7 +162,7 @@ monitor = crossvalidation(x,
                                  monitor, rbm, epoch, datadict))
                monitor
             end);
-BMPlots.crossvalidationcurve(monitor)
+BoltzmannMachinesPlots.crossvalidationcurve(monitor)
 
 
 # Determine the optimal number of pretraining epochs for a DBM
@@ -183,4 +184,4 @@ BMPlots.crossvalidationcurve(monitor)
 end
 
 monitor = crossvalidation(x, my_pretraining_monitoring, 10:10:200);
-BMPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)
+BoltzmannMachinesPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)

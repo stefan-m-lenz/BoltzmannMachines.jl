@@ -1,6 +1,7 @@
 module BoltzmannMachines
 
 using Distributions
+using Compat.Distributed
 
 const BMs = BoltzmannMachines
 
@@ -32,10 +33,13 @@ export
          BasicDBM,
          AbstractTrainLayer, AbstractTrainLayers,
          TrainLayer, TrainPartitionedLayer,
-         addlayer!, fitdbm, gibbssample!, meanfield, stackrbms, traindbm!,
+         addlayer!, stackrbms,
+         initparticles, gibbssample!,
+         meanfield, fitdbm, traindbm!,
    Particle, Particles,
    AbstractOptimizer,
       computegradient!, updateparameters!,
+      LoglikelihoodOptimizer,
       loglikelihoodoptimizer,
       beamoptimizer,
    Monitor, MonitoringItem, DataDict,
@@ -47,8 +51,7 @@ export
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
-   barsandstripes, splitdata,
-   BMPlots
+   barsandstripes, splitdata
 
 include("bmtypes.jl")
 include("gibbssampling.jl")
@@ -62,7 +65,5 @@ include("evaluating.jl")
 include("monitoring.jl")
 include("beam.jl")
 include("misc.jl")
-
-include("BMPlots.jl")
 
 end # of module BoltzmannMachines

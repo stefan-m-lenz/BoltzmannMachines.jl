@@ -1,8 +1,9 @@
+using Compat.Distributed
 if nprocs() == 1
    addprocs() # test with multiple processes
 end
 
-using Base.Test
+using Compat.Test
 import BoltzmannMachines
 
 const BMs = BoltzmannMachines

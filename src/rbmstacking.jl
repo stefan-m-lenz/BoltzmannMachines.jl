@@ -401,7 +401,7 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          ),
          eachindex(trainpartitionedlayer.parts))
 
-   rbms = @parallel (vcat) for arg in trainingargs
+   rbms = @distributed (vcat) for arg in trainingargs
       stackrbms_trainlayer(arg[1], arg[2];
             monitoringdata = arg[3],
             upfactor = upfactor, downfactor = downfactor)
