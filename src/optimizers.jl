@@ -24,6 +24,21 @@ mutable struct LoglikelihoodOptimizer{R<:AbstractRBM} <: AbstractLoglikelihoodOp
 end
 
 
+function converttodbmoptimizer(optimizer::NoOptimizer, dbm::MultimodalDBM)
+   optimizer
+end
+
+function converttodbmoptimizer(optimizer::AbstractOptimizer{<:AbstractRBM},
+      dbm::MultimodalDBM)
+   StackedOptimizer(map(i -> deepcopy(optimizer), eachindex(dbm)))
+end
+
+function converttodbmoptimizer(optimizer::AbstractOptimizer{MultimodalDBM},
+      dbm::MultimodalDBM)
+   optimizer
+end
+
+
 function loglikelihoodoptimizer(;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0)
 
@@ -157,8 +172,8 @@ end
 
 function initialized(stackedoptimizer::StackedOptimizer, dbm::MultimodalDBM)
    StackedOptimizer(map(
-         i -> initialized(stackedoptimizer.optimizers[i], dbm[i],
-         eachindex(dbm))))
+         i -> initialized(stackedoptimizer.optimizers[i], dbm[i]),
+         eachindex(dbm)))
 end
 
 

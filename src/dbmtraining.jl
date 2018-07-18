@@ -248,6 +248,9 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
    assert_enoughvaluesforepochs("learningrates", learningrates, epochs)
+
+   optimizer = converttodbmoptimizer(optimizer, dbm)
+   map!(opt -> converttodbmoptimizer(opt, dbm), optimizers, optimizers)
    optimizers = assertinitoptimizers(optimizer, optimizers, dbm,
          learningrates, sdlearningrates, epochs)
 

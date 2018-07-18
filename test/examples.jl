@@ -184,3 +184,45 @@ end
 
 monitor = crossvalidation(x, my_pretraining_monitoring, 10:10:200);
 BMPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)
+
+
+
+# ==============================================================================
+# Examples for custom optimization algorithm
+# ------------------------------------------------------------------------------
+
+x = barsandstripes(100, 16);
+
+struct MyRegularizedOptimizer{R<:AbstractRBM} <: AbstractOptimizer{R}
+   llopt::LoglikelihoodOptimizer{R}
+end
+
+function MyRegularizedOptimizer()
+   MyRegularizedOptimizer(loglikelihoodoptimizer(learningrate = 0.01))
+end
+
+import BoltzmannMachines: initialized, computegradient!, updateparameters!
+
+function initialized(myoptimizer::MyRegularizedOptimizer,
+      rbm::R) where {R<: AbstractRBM}
+   MyRegularizedOptimizer(initialized(myoptimizer.llopt, rbm))
+end
+
+function computegradient!(myoptimizer::MyRegularizedOptimizer,
+      v, vmodel, h, hmodel, rbm)
+   computegradient!(myoptimizer.llopt, v, vmodel, h, hmodel, rbm)
+   # add L2 regularization term
+   myoptimizer.llopt.gradient.weights .-= 0.1 .* rbm.weights
+   nothing
+end
+
+function updateparameters!(rbm::R, myoptimizer::MyRegularizedOptimizer{R}
+      ) where {R<: AbstractRBM}
+   updateparameters!(rbm, myoptimizer.llopt)
+end
+
+# The optimizer can be used for fitting RBMs ...
+rbm = fitrbm(x; optimizer = MyRegularizedOptimizer())
+
+# and also for DBMs
+dbm = fitdbm(x; optimizer = MyRegularizedOptimizer())
