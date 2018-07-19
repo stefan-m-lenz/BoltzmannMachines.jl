@@ -28,6 +28,7 @@ function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
       cdsteps::Int = 1,
       monitoring::Function = nomonitoring)
 
+   warn("`addlayer!`` is deprecated. Please use the options of `fitdbm` instead.")
    # propagate input x up to last hidden layer
    hh = x
    for i = 1:length(dbm)

@@ -28,39 +28,28 @@ BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
 BMPlots.plotevaluation(monitor, monitorreconstructionerror)
 
 
-# DBM-Fitting approach 1 - Step 1: Pre-training, adding layer by layer.
-# With this approach it is possible to also monitor the layerwise pretraining,
-# which is basically the same as fitting an RBM.
-
-dbm = BasicDBM();
-
 srand(12);
-monitor1 = Monitor()
-addlayer!(dbm, x;
-      nhidden = 6, epochs = 20, learningrate = 0.05,
-      monitoring = (rbm, epoch) ->
-            monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
-BMPlots.plotevaluation(monitor1, monitorreconstructionerror)
 
-monitor2  = Monitor()
-datadict2 = propagateforward(dbm[1], datadict, 2.0);
-addlayer!(dbm, x; islast = true,
-      nhidden = 2, epochs = 20, learningrate = 0.05,
-      monitoring = (rbm, epoch) ->
-            monitorreconstructionerror!(monitor2, rbm, epoch, datadict2));
-BMPlots.plotevaluation(monitor2, monitorreconstructionerror)
+# DBM-Fitting: Pretraining and Fine-Tuning combined in one function
+dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, learningrate = 0.05);
 
-# DBM-Fitting approach 1 - Step 2: Fine-Tuning
-monitor = Monitor();
-traindbm!(dbm, x; epochs = 50, learningrate = 0.05,
+# .. with extensive monitoring
+monitor = Monitor(); monitor1 = Monitor(); monitor2 = Monitor();
+dbm = fitdbm(x, epochs = 20, learningrate = 0.05,
+      monitoringdatapretraining = datadict,
+      pretraining = [
+            TrainLayer(nhidden = 6, monitoring = (rbm, epoch, datadict) ->
+                  monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
+            TrainLayer(nhidden = 2, monitoring = (rbm, epoch, datadict) ->
+                  monitorreconstructionerror!(monitor2, rbm, epoch, datadict))
+            ],
       monitoring = (dbm, epoch) ->
             monitorexactloglikelihood!(monitor, dbm, epoch, datadict));
 
+# Monitoring plots
+BMPlots.plotevaluation(monitor1, monitorreconstructionerror)
+BMPlots.plotevaluation(monitor2, monitorreconstructionerror)
 BMPlots.plotevaluation(monitor, monitorexactloglikelihood)
-
-# DBM-Fitting approach 2: Pretraining and Fine-Tuning combined in one function
-dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, epochspretraining = 20,
-      learningratepretraining = 0.05, learningrate = 0.05);
 
 # Evaluate final result with exact computation of likelihood
 exactloglikelihood(dbm, xtest)
