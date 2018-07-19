@@ -104,7 +104,8 @@ Prerequisite for running the [example code here](test/examples.jl) is that the `
 
     Pkg.clone("https://github.com/binderh/BoltzmannMachines.jl.git")
 
-If you want to use the plotting functionality in the submodule `BMPlots`, you are also required to have the Julia package [Gadfly](http://gadflyjl.org/stable/) installed.
+If you want to use the plotting functionality, you need to install the package [`BoltzmannMachinesPlots`](https://github.com/stefan-m-lenz/BoltzmannMachinesPlots.jl)
+in addition.
 
 ### Applications
 

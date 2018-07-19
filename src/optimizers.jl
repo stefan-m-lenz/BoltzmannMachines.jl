@@ -1,6 +1,18 @@
 """
-An `AbstractOptimizer` needs to implement the functions `computegradient!`.
-It may also override the behaviour of `updateparameters!` (see there).
+The `AbstractOptimizer` interface allows to specify optimization procedures.
+It consists of three methods:
+* `initialized(optimizer, bm)`: May be used for creating an optimizer that is
+   specifically initialized for the Boltzmann machine `bm`.
+   In particular it may be used to allocate reusable space for the gradient.
+   The default implementation simply returns the unmodified `optimizer`.
+* `computegradient!(optimizer, v, vmodel, h, hmodel, rbm)` or
+  `computegradient!(optimizer, meanfieldparticles, gibbsparticles, dbm)`
+   needs to be implemented for computing the gradient given the samples
+   from the positive and negative phase.
+* `updateparameters!(bm, optimizer)` needs to be specified for taking the
+   gradient step. The default implementation for RBMs expects the fields
+   `learningrate` and `gradient` and adds `learningrate * gradient` to the
+   given RBM.
 """
 abstract type AbstractOptimizer{R<:AbstractBM}
 end
@@ -15,12 +27,30 @@ struct NoOptimizer <: AbstractOptimizer{AbstractBM}
 end
 
 
-# TODO document
+"""
+Implements the `AbstractOptimizer` interface for optimizing the loglikelihood
+with stochastic gradient descent.
+"""
 mutable struct LoglikelihoodOptimizer{R<:AbstractRBM} <: AbstractLoglikelihoodOptimizer{R}
    gradient::R
    negupdate::Matrix{Float64}
    learningrate::Float64
    sdlearningrate::Float64
+end
+
+
+function converttodbmoptimizer(optimizer::NoOptimizer, dbm::MultimodalDBM)
+   optimizer
+end
+
+function converttodbmoptimizer(optimizer::AbstractOptimizer{<:AbstractRBM},
+      dbm::MultimodalDBM)
+   StackedOptimizer(map(i -> deepcopy(optimizer), eachindex(dbm)))
+end
+
+function converttodbmoptimizer(optimizer::AbstractOptimizer{MultimodalDBM},
+      dbm::MultimodalDBM)
+   optimizer
 end
 
 
@@ -157,8 +187,8 @@ end
 
 function initialized(stackedoptimizer::StackedOptimizer, dbm::MultimodalDBM)
    StackedOptimizer(map(
-         i -> initialized(stackedoptimizer.optimizers[i], dbm[i],
-         eachindex(dbm))))
+         i -> initialized(stackedoptimizer.optimizers[i], dbm[i]),
+         eachindex(dbm)))
 end
 
 

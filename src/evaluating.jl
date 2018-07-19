@@ -868,7 +868,7 @@ function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = 
       # divide data set x into batches and compute unnormalized probabilties
       batches = mostevenbatches(nsamples)
       batchranges = ranges(batches)
-      logp = @sync @distributed (+) for i in 1:length(batches)
+      logp = @sync @parallel (+) for i in 1:length(batches)
          (batches[i] / nsamples) * # (weighted mean)
             unnormalizedlogprob(mdbm, x[batchranges[i], :];
                   ntemperatures = ntemperatures, temperatures = temperatures,

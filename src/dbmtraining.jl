@@ -28,6 +28,7 @@ function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
       cdsteps::Int = 1,
       monitoring::Function = nomonitoring)
 
+   warn("`addlayer!`` is deprecated. Please use the options of `fitdbm` instead.")
    # propagate input x up to last hidden layer
    hh = x
    for i = 1:length(dbm)
@@ -74,10 +75,12 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
 * `epochs`: number of training epochs for joint training
 * `epochspretraining`: number of training epochs for pretraining,
    defaults to `epochs`
-* `learningrate`: learning rate for joint training of layers (= fine tuning)
+* `learningrate`/`learningrates`:
+   learning rate(s) for joint training of layers (= fine tuning)
    using the learning algorithm for a general Boltzmann Machine.
    The learning rate for fine tuning is by default decaying with the number of epochs,
-   starting with the given value. (For more details see `traindbm!`).
+   starting with the given value for the `learningrate`.
+   (For more details see `traindbm!`).
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
 * `nparticles`: number of particles used for sampling during joint training of
@@ -94,6 +97,10 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    retuning nothing. Used for the monitoring of fine-tuning.
 * `monitoringdatapretraining`: a `DataDict` that contains data used for
    monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)
+* `optimizer`/`optimizers`: an optimizer or a vector of optimizers for each epoch
+   (see `AbstractOptimizer`) used fine-tuning.
+* `optimizerpretraining`: an optimizer used for pre-training.
+   Defaults to the `optimizer`.
 """
 function fitdbm(x::Matrix{Float64};
       nhiddens::Vector{Int} = Vector{Int}(),
@@ -111,7 +118,8 @@ function fitdbm(x::Matrix{Float64};
       monitoring::Function = nomonitoring,
       monitoringdatapretraining::DataDict = DataDict(),
       optimizer::AbstractOptimizer = NoOptimizer(),
-      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
+      optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
+      optimizerpretraining::AbstractOptimizer = optimizer)
 
    if isempty(pretraining) && isempty(nhiddens)
       # set default only if there is not any more detailed info
@@ -123,6 +131,7 @@ function fitdbm(x::Matrix{Float64};
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
          learningrate = learningratepretraining,
+         optimizer = optimizer,
          trainlayers = pretraining,
          monitoringdata = monitoringdatapretraining)
 
@@ -248,6 +257,9 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
    assert_enoughvaluesforepochs("learningrates", learningrates, epochs)
+
+   optimizer = converttodbmoptimizer(optimizer, dbm)
+   map!(opt -> converttodbmoptimizer(opt, dbm), optimizers, optimizers)
    optimizers = assertinitoptimizers(optimizer, optimizers, dbm,
          learningrates, sdlearningrates, epochs)
 

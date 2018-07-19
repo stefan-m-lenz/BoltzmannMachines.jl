@@ -134,7 +134,8 @@ end
 
 
 function setdefaultsforunspecified!(trainlayer::TrainLayer,
-         learningrate::Float64, epochs::Int, batchsize::Int)
+         learningrate::Float64, epochs::Int, batchsize::Int,
+         optimizer::AbstractOptimizer)
 
    if trainlayer.usedefaultlearningrate
       trainlayer.learningrate = learningrate
@@ -144,6 +145,9 @@ function setdefaultsforunspecified!(trainlayer::TrainLayer,
    end
    if trainlayer.usedefaultbatchsize
       trainlayer.batchsize = batchsize
+   end
+   if trainlayer.optimizer === NoOptimizer()
+      trainlayer.optimizer = optimizer
    end
 
    if isempty(trainlayer.learningrates)
@@ -161,18 +165,21 @@ function setdefaultsforunspecified!(trainlayer::TrainLayer,
 end
 
 function setdefaultsforunspecified!(trainpartitionedlayer::TrainPartitionedLayer,
-      learningrate::Float64, epochs::Int, batchsize::Int)
+      learningrate::Float64, epochs::Int, batchsize::Int,
+      optimizer::AbstractOptimizer)
 
    setdefaultsforunspecified!(trainpartitionedlayer.parts,
-         learningrate, epochs, batchsize)
+         learningrate, epochs, batchsize, optimizer)
 end
 
 function setdefaultsforunspecified!(trainlayers::Vector{T},
-      learningrate::Float64, epochs::Int, batchsize::Int
+      learningrate::Float64, epochs::Int, batchsize::Int,
+      optimizer::AbstractOptimizer
       ) where {T <: AbstractTrainLayer}
 
    for trainlayer in trainlayers
-      setdefaultsforunspecified!(trainlayer, learningrate, epochs, batchsize)
+      setdefaultsforunspecified!(trainlayer,
+            learningrate, epochs, batchsize, optimizer)
    end
    trainlayers
 end
@@ -213,13 +220,14 @@ function stackrbms(x::Array{Float64,2};
       samplehidden::Bool = false,
       learningrate::Float64 = 0.005,
       batchsize::Int = 1,
+      optimizer::AbstractOptimizer = NoOptimizer(),
       trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoringdata::DataDict = DataDict())
 
    stackrbms_checkmonitoringdata(x, monitoringdata)
 
    trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, nhiddens, batchsize)
+         learningrate, nhiddens, batchsize, optimizer)
 
    nrbms = length(trainlayers)
    dbmn = Vector{AbstractRBM}(nrbms)
@@ -278,7 +286,8 @@ function stackrbms_preparetrainlayers(
       epochs::Int,
       learningrate::Float64,
       nhiddens::Vector{Int},
-      batchsize::Int)
+      batchsize::Int,
+      optimizer::AbstractOptimizer)
 
    if isempty(trainlayers)
       # construct default "trainlayers"
@@ -286,7 +295,8 @@ function stackrbms_preparetrainlayers(
          nhiddens = fill(size(x,2), 2) # default value for nhiddens
       end
       trainlayers = map(n -> TrainLayer(nhidden = n), nhiddens)
-      setdefaultsforunspecified!(trainlayers, learningrate, epochs, batchsize)
+      setdefaultsforunspecified!(trainlayers,
+            learningrate, epochs, batchsize, optimizer)
       return trainlayers
    end
 
@@ -300,7 +310,8 @@ function stackrbms_preparetrainlayers(
       warn("Argument `nhiddens` not used.")
    end
 
-   setdefaultsforunspecified!(trainlayers, learningrate, epochs, batchsize)
+   setdefaultsforunspecified!(trainlayers,
+         learningrate, epochs, batchsize, optimizer)
 
    function derive_nvisibles!(layer::AbstractTrainLayer,
          prevlayer::AbstractTrainLayer)
@@ -401,7 +412,7 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          ),
          eachindex(trainpartitionedlayer.parts))
 
-   rbms = @distributed (vcat) for arg in trainingargs
+   rbms = @parallel (vcat) for arg in trainingargs
       stackrbms_trainlayer(arg[1], arg[2];
             monitoringdata = arg[3],
             upfactor = upfactor, downfactor = downfactor)

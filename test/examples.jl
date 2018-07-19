@@ -29,39 +29,28 @@ BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorreconstructionerror)
 
 
-# DBM-Fitting approach 1 - Step 1: Pre-training, adding layer by layer.
-# With this approach it is possible to also monitor the layerwise pretraining,
-# which is basically the same as fitting an RBM.
-
-dbm = BasicDBM();
-
 srand(12);
-monitor1 = Monitor()
-addlayer!(dbm, x;
-      nhidden = 6, epochs = 20, learningrate = 0.05,
-      monitoring = (rbm, epoch) ->
-            monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
-BoltzmannMachinesPlots.plotevaluation(monitor1, monitorreconstructionerror)
 
-monitor2  = Monitor()
-datadict2 = propagateforward(dbm[1], datadict, 2.0);
-addlayer!(dbm, x; islast = true,
-      nhidden = 2, epochs = 20, learningrate = 0.05,
-      monitoring = (rbm, epoch) ->
-            monitorreconstructionerror!(monitor2, rbm, epoch, datadict2));
-BoltzmannMachinesPlots.plotevaluation(monitor2, monitorreconstructionerror)
+# DBM-Fitting: Pretraining and Fine-Tuning combined in one function
+dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, learningrate = 0.05);
 
-# DBM-Fitting approach 1 - Step 2: Fine-Tuning
-monitor = Monitor();
-traindbm!(dbm, x; epochs = 50, learningrate = 0.05,
+# .. with extensive monitoring
+monitor = Monitor(); monitor1 = Monitor(); monitor2 = Monitor();
+dbm = fitdbm(x, epochs = 20, learningrate = 0.05,
+      monitoringdatapretraining = datadict,
+      pretraining = [
+            TrainLayer(nhidden = 6, monitoring = (rbm, epoch, datadict) ->
+                  monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
+            TrainLayer(nhidden = 2, monitoring = (rbm, epoch, datadict) ->
+                  monitorreconstructionerror!(monitor2, rbm, epoch, datadict))
+            ],
       monitoring = (dbm, epoch) ->
             monitorexactloglikelihood!(monitor, dbm, epoch, datadict));
 
+# Monitoring plots
+BoltzmannMachinesPlots.plotevaluation(monitor1, monitorreconstructionerror)
+BoltzmannMachinesPlots.plotevaluation(monitor2, monitorreconstructionerror)
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
-
-# DBM-Fitting approach 2: Pretraining and Fine-Tuning combined in one function
-dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, epochspretraining = 20,
-      learningratepretraining = 0.05, learningrate = 0.05);
 
 # Evaluate final result with exact computation of likelihood
 exactloglikelihood(dbm, xtest)
@@ -185,3 +174,45 @@ end
 
 monitor = crossvalidation(x, my_pretraining_monitoring, 10:10:200);
 BoltzmannMachinesPlots.crossvalidationcurve(monitor, monitorlogproblowerbound)
+
+
+
+# ==============================================================================
+# Examples for custom optimization algorithm
+# ------------------------------------------------------------------------------
+
+x = barsandstripes(100, 16);
+
+struct MyRegularizedOptimizer{R<:AbstractRBM} <: AbstractOptimizer{R}
+   llopt::LoglikelihoodOptimizer{R}
+end
+
+function MyRegularizedOptimizer()
+   MyRegularizedOptimizer(loglikelihoodoptimizer(learningrate = 0.01))
+end
+
+import BoltzmannMachines: initialized, computegradient!, updateparameters!
+
+function initialized(myoptimizer::MyRegularizedOptimizer,
+      rbm::R) where {R<: AbstractRBM}
+   MyRegularizedOptimizer(initialized(myoptimizer.llopt, rbm))
+end
+
+function computegradient!(myoptimizer::MyRegularizedOptimizer,
+      v, vmodel, h, hmodel, rbm)
+   computegradient!(myoptimizer.llopt, v, vmodel, h, hmodel, rbm)
+   # add L2 regularization term
+   myoptimizer.llopt.gradient.weights .-= 0.1 .* rbm.weights
+   nothing
+end
+
+function updateparameters!(rbm::R, myoptimizer::MyRegularizedOptimizer{R}
+      ) where {R<: AbstractRBM}
+   updateparameters!(rbm, myoptimizer.llopt)
+end
+
+# The optimizer can be used for fitting RBMs ...
+rbm = fitrbm(x; optimizer = MyRegularizedOptimizer())
+
+# and also for DBMs
+dbm = fitdbm(x; optimizer = MyRegularizedOptimizer())

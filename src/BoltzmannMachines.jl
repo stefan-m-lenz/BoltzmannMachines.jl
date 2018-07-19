@@ -38,8 +38,8 @@ export
          meanfield, fitdbm, traindbm!,
    Particle, Particles,
    AbstractOptimizer,
-      computegradient!, updateparameters!,
       LoglikelihoodOptimizer,
+      initialized, computegradient!, updateparameters!,
       loglikelihoodoptimizer,
       beamoptimizer,
    Monitor, MonitoringItem, DataDict,
@@ -65,5 +65,6 @@ include("evaluating.jl")
 include("monitoring.jl")
 include("beam.jl")
 include("misc.jl")
+
 
 end # of module BoltzmannMachines

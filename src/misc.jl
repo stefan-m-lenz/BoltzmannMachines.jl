@@ -38,7 +38,7 @@ on all the available workers and reduces the results with the operator `op`.
 function batchparallelized(f::Function, n::Int, op::Function)
    batches = mostevenbatches(n)
    if length(batches) > 1
-      return @sync @distributed (op) for batch in batches
+      return @sync @parallel (op) for batch in batches
          f(batch)
       end
    else
