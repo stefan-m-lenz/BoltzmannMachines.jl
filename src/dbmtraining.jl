@@ -114,6 +114,7 @@ function fitdbm(x::Matrix{Float64};
             defaultfinetuninglearningrates(sdlearningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
+      batchsizepretraining::Int = 1,
       pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoring::Function = nomonitoring,
       monitoringdatapretraining::DataDict = DataDict(),
@@ -130,6 +131,7 @@ function fitdbm(x::Matrix{Float64};
    # Layerwise pre-training
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
+         batchsize = batchsizepretraining,
          learningrate = learningratepretraining,
          optimizer = optimizer,
          trainlayers = pretraining,
