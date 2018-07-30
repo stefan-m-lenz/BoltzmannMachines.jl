@@ -146,13 +146,13 @@ function monitorloglikelihood!(monitor::Monitor, rbm::AbstractRBM,
    logr = logmeanexp(logimpweights)
    sd = BMs.aisstandarddeviation(logimpweights)
    logz = BMs.logpartitionfunction(rbm, logr)
-   push!(monitor,
-         MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(BMs.monitoraislogr, epoch, logr, ""))
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(BMs.monitorloglikelihood, epoch,
             BMs.loglikelihood(rbm, x, logz), datasetname))
    end
+   push!(monitor,
+         MonitoringItem(BMs.monitoraisstandarddeviation, epoch, sd, ""),
+         MonitoringItem(BMs.monitoraislogr, epoch, logr, ""))
 
    monitor
 end
