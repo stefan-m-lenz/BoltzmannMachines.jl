@@ -143,6 +143,9 @@ function log1pexp(x::Float64)
    end
 end
 
+function logit(p::Float64)
+   -log.(1.0 ./ p .- 1.0)
+end
 
 """
     mostevenbatches(ntasks)

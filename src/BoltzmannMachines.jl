@@ -51,7 +51,7 @@ export
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
-   barsandstripes, splitdata
+   barsandstripes, logit, splitdata
 
 include("bmtypes.jl")
 include("gibbssampling.jl")
