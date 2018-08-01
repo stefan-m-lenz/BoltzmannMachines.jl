@@ -196,14 +196,15 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::MultimodalDBM,
    logr = logmeanexp(logimpweights)
    sd = aisstandarddeviation(logimpweights)
    logz = logpartitionfunction(dbm, logr)
-   push!(monitor,
-         MonitoringItem(monitoraisstandarddeviation, epoch, sd, ""),
-         MonitoringItem(monitoraislogr, epoch, logr, ""))
+
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(monitorlogproblowerbound, epoch,
             logproblowerbound(dbm, x, logpartitionfunction = logz),
             datasetname))
    end
+   push!(monitor,
+         MonitoringItem(monitoraisstandarddeviation, epoch, sd, ""),
+         MonitoringItem(monitoraislogr, epoch, logr, ""))
 
    monitor
 end
