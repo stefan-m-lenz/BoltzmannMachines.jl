@@ -1054,34 +1054,41 @@ end
 
 """
     logproblowerbound(dbm, x; ...)
+    logproblowerbound(dbm, x, logimpweights; ...)
+    logproblowerbound(dbm, x, logz; ...)
 Estimates the mean of the variational lower bound for the log probability
 of the DBM on a given dataset `x` like described in Equation 38
 in [Salakhutdinov, 2015].
+The logarithmized partition function can be specified directly as `logz`
+or by giving the `logimpweights` from estimating the partition function
+with the Annealed Importance Sampling algorithm (AIS).
+(See `aislogimpweights`.)
+If neither `logimpweights` or `logz` is given, the partition function will be
+estimated by AIS with default parameters.
 
-# Optional keyword arguments:
-* If importance weights `impweights` are given, they are used for estimation
-  of the partition function; otherwise the partition function will be estimated
-  by running the Annealed Importance Sampling algorithm with default parameters
-  for the DBM.
+# Optional keyword argument:
 * The approximate posterior distribution may be given as argument `mu`
   or is calculated by the mean-field method.
-* The `logpartitionfunction` can be specified directly
-  or is calculated using the `logimpweights`.
 """
 function logproblowerbound(dbm::MultimodalDBM,
-      x::Array{Float64};
-      logimpweights::Array{Float64,1} = aislogimpweights(dbm),
-      mu::Particles = meanfield(dbm, x),
-      logpartitionfunction::Float64 = BMs.logpartitionfunction(dbm,
-            logmeanexp(logimpweights)))
+      x::Matrix{Float64},
+      logimpweights::Array{Float64,1} = aislogimpweights(dbm);
+      mu::Particles = meanfield(dbm, x))
+
+   logproblowerbound(dbm, x, logmeanexp(logimpweights); mu = mu)
+end
+
+function logproblowerbound(dbm::MultimodalDBM,
+      x::Matrix{Float64}, logz::Float64;
+      mu::Particles = meanfield(dbm, x))
 
    nsamples = size(mu[1], 1)
    nrbms  = length(dbm)
 
    lowerbound = 0.0
-   for j=1:nsamples # TODO parallelize
+   for j = 1:nsamples # TODO parallelize
 
-      for i=1:nrbms
+      for i = 1:nrbms
          v = vec(mu[i][j,:])   # visible units of i'th RBM
          h = vec(mu[i+1][j,:]) # hidden units of i'th RBM
 
@@ -1092,11 +1099,10 @@ function logproblowerbound(dbm::MultimodalDBM,
          h = h[(h .> 0.0) .& (h .< 1.0)]
          lowerbound += - dot(h, log.(h)) - dot(1-h, log.(1-h))
       end
-
    end
 
    lowerbound /= nsamples
-   lowerbound -= logpartitionfunction
+   lowerbound -= logz
    lowerbound
 end
 

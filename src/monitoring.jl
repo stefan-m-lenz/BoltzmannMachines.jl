@@ -199,7 +199,7 @@ function monitorlogproblowerbound!(monitor::Monitor, dbm::MultimodalDBM,
 
    for (datasetname, x) in datadict
       push!(monitor, MonitoringItem(monitorlogproblowerbound, epoch,
-            logproblowerbound(dbm, x, logpartitionfunction = logz),
+            logproblowerbound(dbm, x, logz),
             datasetname))
    end
    push!(monitor,
