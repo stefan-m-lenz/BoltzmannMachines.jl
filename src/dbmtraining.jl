@@ -63,10 +63,12 @@ end
 
 """
     fitdbm(x; ...)
-Fits a BasicDBM model to the data set `x`. The procedure consists of two parts:
+Fits a (multimodal) DBM to the data set `x`.
+The procedure consists of two parts:
 First a stack of RBMs is pretrained in a greedy layerwise manner
-(see `stackrbms(x)`). Then the weights are jointly trained using the
-general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
+(see `stackrbms(x)`). Then the weights of all layers are jointly
+trained using the general Boltzmann Machine learning procedure
+(see `traindbm!(dbm,x)`).
 
 # Optional keyword arguments (ordered by importance):
 * `nhiddens`: vector that defines the number of nodes in the hidden layers of
@@ -92,14 +94,14 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    (For a detailed description of the possible parameters,
    see help for `TrainLayer`).
    If the number of training epochs and the learning rate are not specified
-   explicitly for a layer, the values of `epochspretraining` and
-   `learningratepretraining` are used.
+   explicitly for a layer, the values of `epochspretraining`,
+   `learningratepretraining` and `batchsizepretraining` are used.
 * `monitoring`: Monitoring function accepting a `dbm` and the number of epochs
    retuning nothing. Used for the monitoring of fine-tuning.
 * `monitoringdatapretraining`: a `DataDict` that contains data used for
    monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)
 * `optimizer`/`optimizers`: an optimizer or a vector of optimizers for each epoch
-   (see `AbstractOptimizer`) used fine-tuning.
+   (see `AbstractOptimizer`) used for fine-tuning.
 * `optimizerpretraining`: an optimizer used for pre-training.
    Defaults to the `optimizer`.
 """
