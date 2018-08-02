@@ -83,6 +83,7 @@ general Boltzmann Machine learning procedure (see `traindbm!(dbm,x)`).
    (For more details see `traindbm!`).
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
+* `batchsizepretraining`: batchsize for pretraining, defaults to 1
 * `nparticles`: number of particles used for sampling during joint training of
    DBM, default 100
 * `pretraining`: The arguments for layerwise pretraining
