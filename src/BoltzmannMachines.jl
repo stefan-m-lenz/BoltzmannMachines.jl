@@ -1,7 +1,6 @@
 module BoltzmannMachines
 
 using Distributions
-using Compat.Distributed
 
 const BMs = BoltzmannMachines
 
