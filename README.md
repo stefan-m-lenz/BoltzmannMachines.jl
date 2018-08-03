@@ -100,9 +100,7 @@ For intended usage of these functions, best see the [examples](test/examples.jl)
 
 ## Examples
 
-Prerequisite for running the [example code here](test/examples.jl) is that the `BoltzmannMachines` package is installed:
-
-    Pkg.clone("https://github.com/binderh/BoltzmannMachines.jl.git")
+You can find [example code here](test/examples.jl).
 
 If you want to use the plotting functionality, you need to install the package [`BoltzmannMachinesPlots`](https://github.com/stefan-m-lenz/BoltzmannMachinesPlots.jl)
 in addition.
