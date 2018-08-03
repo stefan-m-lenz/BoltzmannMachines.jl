@@ -85,7 +85,7 @@ function testpotentials()
    hh = rand(nsamples, nhidden)
    rbm = BMTest.randrbm(nvisible, nhidden)
    BMs.hiddenpotential!(hh, rbm, vv)
-   @test sum(abs.(hh - BMs.hiddenpotential(rbm, vv))) == 0
+   @test isapprox(sum(abs.(hh - BMs.hiddenpotential(rbm, vv))), 0)
 
    # Test that activation potential of hidden nodes of a
    # Binomial2BernoulliRBM is the same as that of a BernoulliRBM
@@ -93,25 +93,25 @@ function testpotentials()
    hh2 = BMs.hiddenpotential(b2brbm, vv)
    @test sum(abs.(hh - hh2)) == 0
    BMs.hiddenpotential!(hh, b2brbm, vv)
-   @test sum(abs.(hh - hh2)) == 0
+   @test isapprox(sum(abs.(hh - hh2)), 0)
 
    # Test activation potential of visible nodes for BernoulliRBM
    BMs.visiblepotential!(vv, rbm, hh)
-   @test sum(abs.(vv - BMs.visiblepotential(rbm, hh))) == 0
+   @test isapprox(sum(abs.(vv - BMs.visiblepotential(rbm, hh))), 0)
 
    # Test activation potential of the visible nodes of a Binomial2BernoulliRBM
    BMs.visiblepotential!(vv, b2brbm, hh)
-   @test sum(abs.(vv- BMs.visiblepotential(b2brbm, hh))) == 0
+   @test isapprox(sum(abs.(vv- BMs.visiblepotential(b2brbm, hh))), 0)
 
    # Test activation potential of hidden nodes for GBRBM
    hh = rand(nsamples, nhidden)
    gbrbm = BMTest.randgbrbm(nvisible, nhidden)
    BMs.hiddenpotential!(hh, gbrbm, vv)
-   @test sum(abs.(hh - BMs.hiddenpotential(gbrbm, vv))) == 0
+   @test isapprox(sum(abs.(hh - BMs.hiddenpotential(gbrbm, vv))), 0)
 
    # Test activation potential of visible nodes for GBRBM
    BMs.visiblepotential!(vv, gbrbm, hh)
-   @test sum(abs.(vv - BMs.visiblepotential(gbrbm, hh))) == 0
+   @test isapprox(sum(abs.(vv - BMs.visiblepotential(gbrbm, hh))), 0)
 
    # Test activation potential of hidden nodes for PartitionedRBM.
    # For a PartitionedRBM consisting of BernoulliRBMs, the
@@ -125,11 +125,11 @@ function testpotentials()
    prbm = BMs.PartitionedRBM{BMs.BernoulliRBM}([rbm; rbm2])
    joinedrbm = BMs.joinrbms([rbm; rbm2])
    BMs.hiddenpotential!(hhpartitioned, joinedrbm, vv)
-   @test sum(abs.(hhpartitioned - BMs.hiddenpotential(joinedrbm, vv))) == 0
+   @test isapprox(sum(abs.(hhpartitioned - BMs.hiddenpotential(joinedrbm, vv))), 0)
 
    # Test activation potential of visible nodes for PartitionedRBM
    BMs.visiblepotential!(vv, prbm, hhpartitioned)
-   @test sum(abs.(vv - BMs.visiblepotential(joinedrbm, hhpartitioned))) == 0
+   @test isapprox(sum(abs.(vv - BMs.visiblepotential(joinedrbm, hhpartitioned))), 0)
 end
 
 
