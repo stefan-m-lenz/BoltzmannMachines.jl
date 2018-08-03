@@ -74,6 +74,8 @@ function gibbssample!(particles::Particles, dbm::MultimodalDBM, nsteps::Int = 5)
    input = newparticleslike(particles)
    input2 = newparticleslike(particles)
 
+   tmp = Particles(length(dbm) + 1)
+
    for step in 1:nsteps
       # first layer gets input only from layer above
       samplevisible!(input[1], dbm[1], particles[2])
@@ -90,9 +92,9 @@ function gibbssample!(particles::Particles, dbm::MultimodalDBM, nsteps::Int = 5)
       samplehidden!(input[end], dbm[end], particles[end-1])
 
       # swap input and particles
-      tmp = particles
-      particles = input
-      input = tmp
+      tmp .= particles
+      particles .= input
+      input .= tmp
    end
 
    particles
