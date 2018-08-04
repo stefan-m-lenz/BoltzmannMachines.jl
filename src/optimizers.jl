@@ -205,16 +205,17 @@ in a RBM of the same type in the field `optimizer.gradient`.
 """
 function computegradient!(
       optimizer::AbstractLoglikelihoodOptimizer{R},
-      v::M, vmodel::M, h::M, hmodel::M, rbm::R
-      ) where {R <: AbstractRBM, M <: AbstractArray{Float64, 2}}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::R
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2},
+            R <: AbstractRBM}
 
    computegradientsweightsandbiases!(optimizer, v, vmodel, h, hmodel, rbm)
 end
 
 function computegradient!(
       optimizer::LoglikelihoodOptimizer{GaussianBernoulliRBM},
-      v::M, vmodel::M, h::M, hmodel::M, gbrbm::GaussianBernoulliRBM
-      ) where {M<: AbstractArray{Float64, 2}}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, gbrbm::GaussianBernoulliRBM
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}}
 
    # See bottom of page 15 in [Krizhevsky, 2009].
 
@@ -234,8 +235,8 @@ end
 
 function computegradient!(
       optimizer::AbstractLoglikelihoodOptimizer{GaussianBernoulliRBM2},
-      v::M, vmodel::M, h::M, hmodel::M, gbrbm::GaussianBernoulliRBM2
-      ) where {M<: AbstractArray{Float64, 2}}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, gbrbm::GaussianBernoulliRBM2
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}}
 
    # See Cho,
    # "Improved learning of Gaussian-Bernoulli restricted Boltzmann machines"
@@ -260,8 +261,9 @@ end
 
 function computegradientsweightsandbiases!(
       optimizer::AbstractLoglikelihoodOptimizer,
-      v::M, vmodel::M, h::M, hmodel::M, rbm::R
-      ) where {M<: AbstractArray{Float64, 2}, R <: AbstractRBM}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::R
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}, 
+            R <: AbstractRBM}
 
    npossamples = size(v, 1)
    nnegsamples = size(vmodel, 1)
@@ -283,8 +285,9 @@ end
 
 function computegradient!(
       optimizer::BeamAdversarialOptimizer{R},
-      v::M, vmodel::M, h::M, hmodel::M, rbm::AbstractRBM
-      ) where {M<: AbstractArray{Float64, 2}, R <:AbstractRBM}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::AbstractRBM
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}, 
+            R <:AbstractRBM}
 
    optimizer.critic = nearestneighbourcritic(h, hmodel, optimizer.knearest)
 
@@ -311,11 +314,11 @@ end
 
 function computegradient!(
       optimizer::BeamAdversarialOptimizer{GaussianBernoulliRBM2},
-      v::M, vmodel::M, h::M, hmodel::M, rbm::GaussianBernoulliRBM2
-      ) where {M<: AbstractArray{Float64, 2}}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::GaussianBernoulliRBM2
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}}
 
    invoke(computegradient!,
-         Tuple{BeamAdversarialOptimizer{GaussianBernoulliRBM2}, M, M, M, M, AbstractRBM},
+         Tuple{BeamAdversarialOptimizer{GaussianBernoulliRBM2}, M1, M1, M2, M2, AbstractRBM},
          optimizer, v, vmodel, h, hmodel, rbm)
 
    sdsq = rbm.sd .^ 2
@@ -341,8 +344,9 @@ function computegradient!(
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
-      v::M, vmodel::M, h::M, hmodel::M, rbm::AbstractRBM
-      ) where {M<: AbstractArray{Float64, 2}, R <:AbstractRBM}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::AbstractRBM
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2},
+            R <:AbstractRBM}
 
    computegradient!(optimizer.part1, v, vmodel, h, hmodel, rbm)
    computegradient!(optimizer.part2, v, vmodel, h, hmodel, rbm)
@@ -366,12 +370,12 @@ function computegradient!(optimizer::CombinedOptimizer{R},
 end
 
 function computegradient!(optimizer::CombinedOptimizer{R},
-      v::M, vmodel::M, h::M, hmodel::M, rbm::R
-      ) where {M<: AbstractArray{Float64, 2},
+      v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::R
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2},
             R <:Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
 
    invoke(computegradient!,
-         Tuple{CombinedOptimizer{R}, M, M, M, M, AbstractRBM},
+         Tuple{CombinedOptimizer{R}, M1, M1, M2, M2, AbstractRBM},
          optimizer, v, vmodel, h, hmodel, rbm)
 
    if optimizer.sdlearningrate > 0.0
@@ -384,8 +388,8 @@ function computegradient!(optimizer::CombinedOptimizer{R},
 end
 
 function computegradient!(optimizer::PartitionedOptimizer,
-      v::M, vmodel::M, h::M, hmodel::M, prbm::PartitionedRBM
-      ) where {M<: AbstractArray{Float64, 2}}
+      v::M1, vmodel::M1, h::M2, hmodel::M2, prbm::PartitionedRBM
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}}
 
    for i in eachindex(prbm.rbms)
       computegradient!(optimizer.optimizers[i],

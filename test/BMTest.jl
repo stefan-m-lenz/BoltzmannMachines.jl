@@ -6,6 +6,28 @@ import BoltzmannMachines
 const BMs = BoltzmannMachines
 
 
+"""
+    test3(expr)
+Tests an expression up to three times. 
+Useful for evaluating stochastic algorithms that may fail some times.
+"""
+macro test3(expr)
+   quote
+      fails = 0
+      while fails < 2
+         if ($expr)
+            return @test true
+         else
+            warn("Testing failed, but will try again:")
+            println($(string(expr)))
+            fails = fails + 1
+         end
+      end
+      @test $expr
+   end
+end
+
+
 function createsamples(nsamples::Int, nvariables::Int, samerate::Float64 = 0.7)
 
    x = round.(rand(nsamples, nvariables))
@@ -554,7 +576,7 @@ function test_mdbm_rbm_b2brbm()
             BMs.TrainLayer(rbmtype = BMs.Binomial2BernoulliRBM,
                   nvisible = nvariables, nhidden = nvariables - 1,
                   learningrate = 0.0015);
-               BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
+            BMs.TrainLayer(rbmtype = BMs.BernoulliRBM,
                   nvisible = nvariables, nhidden = nvariables)
          ]);
          BMs.TrainLayer(nhidden = nvariables);
@@ -666,6 +688,43 @@ function test_mdbm_gaussianvisibles()
    @test abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
 
    nothing
+end
+
+function test_mdbm_architectures()
+   nsamples = 5
+   data = hcat(float.(rand(nsamples, 3) .< 0.5), randn(nsamples, 3))
+
+   BMs.fitdbm(data; epochs = 2, pretraining = [ 
+         BMs.TrainPartitionedLayer([               
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);                
+               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+                     rbmtype = BMs.GaussianBernoulliRBM)]);
+               BMs.TrainLayer(nhidden = 4);
+               BMs.TrainLayer(nhidden = 3)])
+
+   BMs.fitdbm(data; epochs = 2, pretraining = [          
+         BMs.TrainPartitionedLayer([                   
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);             
+               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+                     rbmtype = BMs.GaussianBernoulliRBM2)]);
+         BMs.TrainPartitionedLayer([
+               BMs.TrainLayer(nhidden = 2)    
+               BMs.TrainLayer(nhidden = 2)]);
+         BMs.TrainLayer(nhidden = 4)])
+
+   data2 = hcat(data, 
+         float.(rand(nsamples, 3) .< 0.5) .+ float.(rand(nsamples, 3) .< 0.5))
+   BMs.fitdbm(data2; epochs = 2, pretraining = [          
+         BMs.TrainPartitionedLayer([                   
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);             
+               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+                     rbmtype = BMs.GaussianBernoulliRBM2);
+               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+                     rbmtype = BMs.Binomial2BernoulliRBM)]);
+         BMs.TrainPartitionedLayer([
+               BMs.TrainLayer(nvisible = 3, nhidden = 3)    
+               BMs.TrainLayer(nvisible = 6, nhidden = 3)]);
+         BMs.TrainLayer(nhidden = 3)])
 end
 
 

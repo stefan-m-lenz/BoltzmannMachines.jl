@@ -61,6 +61,7 @@ BMTest.test_rbm()
 BMTest.test_b2brbm()
 BMTest.test_gbrbm(BMs.GaussianBernoulliRBM)
 BMTest.test_gbrbm(BMs.GaussianBernoulliRBM2)
+BMTest.test_mdbm_architectures()
 BMTest.test_mdbm_rbm_b2brbm()
 BMTest.test_mdbm_gaussianvisibles()
 
