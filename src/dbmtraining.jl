@@ -57,7 +57,7 @@ end
 
 
 function defaultfinetuninglearningrates(learningrate, epochs)
-   learningrate * 11.0 ./ (10.0 + (1:epochs))
+   learningrate * 11.0 ./ (10.0 .+ (1:epochs))
 end
 
 
@@ -176,7 +176,7 @@ It is assumed that all nodes in in-between-layers are Bernoulli distributed.
 function meanfield(dbm::MultimodalDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
 
    nlayers = length(dbm) + 1
-   mu = Particles(nlayers)
+   mu = Particles(undef, nlayers)
 
    # Initialization with single bottom-up pass using twice the weights for all
    # but the topmost layer (see [Salakhutdinov+Hinton, 2012], p. 1985)

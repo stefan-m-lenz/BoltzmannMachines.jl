@@ -1,8 +1,9 @@
+using Distributed
 if nprocs() == 1
    addprocs() # test with multiple processes
 end
 
-using Base.Test
+using Test
 import BoltzmannMachines
 
 const BMs = BoltzmannMachines
@@ -11,6 +12,19 @@ push!(LOAD_PATH, "../test/")
 import BMTest
 pop!(LOAD_PATH)
 
+BMTest.testpotentials()
+
+@test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
+      BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
+      atol = 0.002)
+
+# Test exact loglikelihood of a baserate RBM
+# vs the calculated loglikelihoodbaserate
+x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
+@test isapprox(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+@test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+x = rand(100, 10) + randn(100, 10);
+@test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
 BMTest.testpotentials()
 
 @test isapprox(BMs.bernoulliloglikelihoodbaserate(10),

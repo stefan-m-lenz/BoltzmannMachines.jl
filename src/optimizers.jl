@@ -57,14 +57,15 @@ end
 function loglikelihoodoptimizer(;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0)
 
-   LoglikelihoodOptimizer(NoRBM(), Matrix{Float64}(0,0),
+   LoglikelihoodOptimizer(NoRBM(), Matrix{Float64}(undef, 0,0),
          learningrate, sdlearningrate)
 end
 
 function loglikelihoodoptimizer(rbm::R;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0) where {R<:AbstractRBM}
 
-   LoglikelihoodOptimizer{R}(deepcopy(rbm), Matrix{Float64}(size(rbm.weights)),
+   LoglikelihoodOptimizer{R}(deepcopy(rbm), 
+         Matrix{Float64}(undef, size(rbm.weights)),
          learningrate, sdlearningrate)
 end
 
@@ -248,7 +249,7 @@ function computegradient!(
       sdgrads .*= 2.0
       sdgrads .+= (v .- gbrbm.visbias') .^ 2
       sdgrads .-= (vmodel .- gbrbm.visbias') .^ 2
-      optimizer.gradient.sd .= vec(mean(sdgrads, 1))
+      optimizer.gradient.sd .= vec(mean(sdgrads, dims = 1))
       optimizer.gradient.sd ./= sdsq
       optimizer.gradient.sd ./= gbrbm.sd
    end
@@ -268,18 +269,18 @@ function computegradientsweightsandbiases!(
    npossamples = size(v, 1)
    nnegsamples = size(vmodel, 1)
 
-   At_mul_B!(optimizer.gradient.weights, v, h)
+   mul!(optimizer.gradient.weights, transpose(v), h)
    if npossamples != 1
       optimizer.gradient.weights ./= npossamples
    end
-   At_mul_B!(optimizer.negupdate, vmodel, hmodel)
+   mul!(optimizer.negupdate, transpose(vmodel), hmodel)
    if nnegsamples != 1
       optimizer.negupdate ./= nnegsamples
    end
    optimizer.gradient.weights .-= optimizer.negupdate
 
-   optimizer.gradient.hidbias .= vec(mean(h, 1) - mean(hmodel, 1))
-   optimizer.gradient.visbias .= vec(mean(v, 1) - mean(vmodel, 1))
+   optimizer.gradient.hidbias .= vec(mean(h, dims = 1) - mean(hmodel, dims = 1))
+   optimizer.gradient.visbias .= vec(mean(v, dims = 1) - mean(vmodel, dims = 1))
    nothing
 end
 

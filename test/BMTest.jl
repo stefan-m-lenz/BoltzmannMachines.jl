@@ -1,7 +1,10 @@
 module BMTest
 
-using Base.Test
+using LinearAlgebra
+using Test
 using RDatasets
+using Statistics
+
 import BoltzmannMachines
 const BMs = BoltzmannMachines
 
@@ -37,7 +40,7 @@ function createsamples(nsamples::Int, nvariables::Int, samerate::Float64 = 0.7)
    sameratediff = samerate - sameratestart
 
    if sameratediff > 0
-      addedsamerange = find(.!samerows)
+      addedsamerange = findall(.!samerows)
       shuffle!(addedsamerange)
       nsameadded = round(Int, sameratediff * nsamples)
       addedsamerange = addedsamerange[1:nsameadded]
@@ -61,7 +64,7 @@ end
 function randrbm(nvisible, nhidden, factorw = 1.0, factora = 1.0, factorb = 1.0)
    w = factorw*randn(nvisible, nhidden)
    a = factora*rand(nvisible)
-   b = factorb*(0.5 - rand(nhidden))
+   b = factorb*(0.5 .- rand(nhidden))
    BMs.BernoulliRBM(w, a, b)
 end
 
@@ -82,7 +85,7 @@ end
 
 function randdbm(nunits)
    nrbms = length(nunits) - 1
-   dbm = BMs.BasicDBM(nrbms)
+   dbm = BMs.BasicDBM(undef, nrbms)
    for i = 1:nrbms
       dbm[i] = randrbm(nunits[i], nunits[i+1])
    end
@@ -156,7 +159,7 @@ end
 
 
 function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
-   a = logit(vec(mean(x,1)))
+   a = logit(vec(mean(x, dims = 1)))
    nvisible = length(a)
    rbm = BMs.BernoulliRBM(zeros(nvisible, nhidden), a, ones(nhidden))
    baserate = BMs.bernoulliloglikelihoodbaserate(x)
@@ -165,7 +168,7 @@ function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
 end
 
 function bgrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
-   a = logit(vec(mean(x,1)))
+   a = logit(vec(mean(x, dims = 1)))
    nvisible = length(a)
    bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), a, ones(nhidden))
    baserate = BMs.bernoulliloglikelihoodbaserate(x)
@@ -174,9 +177,9 @@ function bgrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
 end
 
 function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
-   a = vec(mean(x,1))
+   a = vec(mean(x, dims = 1))
    nvisible = length(a)
-   sd = vec(std(x,1))
+   sd = vec(std(x, dims = 1))
    gbrbm = BMs.GaussianBernoulliRBM(zeros(nvisible, nhidden), a, ones(nhidden), sd)
    baserate = BMs.gaussianloglikelihoodbaserate(x)
    exactloglik = BMs.loglikelihood(gbrbm, x, BMs.exactlogpartitionfunction(gbrbm))
@@ -184,7 +187,7 @@ function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
 end
 
 function test_stackrbms_preparetrainlayers()
-   x = Matrix{Float64}(22, 10);
+   x = Matrix{Float64}(undef, 22, 10);
    epochs = 17
    learningrate = 0.007
    nhiddens = [7;6;5]
@@ -424,9 +427,9 @@ function test_likelihoodconsistency()
    logp2 = BMs.loglikelihood(rbm2, x, logz2)
 
    samplemeanrbm =
-         BMs.BernoulliRBM(zeros(nvariables,1), vec(mean(x, 1)), zeros(1))
+         BMs.BernoulliRBM(fill(0.0, nvariables, 1), vec(mean(x, dims = 1)), fill(0.0, 1, 1))
    samplemeanrbm2 =
-         BMs.BernoulliRBM(zeros(rbm1.weights), vec(mean(x, 1)), zeros(rbm1.hidbias))
+         BMs.BernoulliRBM(fill(0.0, size(rbm1.weights)), vec(mean(x, dims = 1)), zeros(rbm1.hidbias))
 
    # Annealing between two RBMs with zero weights
    @test isapprox(
@@ -469,7 +472,7 @@ function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
          sdlearningrate = 0.00001)
 
    datainitrbm = GBRBM(zeros(size(x,2), 1),
-         vec(mean(x,1)), [0.0], vec(std(x,1)))
+         vec(mean(x, dims = 1)), [0.0], vec(std(x,1)))
 
 
    # Compare estimated difference of log partition functions to difference

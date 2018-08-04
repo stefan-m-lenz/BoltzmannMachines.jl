@@ -84,10 +84,10 @@ Returns a vector of consecutive integer ranges, the first starting with 1.
 The i'th such range spans over `numbers[i]` items.
 """
 function ranges(numbers::Vector{Int})
-   ranges = Vector{UnitRange{Int}}(length(numbers))
+   ranges = Vector{UnitRange{Int}}(undef, length(numbers))
    offset = 0
    for i in eachindex(numbers)
-      ranges[i] = offset + (1:numbers[i])
+      ranges[i] = offset .+ (1:numbers[i])
       offset += numbers[i]
    end
    ranges

@@ -48,7 +48,7 @@ Creates and returns a dictionary with the same keys as the given `datadict`.
 The values of the returned dictionary are the samples' means in the `datadict`.
 """
 function means(datadict::DataDict)
-   DataDict(map(kv -> (kv[1] => mean(kv[2], 1)), datadict))
+   DataDict(map(kv -> (kv[1] => mean(kv[2], dims = 1)), datadict))
 end
 
 
@@ -215,7 +215,7 @@ function monitormeandiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
       nparticles::Int = 3000, burnin::Int = 10,
       xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1])
 
-   samplemean = mean(xgenerated, 1)
+   samplemean = mean(xgenerated, dims = 1)
    for (datasetname, datamean) in meandict
       push!(monitor, MonitoringItem(monitormeandiff, epoch,
                norm(samplemean - datamean), datasetname))
@@ -231,7 +231,7 @@ function monitormeandiffpervariable!(monitor::Monitor, bm::AbstractBM, epoch::In
       xgenerated::Matrix{Float64} = sampleparticles(bm, nparticles, burnin)[1],
       variables::Vector{Int} = collect(1:size(xgenerated, 2)))
 
-   samplemean = mean(xgenerated, 1)
+   samplemean = mean(xgenerated, dims = 1)
    for (datasetname, datamean) in meandict
       for i in variables
          push!(monitor, MonitoringItem(monitormeandiffpervariable, epoch,

@@ -1,6 +1,10 @@
 module BoltzmannMachines
 
 using Distributions
+using Distributed
+using LinearAlgebra
+using Random
+using Statistics
 
 const BMs = BoltzmannMachines
 

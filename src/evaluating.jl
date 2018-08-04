@@ -25,7 +25,7 @@ function aislogimpweights(rbm::AbstractXBernoulliRBM;
    mixrbm = deepcopy(rbm)
 
    # start with samples from model with zero weights
-   hh = repmat(rbm.hidbias', nparticles)
+   hh = repeat(rbm.hidbias', nparticles)
    sigm_bernoulli!(hh)
 
    vv = Matrix{Float64}(nparticles, length(rbm.visbias))
@@ -70,7 +70,7 @@ function aislogimpweights(rbm1::R, rbm2::R;
    vv = BMs.sampleparticles(rbm1, nparticles, initburnin)[1]
    nhidden1 = length(rbm1.hidbias)
    nhidden2 = length(rbm2.hidbias)
-   hh = Matrix{Float64}(nparticles, nhidden1 + nhidden2)
+   hh = Matrix{Float64}(undef, nparticles, nhidden1 + nhidden2)
 
    prevmixedrbm = BMs.mixedrbm(rbm1, rbm2, temperatures[1])
 
@@ -90,7 +90,7 @@ function aislogimpweights(rbm1::R, rbm2::R;
    end
 
    # account for different model size
-   logimpweights += log(2) * (nhidden2 - nhidden1)
+   logimpweights .+= log(2) * (nhidden2 - nhidden1)
 
    logimpweights
 end
@@ -297,7 +297,7 @@ layer of the `dbm`. For intermediate layers, visible and hidden biases are
 combined to a single bias vector.
 """
 function combinedbiases(dbm::MultimodalDBM)
-   biases = Particle(length(dbm) + 1)
+   biases = Particle(undef, length(dbm) + 1)
    # Create copy to avoid accidental modification of dbm.
    # Use functions `visiblebias` and `hiddenbias` instead of
    # fields `visbias` and `hidbias` of RBMs to be able to
@@ -398,7 +398,7 @@ end
 function energy(dbm::BasicDBM, u::Particle)
    energy = [0.0]
    for i = 1:length(dbm)
-      energy -= u[i]'*dbm[i].weights*u[i+1] + dbm[i].visbias'*u[i] + dbm[i].hidbias'*u[i+1]
+      energy .-= u[i]'*dbm[i].weights*u[i+1] .+ dbm[i].visbias'*u[i] .+ dbm[i].hidbias'*u[i+1]
    end
    energy[1]
 end
@@ -780,7 +780,7 @@ regarding the RBM models `rbm1` and `rbm2`. Returns a vector of differences.
 """
 function freeenergydiffs(rbm1::AbstractRBM, rbm2::AbstractRBM, x::Matrix{Float64})
    nsamples = size(x, 1)
-   freeenergydiffs = Vector{Float64}(nsamples)
+   freeenergydiffs = Vector{Float64}(undef, nsamples)
    for j = 1:nsamples
       v = vec(x[j,:])
       freeenergydiffs[j] = freeenergy(rbm1, v) - freeenergy(rbm2, v)
@@ -806,7 +806,7 @@ Returns particle for DBM, initialized with zeros.
 function initcombination(dbm::BasicDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
-   u = Particle(nlayers)
+   u = Particle(undef, nlayers)
    for i = 1:nlayers
       u[i] = zeros(nunits[i])
    end
@@ -821,7 +821,7 @@ in the `dbm`.
 function initcombinationoddlayersonly(dbm::MultimodalDBM)
    nunits = BMs.nunits(dbm)
    nlayers = length(nunits)
-   uodd = Particle(round(Int, nlayers/2, RoundUp))
+   uodd = Particle(undef, round(Int, nlayers/2, RoundUp))
    for i = eachindex(uodd)
       uodd[i] = zeros(nunits[2i-1])
    end
@@ -868,7 +868,7 @@ function loglikelihood(mdbm::MultimodalDBM, x::Matrix{Float64}, logz::Float64 = 
       # divide data set x into batches and compute unnormalized probabilties
       batches = mostevenbatches(nsamples)
       batchranges = ranges(batches)
-      logp = @sync @parallel (+) for i in 1:length(batches)
+      logp = @sync @distributed (+) for i in 1:length(batches)
          (batches[i] / nsamples) * # (weighted mean)
             unnormalizedlogprob(mdbm, x[batchranges[i], :];
                   ntemperatures = ntemperatures, temperatures = temperatures,
@@ -1195,7 +1195,7 @@ function nunits(dbm::MultimodalDBM)
       error("Nodes and layers not defined in empty DBM")
    end
    nlayers = length(dbm) + 1
-   nu = Array{Int,1}(nlayers)
+   nu = Vector{Int}(undef, nlayers)
    for i = 1:nrbms
       nu[i] = nvisiblenodes(dbm[i])
    end
@@ -1282,7 +1282,7 @@ function unnormalizedproblogratios(rbm::BernoulliRBM,
    weightsinput = hh * rbm.weights'
    vec(sum(log.(
          (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2))
+         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), dims = 2))
 end
 
 function unnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
@@ -1392,7 +1392,7 @@ function unnormalizedlogprob(mdbm, x::Matrix{Float64};
    nsamples = size(x, 1)
    logp = 0.0
    hiddbm = deepcopy(mdbm[2:end])
-   h1 = Vector{Float64}(nhiddennodes(mdbm[1]))
+   h1 = Vector{Float64}(undef, nhiddennodes(mdbm[1]))
    visbias2 = visiblebias(mdbm[2]) # visible bias of second RBM
 
    for j = 1:nsamples
@@ -1469,11 +1469,11 @@ function unnormalizedproboddlayers(dbm::PartitionedBernoulliDBM, uodd::Particle,
    nintermediatelayerstobesummedout = div(nlayers - 1, 2)
    pun = 1.0
    for i = 1:nintermediatelayerstobesummedout
-      pun *= prod(1 + exp.(
-            hiddeninput(dbm[2i-1], uodd[i]) + visibleinput(dbm[2i], uodd[i+1])))
+      pun *= prod(1.0 .+ exp.(
+            hiddeninput(dbm[2i-1], uodd[i]) .+ visibleinput(dbm[2i], uodd[i+1])))
    end
    if nlayers % 2 == 0
-      pun *= prod(1 + exp.(hiddeninput(dbm[end], uodd[end])))
+      pun *= prod(1.0 .+ exp.(hiddeninput(dbm[end], uodd[end])))
    end
    for i = 1:length(uodd)
       pun *= exp(dot(combinedbiases[2i-1], uodd[i]))
@@ -1490,11 +1490,11 @@ Calculates the unnormalized probability of the `rbm`'s hidden nodes'
 activations given by `h`.
 """
 function unnormalizedprobhidden(rbm::BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.hidbias, h)) * prod(1 + exp.(visibleinput(rbm, h)))
+   exp(dot(rbm.hidbias, h)) * prod(1.0 .+ exp.(visibleinput(rbm, h)))
 end
 
 function unnormalizedprobhidden(rbm::Binomial2BernoulliRBM, h::Vector{Float64})
-   exp(dot(rbm.hidbias, h)) * prod(1 + exp.(visibleinput(rbm, h)))^2
+   exp(dot(rbm.hidbias, h)) * prod(1.0 .+ exp.(visibleinput(rbm, h)))^2
 end
 
 const sqrt2pi = sqrt(2pi)
@@ -1563,7 +1563,7 @@ end
 function weightshiddeninput!(hh::M, rbm::BernoulliRBM,
       vv::M) where {M<:AbstractArray{Float64}}
 
-   A_mul_B!(hh, vv, rbm.weights)
+   mul!(hh, vv, rbm.weights)
 end
 
 function weightshiddeninput!(hh::M, prbm::PartitionedRBM{BernoulliRBM},
@@ -1581,7 +1581,7 @@ end
 function weightsvisibleinput!(vv::M, rbm::BernoulliRBM,
       hh::M) where {M<:AbstractArray{Float64}}
 
-   A_mul_Bt!(vv, hh, rbm.weights)
+   mul!(vv, hh, transpose(rbm.weights))
 end
 
 function weightsvisibleinput!(vv::M, prbm::PartitionedRBM{BernoulliRBM},
@@ -1639,7 +1639,7 @@ all weights being zero and visible bias set to the empirical probability of the
 samples' components in `x` being 1.
 """
 function bernoulliloglikelihoodbaserate(x::Matrix{Float64})
-   p = mean(x,1)
+   p = mean(x, dims = 1)
    nsamples, nvariables = size(x)
    loglikelihood = 0.0
    for i = 1:nvariables
@@ -1661,8 +1661,8 @@ standard deviation of values of the i'th component of the sample vectors.
 """
 function gaussianloglikelihoodbaserate(x::Matrix{Float64})
    nsamples, nvariables = size(x)
-   sigmasq = vec(var(x,1))
-   mu = vec(mean(x,1))
+   sigmasq = vec(var(x, dims = 1))
+   mu = vec(mean(x, dims = 1))
    loglikelihood = 0.0
    for j = 1:nsamples
       loglikelihood -= sum((vec(x[j,:]) - mu).^2 ./ sigmasq)

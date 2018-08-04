@@ -38,7 +38,7 @@ on all the available workers and reduces the results with the operator `op`.
 function batchparallelized(f::Function, n::Int, op::Function)
    batches = mostevenbatches(n)
    if length(batches) > 1
-      return @sync @parallel (op) for batch in batches
+      return @sync @distributed (op) for batch in batches
          f(batch)
       end
    else
@@ -157,7 +157,7 @@ The returned result is a vector containing the numbers of tasks for each batch.
 function mostevenbatches(ntasks::Int, nbatches::Int = min(nworkers(), ntasks))
 
    minparticlesperbatch, nbatcheswithplus1 = divrem(ntasks, nbatches)
-   batches = Vector{Int}(nbatches)
+   batches = Vector{Int}(undef, nbatches)
    for i = 1:nbatches
       if i <= nbatcheswithplus1
          batches[i] = minparticlesperbatch + 1
@@ -206,7 +206,7 @@ function curvebundles(;
 
    x = piecewiselinearsequences(nbundles, nvariables;
          pbreak = pbreak, breakval = breakval)
-   x = repmat(x, nperbundle)
+   x = repeat(x, nperbundle)
    nsamples = size(x, 1)
    x .+= noisesd * randn(nsamples, nvariables)
 
@@ -218,7 +218,7 @@ function curvebundles(;
          labels[j,:] .= labels[j-1,:]
          next!(view(labels, j, :))
       end
-      labels = repmat(labels, nperbundle)
+      labels = repeat(labels, nperbundle)
       x = hcat(labels, x)
    end
 

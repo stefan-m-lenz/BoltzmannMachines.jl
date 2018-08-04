@@ -130,14 +130,14 @@ function fitrbm(x::Matrix{Float64};
    if pcd
       chainstate = rand(batchsize, nhidden)
    else
-      chainstate = Matrix{Float64}(0, 0)
+      chainstate = Matrix{Float64}(undef, 0, 0)
    end
 
    # allocate space for trainrbm!
    nvisible = size(x, 2)
-   h = Matrix{Float64}(batchsize, nhidden)
-   hmodel = Matrix{Float64}(batchsize, nhidden)
-   vmodel = Matrix{Float64}(batchsize, nvisible)
+   h = Matrix{Float64}(undef, batchsize, nhidden)
+   hmodel = Matrix{Float64}(undef, batchsize, nhidden)
+   vmodel = Matrix{Float64}(undef, batchsize, nvisible)
 
    for epoch = 1:epochs
 
@@ -178,15 +178,15 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       return BernoulliRBM(weights, visbias, hidbias)
 
    elseif rbmtype == GaussianBernoulliRBM
-      visbias = vec(mean(x, 1))
-      sd = vec(std(x, 1))
+      visbias = vec(mean(x, dims = 1))
+      sd = vec(std(x, dims = 1))
       #sd = fill(0.05, length(vec(std(x, 1))))
       GaussianBernoulliRBM(weights, visbias, hidbias, sd)
 
    elseif rbmtype == GaussianBernoulliRBM2
-      visbias = vec(mean(x, 1))
+      visbias = vec(mean(x, dims = 1))
       #sd = fill(0.05, length(vec(std(x, 1))))
-      sd = vec(std(x, 1))
+      sd = vec(std(x, dims = 1))
       weights .*= sd
       return GaussianBernoulliRBM2(weights, visbias, hidbias, sd)
 
@@ -254,7 +254,7 @@ end
 function sdupdateterm(gbrbm::GaussianBernoulliRBM,
          v::Matrix{Float64}, h::Matrix{Float64})
    vec(mean((v .- gbrbm.visbias').^2 ./ (gbrbm.sd' .^ 3) -
-         h * gbrbm.weights' .* (v ./ (gbrbm.sd' .^ 2)), 1))
+         h * gbrbm.weights' .* (v ./ (gbrbm.sd' .^ 2)), dims = 1))
 end
 
 
@@ -325,7 +325,7 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       if pcd
          hmodel = chainstate # note: state of chain will be visible by the caller
       else
-         copy!(hmodel, h)
+         copyto!(hmodel, h)
       end
       samplehiddenpotential!(hmodel, rbm)
 

@@ -9,7 +9,7 @@ DBM for the visible nodes of the i'th of the `dbms`.
 By default the indexes of the visible nodes are assumed to be consecutive.
 """
 function joindbms(dbms::Vector{BasicDBM}, visibleindexes = [])
-   jointdbm = BasicDBM(length(dbms[1]))
+   jointdbm = BasicDBM(undef, length(dbms[1]))
    jointdbm[1] = joinrbms([dbms[i][1] for i in eachindex(dbms)],
          visibleindexes)
    for j = 2:length(dbms[1])
@@ -55,7 +55,7 @@ function joinvecs(vecs::Vector{Vector{Float64}}, indexes = [])
    if isempty(indexes)
       jointvec = vcat(vecs...)
    else
-      jointlength = mapreduce(v -> length(v), +, 0, vecs)
+      jointlength = mapreduce(v -> length(v), +, vecs, init = 0)
       jointvec = Vector{Float64}(jointlength)
       for i in eachindex(vecs)
          jointvec[indexes[i]] = vecs[i]
@@ -76,8 +76,8 @@ weight matrix for the visible nodes of the i'th of the `rbms`.
 By default the indexes of the visible nodes are assumed to be consecutive.
 """
 function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractRBM}
-   jointnhidden = mapreduce(rbm -> length(rbm.hidbias), +, 0, rbms)
-   jointnvisible = mapreduce(rbm -> length(rbm.visbias), +, 0, rbms)
+   jointnhidden = mapreduce(rbm -> length(rbm.hidbias), +, rbms, init = 0)
+   jointnvisible = mapreduce(rbm -> length(rbm.visbias), +, rbms, init = 0)
    jointweights = zeros(jointnvisible, jointnhidden)
    offset = 0
 
@@ -86,7 +86,7 @@ function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractR
       visibleindexes = Array{UnitRange}(length(rbms))
       for i in eachindex(rbms)
          nvisible = length(rbms[i].visbias)
-         visibleindexes[i] = offset + (1:nvisible)
+         visibleindexes[i] = offset .+ (1:nvisible)
          offset += nvisible
       end
    elseif length(visibleindexes) != length(rbms)
@@ -96,7 +96,7 @@ function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractR
    offset = 0
    for i = eachindex(rbms)
       nhidden = length(rbms[i].hidbias)
-      jointweights[visibleindexes[i], offset + (1:nhidden)] = rbms[i].weights
+      jointweights[visibleindexes[i], offset .+ (1:nhidden)] = rbms[i].weights
       offset += nhidden
    end
 

@@ -230,7 +230,7 @@ function stackrbms(x::Array{Float64,2};
          learningrate, nhiddens, batchsize, optimizer)
 
    nrbms = length(trainlayers)
-   dbmn = Vector{AbstractRBM}(nrbms)
+   dbmn = Vector{AbstractRBM}(undef, nrbms)
 
    upfactor = downfactor = 1.0
    if predbm
@@ -340,7 +340,7 @@ function stackrbms_preparetrainlayers(
 
    # check number of visible nodes for first layer
    if isa(trainlayers[1], TrainPartitionedLayer)
-      partswithoutnvisible = find(t -> t.nvisible <= 0, trainlayers[1].parts)
+      partswithoutnvisible = findall(t -> t.nvisible <= 0, trainlayers[1].parts)
       if length(partswithoutnvisible) > 1
          error("The number of visible nodes is unspecified for more " *
                "than one segment in the first layer. ")
@@ -412,7 +412,7 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          ),
          eachindex(trainpartitionedlayer.parts))
 
-   rbms = @parallel (vcat) for arg in trainingargs
+   rbms = @distributed (vcat) for arg in trainingargs
       stackrbms_trainlayer(arg[1], arg[2];
             monitoringdata = arg[3],
             upfactor = upfactor, downfactor = downfactor)
