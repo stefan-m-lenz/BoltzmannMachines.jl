@@ -1,8 +1,10 @@
 module BMTest
 
+import DataFrames
+using DelimitedFiles
 using LinearAlgebra
+using Random
 using Test
-using RDatasets
 using Statistics
 
 import BoltzmannMachines
@@ -11,22 +13,22 @@ const BMs = BoltzmannMachines
 
 """
     test3(expr)
-Tests an expression up to three times. 
+Tests an expression up to three times.
 Useful for evaluating stochastic algorithms that may fail some times.
 """
 macro test3(expr)
    quote
-      fails = 0
+      local fails = 0
       while fails < 2
-         if ($expr)
+         if $(esc(expr))
             return @test true
          else
-            warn("Testing failed, but will try again:")
+            @warn "Testing failed, but will try again:"
             println($(string(expr)))
             fails = fails + 1
          end
       end
-      @test $expr
+      @test $(esc(expr))
    end
 end
 
@@ -92,10 +94,6 @@ function randdbm(nunits)
    dbm
 end
 
-function logit(p::Array{Float64})
-   log.(p./(1-p))
-end
-
 
 """
 Tests the functions for computing the activation potentials
@@ -159,7 +157,7 @@ end
 
 
 function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
-   a = logit(vec(mean(x, dims = 1)))
+   a = BMs.logit.(vec(mean(x, dims = 1)))
    nvisible = length(a)
    rbm = BMs.BernoulliRBM(zeros(nvisible, nhidden), a, ones(nhidden))
    baserate = BMs.bernoulliloglikelihoodbaserate(x)
@@ -168,7 +166,7 @@ function rbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
 end
 
 function bgrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
-   a = logit(vec(mean(x, dims = 1)))
+   a = BMs.logit.(vec(mean(x, dims = 1)))
    nvisible = length(a)
    bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), a, ones(nhidden))
    baserate = BMs.bernoulliloglikelihoodbaserate(x)
@@ -427,9 +425,10 @@ function test_likelihoodconsistency()
    logp2 = BMs.loglikelihood(rbm2, x, logz2)
 
    samplemeanrbm =
-         BMs.BernoulliRBM(fill(0.0, nvariables, 1), vec(mean(x, dims = 1)), fill(0.0, 1, 1))
+         BMs.BernoulliRBM(fill(0.0, nvariables, 1), vec(mean(x, dims = 1)), fill(0.0, 1))
    samplemeanrbm2 =
-         BMs.BernoulliRBM(fill(0.0, size(rbm1.weights)), vec(mean(x, dims = 1)), zeros(rbm1.hidbias))
+         BMs.BernoulliRBM(fill(0.0, size(rbm1.weights)), vec(mean(x, dims = 1)),
+               fill(0.0, length(rbm1.hidbias)))
 
    # Annealing between two RBMs with zero weights
    @test isapprox(
@@ -472,7 +471,7 @@ function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
          sdlearningrate = 0.00001)
 
    datainitrbm = GBRBM(zeros(size(x,2), 1),
-         vec(mean(x, dims = 1)), [0.0], vec(std(x,1)))
+         vec(mean(x, dims = 1)), [0.0], vec(std(x, dims = 1)))
 
 
    # Compare estimated difference of log partition functions to difference
@@ -640,7 +639,9 @@ Test DBMs with Gaussian visible nodes.
 """
 function test_mdbm_gaussianvisibles()
 
-   x = convert(Matrix{Float64}, RDatasets.dataset("datasets", "iris")[1:4])
+   x = convert(Matrix{Float64}, readdlm(
+         joinpath(dirname(pathof(DataFrames)), "..", "test/data/iris.csv"), ',',
+         header = true)[1][:,1:4]);
 
    datadict = BMs.DataDict("x" => x)
 
@@ -658,7 +659,7 @@ function test_mdbm_gaussianvisibles()
    learningrates = [0.02*ones(10); 0.01*ones(10); 0.001*ones(10)]
 
    seed = round(Int, rand()*typemax(Int), RoundDown)
-   srand(seed)
+   Random.seed!(seed)
    dbm1 = BMs.stackrbms(x, epochs = 20, predbm = true, learningrate = 0.001,
          trainlayers = trainlayers)
    # BoltzmannMachinesPlots.plotevaluation(monitor1, BMs.monitorexactloglikelihood)
@@ -666,7 +667,7 @@ function test_mdbm_gaussianvisibles()
          learningrates = learningrates,
          epochs = 30);
 
-   srand(seed)
+   Random.seed!(seed)
    dbm2 = BMs.fitdbm(x, epochs = 30,
          epochspretraining = 20,
          learningratepretraining = 0.001,
@@ -697,35 +698,35 @@ function test_mdbm_architectures()
    nsamples = 5
    data = hcat(float.(rand(nsamples, 3) .< 0.5), randn(nsamples, 3))
 
-   BMs.fitdbm(data; epochs = 2, pretraining = [ 
-         BMs.TrainPartitionedLayer([               
-               BMs.TrainLayer(nvisible = 3, nhidden = 3);                
-               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+   BMs.fitdbm(data; epochs = 2, pretraining = [
+         BMs.TrainPartitionedLayer([
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);
+               BMs.TrainLayer(nvisible = 3, nhidden = 3,
                      rbmtype = BMs.GaussianBernoulliRBM)]);
                BMs.TrainLayer(nhidden = 4);
                BMs.TrainLayer(nhidden = 3)])
 
-   BMs.fitdbm(data; epochs = 2, pretraining = [          
-         BMs.TrainPartitionedLayer([                   
-               BMs.TrainLayer(nvisible = 3, nhidden = 3);             
-               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+   BMs.fitdbm(data; epochs = 2, pretraining = [
+         BMs.TrainPartitionedLayer([
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);
+               BMs.TrainLayer(nvisible = 3, nhidden = 3,
                      rbmtype = BMs.GaussianBernoulliRBM2)]);
          BMs.TrainPartitionedLayer([
-               BMs.TrainLayer(nhidden = 2)    
+               BMs.TrainLayer(nhidden = 2)
                BMs.TrainLayer(nhidden = 2)]);
          BMs.TrainLayer(nhidden = 4)])
 
-   data2 = hcat(data, 
+   data2 = hcat(data,
          float.(rand(nsamples, 3) .< 0.5) .+ float.(rand(nsamples, 3) .< 0.5))
-   BMs.fitdbm(data2; epochs = 2, pretraining = [          
-         BMs.TrainPartitionedLayer([                   
-               BMs.TrainLayer(nvisible = 3, nhidden = 3);             
-               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+   BMs.fitdbm(data2; epochs = 2, pretraining = [
+         BMs.TrainPartitionedLayer([
+               BMs.TrainLayer(nvisible = 3, nhidden = 3);
+               BMs.TrainLayer(nvisible = 3, nhidden = 3,
                      rbmtype = BMs.GaussianBernoulliRBM2);
-               BMs.TrainLayer(nvisible = 3, nhidden = 3, 
+               BMs.TrainLayer(nvisible = 3, nhidden = 3,
                      rbmtype = BMs.Binomial2BernoulliRBM)]);
          BMs.TrainPartitionedLayer([
-               BMs.TrainLayer(nvisible = 3, nhidden = 3)    
+               BMs.TrainLayer(nvisible = 3, nhidden = 3)
                BMs.TrainLayer(nvisible = 6, nhidden = 3)]);
          BMs.TrainLayer(nhidden = 3)])
 end

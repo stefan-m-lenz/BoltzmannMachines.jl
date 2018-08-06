@@ -125,11 +125,11 @@ datasets. The factor is applied for calculating the hidden potential and is 1.0
 by default.
 """
 function propagateforward(rbm::AbstractRBM, datadict::DataDict, factor::Float64 = 1.0)
-   DataDict(map(kv -> (kv[1] => hiddenpotential(rbm, kv[2], factor)), datadict))
+   DataDict(p[1] => hiddenpotential(rbm, p[2], factor) for p = pairs(datadict))
 end
 
 function partitioneddata(datadict::DataDict, visrange::UnitRange{Int})
-   DataDict(map(kv -> (kv[1]::String => kv[2][:, visrange]), datadict))
+   DataDict(p[1] => p[2][:, visrange] for p = pairs(datadict))
 end
 
 

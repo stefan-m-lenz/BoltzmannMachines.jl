@@ -95,7 +95,7 @@ function crossvalidationargs(x::Matrix{Float64}, pars ...; kfold::Int = 10)
    nsamples = size(x, 1)
    batchranges = BMs.ranges(BMs.mostevenbatches(nsamples, kfold))
 
-   args_data = Vector{Tuple{Matrix{Float64}, BMs.DataDict}}(kfold)
+   args_data = Vector{Tuple{Matrix{Float64}, BMs.DataDict}}(undef, kfold)
    for i in eachindex(batchranges)
       rng = batchranges[i]
       trainingdata = x[[!(j in rng) for j in 1:nsamples], :]
@@ -239,7 +239,7 @@ function piecewiselinearsequences(nsequences::Int, nvariables::Int;
       pbreak::Float64 = 0.2, breakval::Function = rand)
 
    inbetweenvariables = 2:(nvariables-1)
-   x = Matrix{Float64}(nsequences, nvariables)
+   x = Matrix{Float64}(undef, nsequences, nvariables)
    for i = 1:nsequences
       breakpointindexes = [1; randsubseq(inbetweenvariables, pbreak); nvariables]
       breakpointvalues = [breakval() for i = 1:length(breakpointindexes)]

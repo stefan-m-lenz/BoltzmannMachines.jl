@@ -156,9 +156,9 @@ Creates new and uninitialized particles of the same dimensions as the given
 `particles`.
 """
 function newparticleslike(particles::Particles)
-   newparticles = Particles(length(particles))
+   newparticles = Particles(undef, length(particles))
    for i in eachindex(particles)
-      newparticles[i] = Matrix{Float64}(size(particles[i]))
+      newparticles[i] = Matrix{Float64}(undef, size(particles[i]))
    end
    newparticles
 end

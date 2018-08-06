@@ -56,7 +56,7 @@ function joinvecs(vecs::Vector{Vector{Float64}}, indexes = [])
       jointvec = vcat(vecs...)
    else
       jointlength = mapreduce(v -> length(v), +, vecs, init = 0)
-      jointvec = Vector{Float64}(jointlength)
+      jointvec = Vector{Float64}(undef, jointlength)
       for i in eachindex(vecs)
          jointvec[indexes[i]] = vecs[i]
       end
@@ -83,7 +83,7 @@ function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractR
 
    # if visibleindexes are not provided, construct them
    if isempty(visibleindexes)
-      visibleindexes = Array{UnitRange}(length(rbms))
+      visibleindexes = Array{UnitRange}(undef, length(rbms))
       for i in eachindex(rbms)
          nvisible = length(rbms[i].visbias)
          visibleindexes[i] = offset .+ (1:nvisible)

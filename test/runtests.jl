@@ -25,7 +25,7 @@ x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
 @test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
 x = rand(100, 10) + randn(100, 10);
 @test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-BMTest.testpotentials()
+
 
 @test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
       BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),

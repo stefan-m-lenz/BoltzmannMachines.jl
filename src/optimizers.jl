@@ -64,7 +64,7 @@ end
 function loglikelihoodoptimizer(rbm::R;
       learningrate::Float64 = 0.0, sdlearningrate::Float64 = 0.0) where {R<:AbstractRBM}
 
-   LoglikelihoodOptimizer{R}(deepcopy(rbm), 
+   LoglikelihoodOptimizer{R}(deepcopy(rbm),
          Matrix{Float64}(undef, size(rbm.weights)),
          learningrate, sdlearningrate)
 end
@@ -150,7 +150,7 @@ function initialized(optimizer::LoglikelihoodOptimizer, rbm::R
       ) where {R <: AbstractRBM}
 
    LoglikelihoodOptimizer(deepcopy(rbm),
-         Matrix{Float64}(size(rbm.weights)),
+         Matrix{Float64}(undef, size(rbm.weights)),
          optimizer.learningrate, optimizer.sdlearningrate)
 end
 
@@ -168,7 +168,7 @@ function initialized(optimizer::BeamAdversarialOptimizer{R1}, rbm::R2
       ) where {R1 <: AbstractRBM, R2 <: AbstractRBM}
 
    BeamAdversarialOptimizer{R2}(deepcopy(rbm),
-         Matrix{Float64}(size(rbm.weights)),
+         Matrix{Float64}(undef, size(rbm.weights)),
          Vector{Float64}(),
          optimizer.learningrate, optimizer.sdlearningrate,
          optimizer.knearest)
@@ -263,7 +263,7 @@ end
 function computegradientsweightsandbiases!(
       optimizer::AbstractLoglikelihoodOptimizer,
       v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::R
-      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}, 
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2},
             R <: AbstractRBM}
 
    npossamples = size(v, 1)
@@ -287,7 +287,7 @@ end
 function computegradient!(
       optimizer::BeamAdversarialOptimizer{R},
       v::M1, vmodel::M1, h::M2, hmodel::M2, rbm::AbstractRBM
-      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}, 
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2},
             R <:AbstractRBM}
 
    optimizer.critic = nearestneighbourcritic(h, hmodel, optimizer.knearest)

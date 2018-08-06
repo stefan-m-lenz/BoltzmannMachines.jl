@@ -8,7 +8,8 @@ import BoltzmannMachinesPlots # only needed for plotting capabilities
 # Generate data and split it in training and test data set
 nsamples = 100;
 nvariables = 36;
-srand(1);
+using Random
+Random.seed!(1);
 x = barsandstripes(nsamples, nvariables);
 x, xtest = splitdata(x, 0.3);
 datadict = DataDict("Training data" => x, "Test data" => xtest);
@@ -29,7 +30,7 @@ BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorreconstructionerror)
 
 
-srand(12);
+Random.seed!(12);
 
 # DBM-Fitting: Pretraining and Fine-Tuning combined in one function
 dbm = fitdbm(x, nhiddens = [6;2], epochs = 20, learningrate = 0.05);
@@ -60,7 +61,7 @@ exactloglikelihood(dbm, xtest)
 # the exact calclation is not feasible any more:
 # We need to calculate the likelihood using AIS.
 
-srand(12);
+Random.seed!(12);
 monitor = Monitor();
 rbm = fitrbm(x, nhidden = 36, epochs = 100,
       learningrates = [0.008*ones(80); 0.001*ones(20)],
@@ -76,7 +77,7 @@ BoltzmannMachinesPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3
 # (But on the other hand, in some cases it might be too conservative to be
 # useful as it is only a lower bound.)
 
-srand(2);
+Random.seed!(2);
 monitor = Monitor();
 dbm = stackrbms(x; nhiddens = [36;10;5], predbm = true, learningrate = 0.05);
 traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
@@ -95,9 +96,12 @@ loglikelihood(dbm, xtest)
 
 # Use "iris" dataset as example data to train a GaussianBernoulliRBM
 # (requires package "RDatasets")
-using RDatasets
-x = convert(Matrix{Float64}, dataset("datasets", "iris")[1:4]);
-srand(12);
+import DataFrames
+using DelimitedFiles
+x = convert(Matrix{Float64}, readdlm(
+            joinpath(dirname(pathof(DataFrames)), "..", "test/data/iris.csv"), ',',
+            header = true)[1][:,1:4]);
+Random.seed!(12);
 x, xtest = splitdata(x, 0.3);
 datadict = DataDict("Training data" => x, "Test data" => xtest);
 monitor = Monitor();
@@ -116,7 +120,7 @@ BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 # Generate data and split it in training and test data set
 nsamples = 100;
 nvariables = 25;
-srand(12);
+Random.seed!(12);
 x = barsandstripes(nsamples, nvariables) + barsandstripes(nsamples, nvariables);
 x, xtest = splitdata(x, 0.3);
 datadict = DataDict("Training data" => x, "Test data" => xtest);
@@ -156,7 +160,7 @@ BoltzmannMachinesPlots.crossvalidationcurve(monitor)
 
 # Determine the optimal number of pretraining epochs for a DBM
 # given the other parameters
-
+using Distributed
 @everywhere function my_pretraining_monitoring(
       x::Matrix{Float64}, datadict::BoltzmannMachines.DataDict, epoch::Int)
 

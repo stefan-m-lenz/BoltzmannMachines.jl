@@ -271,7 +271,7 @@ Trains the given `rbm` for one epoch using the data set `x`.
    it is specified, PCD is used.
 """
 function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
-      chainstate::Matrix{Float64} = Matrix{Float64}(0, 0),
+      chainstate::Matrix{Float64} = Matrix{Float64}(undef, 0, 0),
       upfactor::Float64 = 1.0,
       downfactor::Float64 = 1.0,
       learningrate::Float64 = 0.005,
@@ -283,10 +283,10 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)),
 
       # write-only arguments for reusing allocated space:
-      v::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)),
-      h::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-      hmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.hidbias)),
-      vmodel::Matrix{Float64} = Matrix{Float64}(batchsize, length(rbm.visbias)))
+      v::Matrix{Float64} = Matrix{Float64}(undef, batchsize, length(rbm.visbias)),
+      h::Matrix{Float64} = Matrix{Float64}(undef, batchsize, length(rbm.hidbias)),
+      hmodel::Matrix{Float64} = Matrix{Float64}(undef, batchsize, length(rbm.hidbias)),
+      vmodel::Matrix{Float64} = Matrix{Float64}(undef, batchsize, length(rbm.visbias)))
 
    nsamples = size(x, 1)
 

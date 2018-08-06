@@ -28,7 +28,7 @@ function aislogimpweights(rbm::AbstractXBernoulliRBM;
    hh = repeat(rbm.hidbias', nparticles)
    sigm_bernoulli!(hh)
 
-   vv = Matrix{Float64}(nparticles, length(rbm.visbias))
+   vv = Matrix{Float64}(undef, nparticles, length(rbm.visbias))
 
    for k = 2:length(temperatures)
       logimpweights .+= unnormalizedproblogratios(rbm, hh,
@@ -677,7 +677,7 @@ struct MultivariateBernoulliDistribution
       # create samples, a vector of vectors, covering all
       # theoretically possible combinations of the visible nodes' states
       nviscombinations = 2^nvisible
-      samples = Vector{Vector{Float64}}(nviscombinations)
+      samples = Vector{Vector{Float64}}(undef, nviscombinations)
       v = zeros(nvisible)
       for i = 1:nviscombinations
          samples[i] = copy(v)
@@ -923,7 +923,7 @@ end
 """ Performs numerically stable summation on log-scale. """
 function logsumexp(v::Vector{Float64})
    vmax = maximum(v)
-   vmax + log(sum(exp.(v - vmax)))
+   vmax + log(sum(exp.(v .- vmax)))
 end
 
 
@@ -1097,7 +1097,7 @@ function logproblowerbound(dbm::MultimodalDBM,
 
          # add entropy of approximate posterior Q
          h = h[(h .> 0.0) .& (h .< 1.0)]
-         lowerbound += - dot(h, log.(h)) - dot(1-h, log.(1-h))
+         lowerbound += - dot(h, log.(h)) - dot(1.0 .- h, log.(1.0 .- h))
       end
    end
 
@@ -1236,8 +1236,8 @@ function reconstructionerror(rbm::AbstractRBM,
    nsamples = size(x, 1)
    reconstructionerror = 0.0
 
-   vmodel = Vector{Float64}(nvisiblenodes(rbm))
-   hmodel = Vector{Float64}(nhiddennodes(rbm))
+   vmodel = Vector{Float64}(undef, nvisiblenodes(rbm))
+   hmodel = Vector{Float64}(undef, nhiddennodes(rbm))
 
    for sample = 1:nsamples
       v = vec(x[sample,:])
@@ -1281,8 +1281,8 @@ function unnormalizedproblogratios(rbm::BernoulliRBM,
 
    weightsinput = hh * rbm.weights'
    vec(sum(log.(
-         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), dims = 2))
+         (1.0 .+ exp.(temperature1 .* weightsinput .+ rbm.visbias')) ./
+         (1.0 .+ exp.(temperature2 .* weightsinput .+ rbm.visbias'))), dims = 2))
 end
 
 function unnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
@@ -1292,8 +1292,8 @@ function unnormalizedproblogratios(rbm::Binomial2BernoulliRBM,
 
    weightsinput = hh * rbm.weights'
    vec(sum(log.(
-         (1 + exp.(broadcast(+, temperature1 * weightsinput, rbm.visbias'))) ./
-         (1 + exp.(broadcast(+, temperature2 * weightsinput, rbm.visbias')))), 2) * 2)
+         (1.0 .+ exp.(temperature1 .* weightsinput .+ rbm.visbias')) ./
+         (1.0 .+ exp.(temperature2 .* weightsinput .+ rbm.visbias'))), dims = 2) * 2)
 end
 
 function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
@@ -1303,7 +1303,7 @@ function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM,
 
    wht = hh * gbrbm.weights'
    vec((temperature1 - temperature2) * sum(
-         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), 2))
+         0.5 * wht.^2 + broadcast(*, wht, (gbrbm.visbias ./ gbrbm.sd)'), dims = 2))
 end
 
 function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
@@ -1313,7 +1313,7 @@ function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
 
    wht = hh * gbrbm.weights'
    vec((temperature1 - temperature2) * sum(
-         (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', 2))
+         (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', dims = 2))
 end
 
 function unnormalizedproblogratios(prbm::PartitionedRBM,
@@ -1353,7 +1353,7 @@ end
 
 function samples(mbdist::MultivariateBernoulliDistribution, nsamples::Int)
    nvisible = length(mbdist.samples[1])
-   ret = Matrix{Float64}(nsamples, nvisible)
+   ret = Matrix{Float64}(undef, nsamples, nvisible)
    for i = 1:nsamples
       sampledindex = searchsortedfirst(mbdist.cumprobs, rand())
       ret[i, :] .= mbdist.samples[sampledindex]
@@ -1431,7 +1431,7 @@ function unnormalizedprobs(rbm::Union{BernoulliRBM, BernoulliGaussianRBM},
       samples::Vector{Vector{Float64}})
 
    nsamples = length(samples)
-   probs = Vector{Float64}(nsamples)
+   probs = Vector{Float64}(undef, nsamples)
    for i = 1:nsamples
       probs[i] = exp(-freeenergy(rbm, samples[i]))
    end
@@ -1445,7 +1445,7 @@ function unnormalizedprobs(dbm::PartitionedBernoulliDBM,
    biases = combinedbiases(dbm)
    oddparticle = initcombinationoddlayersonly(dbm)
    oddhiddenparticles = oddparticle[2:end]
-   probs = Vector{Float64}(nsamples)
+   probs = Vector{Float64}(undef, nsamples)
    for i = 1:nsamples
       oddparticle[1] = samples[i]
       probs[i] = 0.0

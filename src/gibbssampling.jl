@@ -168,7 +168,7 @@ function hiddeninput!(h::M, gbrbm::GaussianBernoulliRBM2, v::M,
       ) where{M <: AbstractArray{Float64,1}}
 
    scaledweights = broadcast(/, gbrbm.weights, gbrbm.sd.^2)
-   mul!(h, Tranpose(scaledweights), v)
+   mul!(h, transpose(scaledweights), v)
    h .+= gbrbm.hidbias
 end
 
@@ -289,7 +289,7 @@ If `biased == true` the mean of the Gaussian distribution is shifted by the
 bias vector and the standard deviation of the nodes is used for sampling.
 """
 function initparticles(rbm::AbstractRBM, nparticles::Int; biased::Bool = false)
-   particles = Particles(2)
+   particles = Particles(undef, 2)
    particles[1] = Matrix{Float64}(undef, nparticles, nvisiblenodes(rbm))
    particles[2] = Matrix{Float64}(undef, nparticles, nhiddennodes(rbm))
    initvisiblenodes!(particles[1], rbm, biased)
@@ -300,7 +300,7 @@ end
 function initparticles(dbm::MultimodalDBM, nparticles::Int; biased::Bool = false)
    nlayers = length(dbm) + 1
    particles = Particles(undef, nlayers)
-   particles[1] = Matrix{Float64}(nparticles, nvisiblenodes(dbm[1]))
+   particles[1] = Matrix{Float64}(undef, nparticles, nvisiblenodes(dbm[1]))
    initvisiblenodes!(particles[1], dbm[1], biased)
 
    for i in 2:nlayers
@@ -314,7 +314,7 @@ function inithiddennodes!(h::M, rbm::AbstractXBernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64}}
 
    if biased
-      h .= sigm(rbm.hidbias)'
+      h .= sigm.(rbm.hidbias)'
       bernoulli!(h)
    else
       rand!(h, [0.0 1.0])
@@ -647,13 +647,6 @@ function sigm(x::Float64)
    1 ./ (1 + exp(-x))
 end
 
-function sigm(x::Array{Float64,1})
-   1 ./ (1 + exp.(-x))
-end
-
-function sigm(x::Array{Float64,2})
-   1 ./ (1 + exp.(-x))
-end
 
 function sigm!(x::M) where{M <:AbstractArray{Float64}}
    for i in eachindex(x)
