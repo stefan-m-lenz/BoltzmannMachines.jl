@@ -95,11 +95,9 @@ loglikelihood(dbm, xtest)
 # ------------------------------------------------------------------------------
 
 # Use "iris" dataset as example data to train a GaussianBernoulliRBM
-# (requires package "RDatasets")
-import DataFrames
 using DelimitedFiles
 x = convert(Matrix{Float64}, readdlm(
-            joinpath(dirname(pathof(DataFrames)), "..", "test/data/iris.csv"), ',',
+            joinpath(dirname(pathof(BoltzmannMachines)), "..", "test/data/iris.csv"), ',',
             header = true)[1][:,1:4]);
 Random.seed!(12);
 x, xtest = splitdata(x, 0.3);
@@ -161,12 +159,13 @@ BoltzmannMachinesPlots.crossvalidationcurve(monitor)
 # Determine the optimal number of pretraining epochs for a DBM
 # given the other parameters
 using Distributed
+@everywhere using BoltzmannMachines
 @everywhere function my_pretraining_monitoring(
-      x::Matrix{Float64}, datadict::BoltzmannMachines.DataDict, epoch::Int)
+      x::Matrix{Float64}, datadict::DataDict, epoch::Int)
 
-   monitor = BoltzmannMachines.Monitor()
-   BoltzmannMachines.monitorlogproblowerbound!(monitor,
-         BoltzmannMachines.stackrbms(x,
+   monitor = Monitor()
+   monitorlogproblowerbound!(monitor,
+         stackrbms(x,
                nhiddens = [16; 12],
                learningrate = 0.001,
                predbm = true,

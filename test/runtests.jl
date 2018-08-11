@@ -3,14 +3,16 @@ if nprocs() == 1
    addprocs() # test with multiple processes
 end
 
+# This assumes we are in the /src or /test folder.
+
 using Test
+@everywhere push!(LOAD_PATH, "../src")
 import BoltzmannMachines
 
 const BMs = BoltzmannMachines
 
-push!(LOAD_PATH, "../test/")
+@everywhere push!(LOAD_PATH, "../test/")
 import BMTest
-pop!(LOAD_PATH)
 
 BMTest.testpotentials()
 
@@ -83,4 +85,9 @@ BMTest.test_exactsampling()
 
 
 # run examples
+@everywhere push!(LOAD_PATH, "../test/mock")
 include("../test/examples.jl")
+
+@everywhere pop!(LOAD_PATH)
+@everywhere pop!(LOAD_PATH)
+@everywhere pop!(LOAD_PATH)

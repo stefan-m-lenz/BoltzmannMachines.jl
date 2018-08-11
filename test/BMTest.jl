@@ -1,6 +1,5 @@
 module BMTest
 
-import DataFrames
 using DelimitedFiles
 using LinearAlgebra
 using Random
@@ -431,7 +430,7 @@ function test_likelihoodconsistency()
                fill(0.0, length(rbm1.hidbias)))
 
    # Annealing between two RBMs with zero weights
-   @test isapprox(
+   @test3 isapprox(
          BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, samplemeanrbm2)),
          (BMs.logpartitionfunctionzeroweights(samplemeanrbm2) -
                BMs.logpartitionfunctionzeroweights(samplemeanrbm)))
@@ -640,7 +639,7 @@ Test DBMs with Gaussian visible nodes.
 function test_mdbm_gaussianvisibles()
 
    x = convert(Matrix{Float64}, readdlm(
-         joinpath(dirname(pathof(DataFrames)), "..", "test/data/iris.csv"), ',',
+         joinpath(dirname(pathof(BoltzmannMachines)), "..", "test/data/iris.csv"), ',',
          header = true)[1][:,1:4]);
 
    datadict = BMs.DataDict("x" => x)
