@@ -1,91 +1,68 @@
 using Distributed
 if nprocs() == 1
-   addprocs() # test with multiple processes
+   # test with multiple processes, but use only 2
+   # as travis testing has two processes
+   addprocs(2)
 end
 
 # This assumes we are in the /src or /test folder.
-
-using Test
 @everywhere push!(LOAD_PATH, "../src")
 import BoltzmannMachines
-
-const BMs = BoltzmannMachines
+BMs = BoltzmannMachines
 
 @everywhere push!(LOAD_PATH, "../test/")
 import BMTest
 
-BMTest.testpotentials()
 
-@test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
-      BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
-      atol = 0.002)
+#######################
+# Deterministic tests #
+#######################
 
-# Test exact loglikelihood of a baserate RBM
-# vs the calculated loglikelihoodbaserate
-x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
-@test isapprox(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-@test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-x = rand(100, 10) + randn(100, 10);
-@test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-
-
-@test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
-      BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
-      atol = 0.002)
-
-# Test exact loglikelihood of a baserate RBM
-# vs the calculated loglikelihoodbaserate
-x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
-@test isapprox(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-@test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-x = rand(100, 10) + randn(100, 10);
-@test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
-
-
-nvisible = 10
-nhidden = 10
-bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), rand(nvisible), ones(nhidden));
-@test isapprox(BMs.logpartitionfunction(bgrbm, 0.0),
-      BMs.exactlogpartitionfunction(bgrbm))
-
-# Test exact computation of log partition function of DBM:
-# Compare inefficient simple implementation with more efficient one that
-# sums out layers analytically.
-nhiddensvecs = Array[[5;4;6;3], [5;6;7], [4;4;2;4;3], [4;3;2;2;3;2]];
-for i = 1:length(nhiddensvecs)
-   dbm = BMTest.randdbm(nhiddensvecs[i]);
-   @test isapprox(BMs.exactlogpartitionfunction(dbm),
-         BMTest.exactlogpartitionfunctionwithoutsummingout(dbm))
-end
-
-for nunits in Array[[10;5;4], [20;5;4;2], [4;2;2;3;2]]
-   BMTest.testsummingoutforexactloglikelihood(nunits)
-end
-
+BMTest.test_potentials()
+BMTest.test_likelihoodbaserates()
 BMTest.test_stackrbms_preparetrainlayers()
-
-BMTest.testdbmjoining()
-
-BMTest.test_likelihoodconsistency()
-BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM)
-BMTest.test_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM2)
-
+BMTest.test_dbmjoining()
 BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM)
 BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM2)
-
-BMTest.test_rbm()
-BMTest.test_b2brbm()
-BMTest.test_gbrbm(BMs.GaussianBernoulliRBM)
-BMTest.test_gbrbm(BMs.GaussianBernoulliRBM2)
 BMTest.test_mdbm_architectures()
-BMTest.test_mdbm_rbm_b2brbm()
-BMTest.test_mdbm_gaussianvisibles()
-
-BMTest.test_exactsampling()
+BMTest.test_summing_out()
 
 
-# run examples
+#########################################################################
+# Tests which may fail sometimes due to stochastic nature of algorithms #
+#########################################################################
+
+# allow failures up to n times
+function softly(fun, n::Int = 7)
+   for i = 1:n
+      if fun()
+         return true
+      end
+   end
+   false
+end
+
+using Test
+
+@test softly(BMTest.check_rbm)
+@test softly(BMTest.check_b2brbm)
+@test softly(BMTest.check_likelihoodconsistency)
+@test softly(() -> BMTest.check_gbrbm(BMs.GaussianBernoulliRBM))
+@test softly(() -> BMTest.check_gbrbm(BMs.GaussianBernoulliRBM2))
+@test softly(() ->
+      BMTest.check_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM))
+@test softly(() ->
+      BMTest.check_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM2))
+@test softly(BMTest.check_mdbm_rbm_b2brbm)
+@test softly(BMTest.check_mdbm_gaussianvisibles)
+@test softly(BMTest.check_exactsampling)
+
+
+##########################################
+# Run examples (without actual plotting) #
+##########################################
 @everywhere push!(LOAD_PATH, "../test/mock")
+using BoltzmannMachinesPlots
 include("../test/examples.jl")
 
 @everywhere pop!(LOAD_PATH)

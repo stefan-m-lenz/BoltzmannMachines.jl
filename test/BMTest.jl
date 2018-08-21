@@ -10,24 +10,15 @@ import BoltzmannMachines
 const BMs = BoltzmannMachines
 
 
-"""
-    test3(expr)
-Tests an expression up to three times.
-Useful for evaluating stochastic algorithms that may fail some times.
-"""
-macro test3(expr)
+macro check(expr)
+   msg = string(expr) # TODO: print vales
    quote
-      local fails = 0
-      while fails < 2
-         if $(esc(expr))
-            return @test true
-         else
-            @warn "Testing failed, but will try again:"
-            println($(string(expr)))
-            fails = fails + 1
-         end
+      if !($(esc(expr)))
+         @warn "Check failed: " $msg
+         return false
+      else
+         true # no return
       end
-      @test $(esc(expr))
    end
 end
 
@@ -97,7 +88,7 @@ end
 """
 Tests the functions for computing the activation potentials
 """
-function testpotentials()
+function test_potentials()
    nvisible = 3
    nhidden = 2
    nsamples = 5
@@ -182,6 +173,42 @@ function gbrbmexactloglikelihoodvsbaserate(x::Matrix{Float64}, nhidden::Int)
    exactloglik = BMs.loglikelihood(gbrbm, x, BMs.exactlogpartitionfunction(gbrbm))
    baserate - exactloglik
 end
+
+
+function test_likelihoodbaserates()
+   @test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
+         BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
+         atol = 0.002)
+
+   # Test exact loglikelihood of a baserate RBM
+   # vs the calculated loglikelihoodbaserate
+   x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
+   @test isapprox(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+   @test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+   x = rand(100, 10) + randn(100, 10);
+   @test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+
+
+   @test isapprox(BMs.bernoulliloglikelihoodbaserate(10),
+         BMs.bernoulliloglikelihoodbaserate(rand([0.0 1.0], 10000, 10)),
+         atol = 0.002)
+
+   # Test exact loglikelihood of a baserate RBM
+   # vs the calculated loglikelihoodbaserate
+   x = rand([0.0 0.0 0.0 1.0 1.0], 100, 10);
+   @test isapprox(BMTest.bgrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+   @test isapprox(BMTest.rbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+   x = rand(100, 10) + randn(100, 10);
+   @test isapprox(BMTest.gbrbmexactloglikelihoodvsbaserate(x, 10), 0, atol = 1e-10)
+
+
+   nvisible = 10
+   nhidden = 10
+   bgrbm = BMs.BernoulliGaussianRBM(zeros(nvisible, nhidden), rand(nvisible), ones(nhidden));
+   @test isapprox(BMs.logpartitionfunction(bgrbm, 0.0),
+         BMs.exactlogpartitionfunction(bgrbm))
+end
+
 
 function test_stackrbms_preparetrainlayers()
    x = Matrix{Float64}(undef, 22, 10);
@@ -269,6 +296,18 @@ function test_stackrbms_preparetrainlayers()
    nothing
 end
 
+function test_summing_out()
+   # Test exact computation of log partition function of DBM:
+   # Compare inefficient simple implementation with more efficient one that
+   # sums out layers analytically.
+   nhiddensvecs = Array[[5;4;6;3], [5;6;7], [4;4;2;4;3], [4;3;2;2;3;2]];
+   for i = 1:length(nhiddensvecs)
+      dbm = BMTest.randdbm(nhiddensvecs[i]);
+      @test isapprox(BMs.exactlogpartitionfunction(dbm),
+            BMTest.exactlogpartitionfunctionwithoutsummingout(dbm))
+   end
+end
+
 """
     testaisvsexact(bm, percentalloweddiff)
 Tests whether the exact log partition function is approximated by the value
@@ -277,14 +316,14 @@ The test is successful, if the difference in percent of the log of the exact val
 between the exact log partition function and AIS-estimated one is less than
 `percentalloweddiff`.
 """
-function testaisvsexact(bm::BMs.AbstractBM, percentalloweddiff::Float64;
+function checkaisvsexact(bm::BMs.AbstractBM, percentalloweddiff::Float64;
       ntemperatures = 100, nparticles = 100)
 
    exact = BMs.exactlogpartitionfunction(bm)
    estimated = BMs.logpartitionfunction(bm;
          ntemperatures = ntemperatures, nparticles = nparticles)
 
-   @test abs((exact - estimated)/exact) < percentalloweddiff / 100
+   @check abs((exact - estimated)/exact) < percentalloweddiff / 100
 end
 
 function exactlogpartitionfunctionwithoutsummingout(dbm::BMs.BasicDBM)
@@ -338,7 +377,7 @@ function exactloglikelihoodwithoutsummingout(dbm::BMs.BasicDBM, x::Array{Float64
 end
 
 
-function testdbmjoining()
+function test_dbmjoining()
    dbm1 = BMTest.randdbm([5;4;3])
    dbm2 = BMTest.randdbm([4;5;2])
    dbm3 = BMTest.randdbm([6;7;8])
@@ -369,21 +408,21 @@ end
 Tests whether the empirical loglikelihood from samples that are generated from
 the exact distribution of Boltzmann machines is equal to the exact loglikelihood.
 """
-function test_exactsampling()
+function check_exactsampling()
    nsamples = 200
    x = BMs.barsandstripes(nsamples, 9)[:, 1:6]
 
    dbm1 = BMs.fitdbm(x; epochspretraining = 20, epochs = 15, nhiddens = [8; 5])
-   BMTest.test_exactsampling(dbm1, x)
+   BMTest.check_exactsampling(dbm1, x)
 
    dbm1 = BMs.fitdbm(x; epochspretraining = 20, epochs = 15, nhiddens = [6; 5; 4])
-   BMTest.test_exactsampling(dbm1, x)
+   BMTest.check_exactsampling(dbm1, x)
 
    rbm = BMs.fitrbm(x; epochs = 100, nhidden = 20)
-   BMTest.test_exactsampling(rbm, x)
+   BMTest.check_exactsampling(rbm, x)
 end
 
-function test_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
+function check_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
       percentalloweddiff = 2.0)
 
    mbdist = BMs.MultivariateBernoulliDistribution(bm)
@@ -391,7 +430,7 @@ function test_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
 
    emploglikexactsamples = BMs.empiricalloglikelihood(x, exactsamples)
    exactloglik = BMs.exactloglikelihood(bm, x)
-   @test abs((emploglikexactsamples - exactloglik) / exactloglik) <
+   @check abs((emploglikexactsamples - exactloglik) / exactloglik) <
          percentalloweddiff / 100
 end
 
@@ -400,7 +439,7 @@ end
 Fits a larger RBM and a DBM and tests whether the AIS estimation
 yields approximately the same results, if performed parallel or not.
 """
-function test_likelihoodconsistency()
+function check_likelihoodconsistency()
    nsamples = 1000
    nvariables = 64
    x = BMs.barsandstripes(nsamples, nvariables)
@@ -430,26 +469,26 @@ function test_likelihoodconsistency()
                fill(0.0, length(rbm1.hidbias)))
 
    # Annealing between two RBMs with zero weights
-   @test3 isapprox(
+   @check isapprox(
          BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, samplemeanrbm2)),
          (BMs.logpartitionfunctionzeroweights(samplemeanrbm2) -
                BMs.logpartitionfunctionzeroweights(samplemeanrbm)))
 
    # Annealing from RBM to RBM with sample mean and zero weights
-   @test abs(logz1 - BMs.logpartitionfunctionzeroweights(samplemeanrbm) -
+   @check abs(logz1 - BMs.logpartitionfunctionzeroweights(samplemeanrbm) -
          BMs.logmeanexp(BMs.aislogimpweights(samplemeanrbm, rbm1))) <
                logz1 * 0.013
 
    # Annealing from one RBM to another RBM: Compare partition functions ...
    logimpweights = BMs.aislogimpweights(rbm1, rbm2;
          ntemperatures = 1000, nparticles = 200, burnin = 10)
-   @test abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
+   @check abs(BMs.logmeanexp(logimpweights) - (logz2 - logz1)) <
          max(logz2, logz1) * 0.03
    # ... and loglikelihood
    lldiff2 = BMs.loglikelihooddiff(rbm1, rbm2, x, logimpweights)
    lldiff1 = logp1 - logp2
    # very weak test, TODO: check and improve
-   @test sign(lldiff1) == sign(lldiff2)
+   @check sign(lldiff1) == sign(lldiff2)
 end
 
 
@@ -457,7 +496,7 @@ end
 Tests the likelihood estimation approaches for GaussianBernoulliRBMs
 and alternative GaussianBernoulliRBMs.
 """
-function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
+function check_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
       ) where GBRBM <: Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
 
    x = BMs.curvebundles(nperbundle = 300, nvariables = 10,
@@ -476,7 +515,7 @@ function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
    # Compare estimated difference of log partition functions to difference
    # between estimation and exact log partition function of GBRBM with zero weights
    logz1 = BMs.logpartitionfunction(gbrbm1)
-   @test abs(logz1 - BMs.logpartitionfunctionzeroweights(datainitrbm) -
+   @check abs(logz1 - BMs.logpartitionfunctionzeroweights(datainitrbm) -
          BMs.logmeanexp(BMs.aislogimpweights(datainitrbm, gbrbm1,
                nparticles = 200, ntemperatures = 200))) < 0.03 * logz1
 
@@ -491,14 +530,14 @@ function test_likelihoodconsistency_gaussian(gbrbmtype::Type{GBRBM}
    logzdiff = BMs.logmeanexp(logdiffimpweights)
 
    # Annealing from one RBM to another RBM: Compare partition functions ...
-   @test abs(logzdiff - (logz2 - logz1)) < max(logz2, logz1) * 0.03
+   @check abs(logzdiff - (logz2 - logz1)) < max(logz2, logz1) * 0.03
    # ... and loglikelihood
    logp1 = BMs.loglikelihood(gbrbm1, x, logz1)
    logp2 = BMs.loglikelihood(gbrbm2, x, logz2)
    lldiff2 = BMs.loglikelihooddiff(gbrbm1, gbrbm2, x, logdiffimpweights)
    lldiff1 = logp1 - logp2
    # very weak test, TODO: check and improve
-   @test sign(lldiff1) == sign(lldiff2)
+   @check sign(lldiff1) == sign(lldiff2)
 end
 
 
@@ -507,22 +546,22 @@ Tests whether the log-likelihood of Binomial2BernoulliRBMs is approximately
 equal to the empirical loglikelihood of data generated by the models, and whether
 the partition function estimated by AIS is near the exact value.
 "
-function test_b2brbm()
+function check_b2brbm()
    x = BMTest.createsamples(100, 4) + BMTest.createsamples(100, 4)
    b2brbm = BMs.fitrbm(x, rbmtype = BMs.Binomial2BernoulliRBM, epochs = 150,
          nhidden = 4, learningrate = 0.001)
-   testlikelihoodempirically(b2brbm, x; percentalloweddiff = 1.0)
+   @check checklikelihoodempirically(b2brbm, x; percentalloweddiff = 1.0)
 end
 
 
-function test_rbm()
+function check_rbm()
    x = BMTest.createsamples(100, 4)
    rbm = BMs.fitrbm(x, epochs = 30,
          nhidden = 4, learningrate = 0.001)
-   testlikelihoodempirically(rbm, x)
+   @check checklikelihoodempirically(rbm, x)
 end
 
-function test_gbrbm(gbrbmtype::Type{GBRBM}
+function check_gbrbm(gbrbmtype::Type{GBRBM}
       ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
 
    x = BMs.curvebundles(nperbundle = 300, nvariables = 10,
@@ -537,7 +576,7 @@ function test_gbrbm(gbrbmtype::Type{GBRBM}
          ntemperatures = 500, nparticles = 500)
    estloglik = BMs.loglikelihood(gbrbm, x, logz)
    exactloglik = BMs.exactloglikelihood(gbrbm, x)
-   @test abs((exactloglik - estloglik) / exactloglik) < 2.5 / 100
+   @check abs((exactloglik - estloglik) / exactloglik) < 2.5 / 100
 end
 
 function test_rbm_monitoring(gbrbmtype::Type{GBRBM}
@@ -556,15 +595,15 @@ function test_rbm_monitoring(gbrbmtype::Type{GBRBM}
          sdlearningrate = 0.000000001,
          monitoring = (rbm, epoch) -> begin
             if epoch == 10 || epoch == 20
-               BMs.monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
-               BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict)
+               BoltzmannMachines.monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
+               BoltzmannMachines.monitorreconstructionerror!(monitor, rbm, epoch, datadict)
             end
          end)
    nothing
 end
 
 
-function test_mdbm_rbm_b2brbm()
+function check_mdbm_rbm_b2brbm()
    nsamples = 100
    nvariables = 4
 
@@ -588,7 +627,7 @@ function test_mdbm_rbm_b2brbm()
          learningratepretraining = 0.001,
          pretraining = trainlayers1)
 
-   BMTest.testlikelihoodempirically(dbm1, x; percentalloweddiff = 5.5,
+   @check BMTest.checklikelihoodempirically(dbm1, x; percentalloweddiff = 5.5,
          ntemperatures = 300, nparticles = 300)
 
    # partitioned second layer
@@ -603,40 +642,40 @@ function test_mdbm_rbm_b2brbm()
    ]
 
    dbm2 = BMs.fitdbm(x, pretraining = trainlayers2)
-   BMTest.testlikelihoodempirically(dbm2, x; percentalloweddiff = 6.3,
+   @check BMTest.checklikelihoodempirically(dbm2, x; percentalloweddiff = 6.3,
          ntemperatures = 300, nparticles = 300)
 end
 
 
-function testlikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
+function checklikelihoodempirically(rbm::BMs.AbstractRBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
    logz = BMs.logpartitionfunction(rbm; parallelized = true,
       nparticles = nparticles, ntemperatures = ntemperatures)
    estloglik = BMs.loglikelihood(rbm, x, logz)
    exactloglik = BMs.exactloglikelihood(rbm, x)
-   @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
+   @check abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
 
    emploglik = BMs.empiricalloglikelihood(rbm, x, 1000000)
-   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
+   @check abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
 end
 
-function testlikelihoodempirically(dbm::BMs.MultimodalDBM, x::Matrix{Float64};
+function checklikelihoodempirically(dbm::BMs.MultimodalDBM, x::Matrix{Float64};
       percentalloweddiff = 0.5, ntemperatures::Int = 100, nparticles::Int = 100)
 
    emploglik = BMs.empiricalloglikelihood(dbm, x, 1000000)
    estloglik = BMs.loglikelihood(dbm, x; parallelized = true,
          ntemperatures = ntemperatures, nparticles = nparticles)
    exactloglik = BMs.exactloglikelihood(dbm, x)
-   @test abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
-   @test abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
+   @check abs((exactloglik - emploglik) / exactloglik) < percentalloweddiff / 100
+   @check abs((exactloglik - estloglik) / exactloglik) < percentalloweddiff / 100
 end
 
 
 """
 Test DBMs with Gaussian visible nodes.
 """
-function test_mdbm_gaussianvisibles()
+function check_mdbm_gaussianvisibles()
 
    x = convert(Matrix{Float64}, readdlm(
          joinpath(dirname(pathof(BoltzmannMachines)), "..", "test/data/iris.csv"), ',',
@@ -683,14 +722,12 @@ function test_mdbm_gaussianvisibles()
    end
 
    # Test AIS
-   BMTest.testaisvsexact(dbm1, 0.6)
+   @check BMTest.checkaisvsexact(dbm1, 0.6)
 
    # Test exact likelihood vs estimated likelihood
    estloglik = BMs.loglikelihood(dbm1, x; nparticles = 400, ntemperatures = 200)
    exactloglik = BMs.exactloglikelihood(dbm1, x)
-   @test abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
-
-   nothing
+   @check abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
 end
 
 function test_mdbm_architectures()
@@ -728,6 +765,7 @@ function test_mdbm_architectures()
                BMs.TrainLayer(nvisible = 3, nhidden = 3)
                BMs.TrainLayer(nvisible = 6, nhidden = 3)]);
          BMs.TrainLayer(nhidden = 3)])
+   nothing
 end
 
 
