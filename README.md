@@ -1,6 +1,6 @@
 # BoltzmannMachines.jl
 
-[![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
+[![Build Status](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl.svg?branch=master)](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl)
 
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
