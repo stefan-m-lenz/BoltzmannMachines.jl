@@ -1,5 +1,7 @@
 # BoltzmannMachines.jl
 
+[![][travis-img]][travis-url] [![][codecov-img]][codecov-url]
+
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
 * Learning of Restricted Boltzmann Machines (RBMs) using Contrastive Divergence (CD)
