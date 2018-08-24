@@ -138,11 +138,11 @@ function test_potentials()
    prbm = BMs.PartitionedRBM{BMs.BernoulliRBM}([rbm; rbm2])
    joinedrbm = BMs.joinrbms([rbm; rbm2])
    BMs.hiddenpotential!(hhpartitioned, joinedrbm, vv)
-   @test isapprox(sum(abs.(hhpartitioned - BMs.hiddenpotential(joinedrbm, vv))), 0)
+   @test all(isapprox.(hhpartitioned, BMs.hiddenpotential(joinedrbm, vv)))
 
    # Test activation potential of visible nodes for PartitionedRBM
    BMs.visiblepotential!(vv, prbm, hhpartitioned)
-   @test isapprox(sum(abs.(vv - BMs.visiblepotential(joinedrbm, hhpartitioned))), 0)
+   @test all(isapprox.(vv, BMs.visiblepotential(joinedrbm, hhpartitioned)))
 end
 
 
