@@ -26,6 +26,8 @@ BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM)
 BMTest.test_rbm_monitoring(BMs.GaussianBernoulliRBM2)
 BMTest.test_mdbm_architectures()
 BMTest.test_summing_out()
+BMTest.test_unevenbatches()
+BMTest.test_beam()
 
 
 #########################################################################

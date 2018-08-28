@@ -769,4 +769,32 @@ function test_mdbm_architectures()
 end
 
 
+function test_unevenbatches()
+   x = BMs.barsandstripes(20, 4)
+   rbm = BMs.fitrbm(x, batchsize = 3, epochs = 2) # 20 % 3 !== 0
+   @test_throws ErrorException BMs.fitrbm(x, batchsize = 21, epochs = 2)
+   nothing
+end
+
+
+function test_beam()
+   x = randn(100, 10)
+   rbm = BMs.fitrbm(x, rbmtype = BMs.GaussianBernoulliRBM2,
+         batchsize = 20,
+         cdsteps = 50,
+         nhidden = 20, epochs = 30,
+         sdinitfactor = 0.1,
+         optimizers = [
+               fill(BMs.loglikelihoodoptimizer(learningrate = 0.0001,
+                     sdlearningrate = 0.000001), 10);
+               fill(BMs.beamoptimizer(learningrate = 0.0001,
+                     sdlearningrate = 0.000001,
+                     adversarialweight = 0.5), 20)
+         ],
+         # TODO fix: crashes julia!
+         # sampler = BMs.TemperatureDrivenSampler(nsteps = 50)
+         );
+end
+
+
 end # of module BMTest

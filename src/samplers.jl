@@ -22,31 +22,15 @@ end
 struct NoSampler <: AbstractSampler
 end
 
-function sample!(particles::Particles, sampler::NoSampler, rbm::AbstractRBM,
-      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+function sample!(vmodel::M1, hmodel::M2, sampler::NoSampler, rbm::AbstractRBM,
+      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0
+      ) where {M1 <: AbstractArray{Float64}, M2 <: AbstractArray{Float64}}
    # do nothing
 end
 
-function sample!(vmodel::M, hmodel::M, sampler::NoSampler, rbm::AbstractRBM,
+function sample!(vmodel::M1, hmodel::M2, sampler::GibbsSampler, rbm::AbstractRBM,
       upfactor::Float64 = 1.0, downfactor::Float64 = 1.0
-      ) where {M <:AbstractArray{Float64}}
-   # do nothing
-end
-
-function sample!(vmodel::M, hmodel::M, sampler::AbstractSampler, rbm::AbstractRBM,
-      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0
-      ) where {M <:AbstractArray{Float64}}
-
-   particles = Particles(2)
-   particles[1] = vmodel
-   particles[2] = hmodel
-   sample!(particles, sampler, rbm, upfactor, downfactor)
-   nothing
-end
-
-function sample!(vmodel::M, hmodel::M, sampler::GibbsSampler, rbm::AbstractRBM,
-      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0
-      ) where {M <:AbstractArray{Float64}}
+      ) where {M1 <: AbstractArray{Float64}, M2 <: AbstractArray{Float64}}
 
    for i = 1:sampler.nsteps
       samplevisible!(vmodel, rbm, hmodel, downfactor)
@@ -61,9 +45,10 @@ function sample!(particles::Particles, sampler::GibbsSampler, rbm::AbstractRBM,
    gibbssample!(particles, rbm, sampler.nsteps)
 end
 
-function sample!(particles::Particles, sampler::TemperatureDrivenSampler, rbm::AbstractRBM,
-      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0)
+function sample!(vv::M1, hh::M2, sampler::TemperatureDrivenSampler, rbm::AbstractRBM,
+      upfactor::Float64 = 1.0, downfactor::Float64 = 1.0
+      ) where {M1 <: AbstractArray{Float64}, M2 <: AbstractArray{Float64}}
    # TODO respect upfactor and downfactor
-   gibbssample_gamma!(particles, rbm, sampler.nsteps;
+   gibbssample_gamma!(vv, hh, rbm, sampler.nsteps;
          autocorcoeff = sampler.autocorcoeff, betasd = sampler.betasd)
 end

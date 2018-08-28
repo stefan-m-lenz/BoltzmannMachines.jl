@@ -2,12 +2,13 @@
 # "Boltzmann Encoded Adversarial Machines" of Fisher et al. (2018)
 
 
-function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 10;
-      autocorcoeff::Float64 = 0.9, betasd::Float64 = 0.9)
+function gibbssample_gamma!(vv::M1, hh::M2, gbrbm::GaussianBernoulliRBM2, nsteps::Int = 10;
+      autocorcoeff::Float64 = 0.9, betasd::Float64 = 0.9
+      ) where {M1 <: AbstractArray{Float64, 2}, M2 <: AbstractArray{Float64, 2}}
 
-   nsamples = size(particles[1], 1)
-   vs = map(i -> view(particles[1], i, :), 1:nsamples)
-   hs = map(i -> view(particles[2], i, :), 1:nsamples)
+   nsamples = size(vv, 1)
+   vs = map(i -> view(vv, i, :), 1:nsamples)
+   hs = map(i -> view(hh, i, :), 1:nsamples)
 
    for k = 1:nsamples
       v = vs[k]
@@ -22,7 +23,7 @@ function gibbssample_gamma!(particles::Particles, gbrbm::GaussianBernoulliRBM2, 
          samplehidden!(h, gbrbm, v, 1/beta)
       end
    end
-   particles
+   nothing
 end
 
 
@@ -40,7 +41,7 @@ function nearestneighbourcritic(xdata::M, xmodel::M, k::Int,
 
    # Distancematrix is filled with the distances
    # between all combinations of samples in x.
-   distancematrix = Matrix{Float64}(nsamples, nsamples)
+   distancematrix = Matrix{Float64}(undef, nsamples, nsamples)
    for i = 1:nsamples
       for j = (i+1):nsamples
          distancematrix[i, j] = distancematrix[j, i] = norm(x[j, :] - x[i, :])
@@ -48,11 +49,11 @@ function nearestneighbourcritic(xdata::M, xmodel::M, k::Int,
       distancematrix[i, i] = 0.0
    end
 
-   ret = Vector{Float64}(ndatasamples)
+   ret = Vector{Float64}(undef, ndatasamples)
    eps = 0.1
    if distanceweighted
       for i = 1:ndatasamples
-         knearestindices = selectperm(distancematrix[i, :], (1:k)+1)
+         knearestindices = partialsortperm(distancematrix[i, :], (1:k) .+ 1)
          nearestdatasamplesindices = knearestindices[knearestindices .<= ndatasamples]
          datasamplesdistances = distancematrix[i, nearestdatasamplesindices]
          ret[i] = 2.0 * ( sum(1.0 ./ (datasamplesdistances .+ eps)) /
@@ -60,7 +61,7 @@ function nearestneighbourcritic(xdata::M, xmodel::M, k::Int,
       end
    else
       for i = 1:ndatasamples
-         knearestindices = selectperm(distancematrix[i, :], (1:k)+1)
+         knearestindices = partialsortperm(distancematrix[i, :], (1:k) .+ 1)
          nnearestdatasamples = sum(knearestindices .<= ndatasamples)
          ret[i] = 2 * nnearestdatasamples / k - 1
       end

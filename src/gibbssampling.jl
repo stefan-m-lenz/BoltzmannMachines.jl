@@ -31,18 +31,13 @@ function alloc_v_for_h(rbm::AbstractRBM, h::AbstractArray{Float64, 2})
 end
 
 
-function bernoulli(x::M) where{M <:AbstractArray{Float64}}
-   ret = rand(size(x))
-   ret .= float.(ret .< x)
-   ret
-end
-
 function bernoulli!(x::M) where{M <:AbstractArray{Float64}}
    for i in eachindex(x)
       @inbounds x[i] = float(rand() < x[i])
    end
    x
 end
+
 
 function binomial2!(x::M) where{M <:AbstractArray{Float64}}
    for i in eachindex(x)

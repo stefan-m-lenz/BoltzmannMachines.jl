@@ -245,7 +245,7 @@ function stackrbms(x::Array{Float64,2};
    for i = 2:nrbms
       hiddenval = hiddenpotential(dbmn[i-1], hiddenval, upfactor)
       if samplehidden
-         hiddenval = bernoulli(hiddenval)
+         bernoulli!(hiddenval)
       end
 
       if !isempty(monitoringdata)

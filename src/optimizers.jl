@@ -128,7 +128,7 @@ function beamoptimizer(;learningrate::Float64 = 0.05,
    llstep = loglikelihoodoptimizer(
          learningrate = learningrate, sdlearningrate = sdlearningrate)
    advstep = BeamAdversarialOptimizer(
-         NoRBM(), Matrix{Float64}(0,0), Vector{Float64}(),
+         NoRBM(), Matrix{Float64}(undef, 0, 0), Vector{Float64}(),
          learningrate, sdlearningrate, knearest)
 
    CombinedOptimizer(advstep, llstep, NoRBM(),

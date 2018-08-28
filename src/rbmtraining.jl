@@ -22,8 +22,12 @@ function assertinitoptimizers(optimizer::AbstractOptimizer,
          optimizers = fill(initialized(optimizer, bm), epochs)
       end
    else
-      optimizers = map(opt -> initialized(opt, bm), optimizers)
       assert_enoughvaluesforepochs("optimizers", optimizers, epochs)
+      initalizedoptimizers = Vector(undef, epochs)
+      for i in 1:epochs
+         initalizedoptimizers[i] = initialized(optimizers[i], bm)
+      end
+      optimizers = converttomostspecifictype(initalizedoptimizers)
    end
 
    optimizers
@@ -309,10 +313,10 @@ function trainrbm!(rbm::AbstractRBM, x::Array{Float64,2};
       else
          v = x[batchmask, :]
          thisbatchsize = nsamples % batchsize
-         h = Matrix{Float64}(thisbatchsize, nhiddennodes(rbm))
+         h = Matrix{Float64}(undef, thisbatchsize, nhiddennodes(rbm))
          if !pcd
-            vmodel = Matrix{Float64}(size(v))
-            hmodel = Matrix{Float64}(size(h))
+            vmodel = Matrix{Float64}(undef, size(v))
+            hmodel = Matrix{Float64}(undef, size(h))
          end # in case of pcd, vmodel and hmodel are not downsized
       end
 
