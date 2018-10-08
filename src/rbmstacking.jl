@@ -375,6 +375,8 @@ function stackrbms_trainlayer(x::Matrix{Float64},
    elseif trainlayer.monitoring != nomonitoring
       monitoring = (rbm, epoch) ->
             trainlayer.monitoring(rbm, epoch, monitoringdata)
+   else
+      monitoring = nomonitoring
    end
 
    BMs.fitrbm(x;

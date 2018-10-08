@@ -212,7 +212,7 @@ function curvebundles(;
 
    if addlabels
       nlabelvars = Int(ceil(log(nbundles)/log(2)))
-      labels = Matrix{Float64}(nbundles, nlabelvars)
+      labels = Matrix{Float64}(undef, nbundles, nlabelvars)
       labels[1,:] .= 0.0
       for j = 2:nbundles
          labels[j,:] .= labels[j-1,:]

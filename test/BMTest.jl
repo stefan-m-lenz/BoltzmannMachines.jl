@@ -603,6 +603,31 @@ function test_rbm_monitoring(gbrbmtype::Type{GBRBM}
 end
 
 
+function test_mdbm_monitoring()
+   x1 = BMTest.createsamples(80, 4)
+   x2 = BMs.curvebundles(nperbundle = 20, nvariables = 5, nbundles = 4)
+   data = hcat(x1, x2)
+   traindata, testdata = BMs.splitdata(data, 0.2)
+   monitor = BMs.Monitor(); monitor1 = BMs.Monitor()
+   datadict = BMs.DataDict("Training data" => traindata, "Test data" => testdata)
+   dbm = BMs.fitdbm(traindata,
+      epochs = 2,
+      monitoringdatapretraining = datadict,
+      batchsizepretraining = 10,
+      pretraining = [
+         BMs.TrainPartitionedLayer([
+            BMs.TrainLayer(nvisible = 4, nhidden = 5,
+                  monitoring = (rbm, epoch, datadict) ->
+                        BMs.monitorreconstructionerror!(monitor1, rbm, epoch, datadict))
+            BMs.TrainLayer(nhidden = 6, rbmtype = BMs.GaussianBernoulliRBM2)
+         ]),
+         BMs.TrainLayer(nhidden = 5)
+      ],
+      monitoring = (dbm, epoch) -> BMs.monitorlogproblowerbound!(monitor, dbm, epoch, datadict))
+   nothing
+end
+
+
 function check_mdbm_rbm_b2brbm()
    nsamples = 100
    nvariables = 4
@@ -791,9 +816,7 @@ function test_beam()
                      sdlearningrate = 0.000001,
                      adversarialweight = 0.5), 20)
          ],
-         # TODO fix: crashes julia!
-         # sampler = BMs.TemperatureDrivenSampler(nsteps = 50)
-         );
+         sampler = BMs.TemperatureDrivenSampler(nsteps = 50));
 end
 
 

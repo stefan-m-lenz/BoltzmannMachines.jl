@@ -51,6 +51,7 @@ export
       monitorlogproblowerbound, monitorlogproblowerbound!,
       monitorloglikelihood, monitorloglikelihood!,
       monitorreconstructionerror, monitorreconstructionerror!,
+      monitorsd, monitorsd!,
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
