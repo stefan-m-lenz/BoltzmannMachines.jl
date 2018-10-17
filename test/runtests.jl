@@ -29,6 +29,7 @@ BMTest.test_mdbm_monitoring()
 BMTest.test_summing_out()
 BMTest.test_unevenbatches()
 BMTest.test_beam()
+BMTest.test_softmaxvssigm()
 
 
 #########################################################################

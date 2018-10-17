@@ -48,6 +48,35 @@ struct GaussianBernoulliRBM2 <: AbstractXBernoulliRBM
 end
 
 
+struct SoftmaxBernoulliRBM <: AbstractXBernoulliRBM
+   weights::Array{Float64,2}
+   visbias::Array{Float64,1}
+   hidbias::Array{Float64,1}
+
+   # length of range vor each variable is number the of classes minus 1
+   varranges::Vector{UnitRange}
+end
+
+function SoftmaxBernoulliRBM(
+      weights::Array{Float64,2},
+      visbias::Array{Float64,1},
+      hidbias::Array{Float64,1}, ncategories::Int)
+
+   ncategoricalvariables = div(length(visbias), ncategories)
+
+   SoftmaxBernoulliRBM(weights, visbias, hidbias,
+         fill(ncategories, ncategoricalvariables))
+end
+
+function SoftmaxBernoulliRBM(
+      weights::Array{Float64,2},
+      visbias::Array{Float64,1},
+      hidbias::Array{Float64,1}, nscategories::Vector{Int})
+
+   SoftmaxBernoulliRBM(weights, visbias, hidbias, ranges(nscategories .- 1))
+end
+
+
 """
     BernoulliGaussianRBM(weights, visbias, hidbias)
 Encapsulates the parameters of an RBM with Bernoulli distributed visible nodes

@@ -147,6 +147,20 @@ function logit(p::Float64)
    -log.(1.0 ./ p .- 1.0)
 end
 
+
+function intensities(data::Matrix{Float64}, q1::Float64 = 0.0, q2::Float64 = 1.0)
+   mapslices(col -> begin
+         bottomval = quantile(col, q1)
+         topval = quantile(col, q2)
+         col[col .< bottomval] .= bottomval
+         col[col .> topval] .= topval
+         col .-= bottomval
+         col ./= topval - bottomval
+         col
+      end, data, dims = 1)
+end
+
+
 """
     mostevenbatches(ntasks)
     mostevenbatches(ntasks, nbatches)
@@ -255,6 +269,25 @@ function piecewiselinearsequences(nsequences::Int, nvariables::Int;
       end
    end
    x
+end
+
+
+function softmaxinputdata(x::M, nscategories::Vector{Int}
+      ) where {N <: Number, M <:AbstractArray{N,2}}
+
+   nsamples, norigvariables = size(x)
+   n10variables = sum(nscategories .- 1)
+   xout = zeros(nsamples, n10variables)
+   varoffset = 0
+   for k in 1:norigvariables
+      for i in 1:nsamples
+         if x[i, k] > 0.0
+            xout[i, varoffset + Int(x[i,k])] = 1.0
+         end
+      end
+      varoffset += nscategories[k] - 1
+   end
+   xout
 end
 
 

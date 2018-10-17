@@ -111,14 +111,14 @@ end
     hiddeninput!(h, rbm, v)
 Like `hiddeninput`, but stores the returned result in `h`.
 """
-function hiddeninput!(h::M, rbm::BernoulliRBM, v::M
+function hiddeninput!(h::M, rbm::Union{BernoulliRBM, SoftmaxBernoulliRBM}, v::M
       ) where{M <: AbstractArray{Float64,1}}
 
    mul!(h, transpose(rbm.weights), v)
    h .+= rbm.hidbias
 end
 
-function hiddeninput!(hh::M, rbm::BernoulliRBM, vv::M
+function hiddeninput!(hh::M, rbm::Union{BernoulliRBM, SoftmaxBernoulliRBM}, vv::M
       ) where{M <: AbstractArray{Float64,2}}
 
    mul!(hh, vv, rbm.weights)
@@ -637,6 +637,27 @@ function samplevisiblepotential!(vv::M, prbm::PartitionedRBM
    end
 end
 
+function samplevisiblepotential!(vv::M,
+      softrbm::SoftmaxBernoulliRBM
+      ) where{M <: AbstractArray{Float64, 2}}
+
+   for varrange in softrbm.varranges
+      for i in 1:size(x, 1)
+         probsum = 0.0
+         p = rand()
+         for k = 2:length(varrange)
+            if probsum < p <= vv[i, varrange[k]]
+               vv[i, varrange[k]] = 1.0
+            else
+               probsum += vv[i, varrange[k]]
+               vv[i, varrange[k]] = 0.0
+            end
+         end
+      end
+   end
+   vv
+end
+
 
 function sigm(x::Float64)
    1 ./ (1 + exp(-x))
@@ -669,6 +690,19 @@ function sigm_bernoulli!(input::Matrix{Float64})
    input
 end
 
+# TODO better documentation
+"""
+    softmax!(x)
+Applies the softmax transformation to each of the rows in `x`.
+"""
+function softmax!(x::M) where {M <:AbstractArray{Float64,2}}
+   m = maximum(x)
+   x .= exp.(x .- m)
+   # divide through sum, account for zero element
+   x ./= mapslices(sum, x, dims = 2) .+ exp(-m)
+   x
+end
+
 
 """
     visibleinput(rbm, h)
@@ -687,7 +721,8 @@ end
 Like `visibleinput` but stores the returned result in `v`.
 """
 function visibleinput!(v::M,
-      rbm::Union{BernoulliRBM, BernoulliGaussianRBM, Binomial2BernoulliRBM},
+      rbm::Union{BernoulliRBM, BernoulliGaussianRBM,
+            Binomial2BernoulliRBM, SoftmaxBernoulliRBM},
       h::M) where {M <:AbstractArray{Float64,1}}
 
    mul!(v, rbm.weights, h)
@@ -695,7 +730,8 @@ function visibleinput!(v::M,
 end
 
 function visibleinput!(vv::M,
-      rbm::Union{BernoulliRBM, BernoulliGaussianRBM, Binomial2BernoulliRBM},
+      rbm::Union{BernoulliRBM, BernoulliGaussianRBM,
+            Binomial2BernoulliRBM, SoftmaxBernoulliRBM},
       hh::M) where {M <:AbstractArray{Float64,2}}
 
    mul!(vv, hh, transpose(rbm.weights))
@@ -812,6 +848,19 @@ function visiblepotential!(v::M,
 
    mul!(v, h, transpose(gbrbm.weights))
    broadcast!(+, v, v, gbrbm.visbias')
+end
+
+function visiblepotential!(vv::M, rbm::SoftmaxBernoulliRBM,
+      hh::M, factor::Float64 = 1.0) where {M <: AbstractArray{Float64,2}}
+
+   visibleinput!(vv, rbm, hh)
+   if factor != 1.0
+      vv .*= factor
+   end
+   for varrange in rbm.varranges
+      softmax!(view(vv, :, varrange))
+   end
+   vv
 end
 
 function visiblepotential!(v::M, prbm::PartitionedRBM, h::M,

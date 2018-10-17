@@ -29,18 +29,19 @@ function joinrbms(rbm1::T, rbm2::T) where {T<:AbstractRBM}
    joinrbms(T[rbm1, rbm2])
 end
 
-function joinrbms(rbms::Vector{BernoulliRBM}, visibleindexes = [])
+function joinrbms(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractRBM}
    jointvisiblebias = joinvecs([rbm.visbias for rbm in rbms], visibleindexes)
    jointhiddenbias = vcat(map(rbm -> rbm.hidbias, rbms)...)
-   BernoulliRBM(joinweights(rbms, visibleindexes),
-         jointvisiblebias, jointhiddenbias)
+   T(joinweights(rbms, visibleindexes), jointvisiblebias, jointhiddenbias)
 end
 
-function joinrbms(rbms::Vector{GaussianBernoulliRBM}, visibleindexes = [])
+function joinrbms(rbms::Vector{T}, visibleindexes = []
+      ) where {T <: Union{GaussianBernoulliRBM, GaussianBernoulliRBM2}}
+
    jointvisiblebias = joinvecs([rbm.visbias for rbm in rbms], visibleindexes)
    jointhiddenbias = vcat(map(rbm -> rbm.hidbias, rbms)...)
    jointsd = joinvecs([rbm.sd for rbm in rbms], visibleindexes)
-   GaussianBernoulliRBM(joinweights(rbms, visibleindexes),
+   T(joinweights(rbms, visibleindexes),
          jointvisiblebias, jointhiddenbias, jointsd)
 end
 

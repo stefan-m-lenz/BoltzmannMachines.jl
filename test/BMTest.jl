@@ -308,6 +308,20 @@ function test_summing_out()
    end
 end
 
+
+function test_softmaxvssigm()
+   nsamples = 5
+   nvariables = 6
+   x1 = 100 .* rand(nsamples, nvariables) .- 50
+   x2 = copy(x1)
+   # softmax transfomation to each of the columns
+   for i in 1:nvariables
+      BMs.softmax!(view(x1, :, i:i))
+   end
+   @test all(isapprox.(x1, BMs.sigm!(x2)))
+end
+
+
 """
     testaisvsexact(bm, percentalloweddiff)
 Tests whether the exact log partition function is approximated by the value
