@@ -338,7 +338,7 @@ function inithiddennodes!(h::M, prbm::PartitionedRBM, biased::Bool
 end
 
 function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
+      ) where{M <: AbstractArray{Float64, 2}}
 
    if biased
       for k in 1:size(v, 2)
@@ -352,7 +352,7 @@ function initvisiblenodes!(v::M, rbm::BernoulliRBM, biased::Bool
 end
 
 function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
-   ) where{M <: AbstractArray{Float64}}
+   ) where{M <: AbstractArray{Float64, 2}}
 
    if biased
       for k in 1:size(v, 2)
@@ -366,7 +366,8 @@ function initvisiblenodes!(v::M, b2brbm::Binomial2BernoulliRBM, biased::Bool
 end
 
 function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
+      ) where{M <: AbstractArray{Float64, 2}}
+
    randn!(v)
    if biased
       broadcast!(*, v, v, rbm.sd')
@@ -376,7 +377,8 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM, biased::Bool
 end
 
 function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM2, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
+      ) where{M <: AbstractArray{Float64, 2}}
+
    randn!(v)
    if biased
       v .+= rbm.visbias'
@@ -384,8 +386,29 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM2, biased::Bool
    v
 end
 
+function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
+      ) where{M <: AbstractArray{Float64, 2}}
+
+   if biased
+      v .= rbm.visbias'
+      softmax!(v)
+      samplevisiblepotential!(v, rbm)
+   else
+      v .= 0.0
+      nsamples, nvariables = size(v)
+      for i in 1:nsamples
+         k1 = rand(0:nvariables)
+         if k1 > 0
+            v[i, k1] = 1.0
+         end
+      end
+   end
+   v
+end
+
 function initvisiblenodes!(v::M, prbm::PartitionedRBM, biased::Bool
-      ) where{M <: AbstractArray{Float64}}
+      ) where{M <: AbstractArray{Float64, 2}}
+
    for i in eachindex(prbm.rbms)
       visrange = prbm.visranges[i]
       initvisiblenodes!(view(v, :, visrange), prbm.rbms[i], biased)
@@ -642,10 +665,10 @@ function samplevisiblepotential!(vv::M,
       ) where{M <: AbstractArray{Float64, 2}}
 
    for varrange in softrbm.varranges
-      for i in 1:size(x, 1)
+      for i in 1:size(vv, 1)
          probsum = 0.0
          p = rand()
-         for k = 2:length(varrange)
+         for k = 1:length(varrange)
             if probsum < p <= vv[i, varrange[k]]
                vv[i, varrange[k]] = 1.0
             else
@@ -695,11 +718,18 @@ end
     softmax!(x)
 Applies the softmax transformation to each of the rows in `x`.
 """
-function softmax!(x::M) where {M <:AbstractArray{Float64,2}}
+function softmax!(x::V) where {V <: AbstractArray{Float64,1}}
    m = maximum(x)
    x .= exp.(x .- m)
    # divide through sum, account for zero element
-   x ./= mapslices(sum, x, dims = 2) .+ exp(-m)
+   x ./= sum(x) + exp(-m)
+   x
+end
+
+function softmax!(x::M) where {M <: AbstractArray{Float64,2}}
+   for i in 1:size(x, 1)
+      @inbounds softmax!(view(x, i, :))
+   end
    x
 end
 
@@ -848,6 +878,19 @@ function visiblepotential!(v::M,
 
    mul!(v, h, transpose(gbrbm.weights))
    broadcast!(+, v, v, gbrbm.visbias')
+end
+
+function visiblepotential!(v::M, rbm::SoftmaxBernoulliRBM,
+      h::M, factor::Float64 = 1.0) where {M <: AbstractArray{Float64,1}}
+
+   visibleinput!(v, rbm, h)
+   if factor != 1.0
+      v .*= factor
+   end
+   for varrange in rbm.varranges
+      softmax!(view(v, varrange))
+   end
+   v
 end
 
 function visiblepotential!(vv::M, rbm::SoftmaxBernoulliRBM,

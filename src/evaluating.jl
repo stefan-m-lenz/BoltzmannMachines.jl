@@ -1218,11 +1218,10 @@ function nmodelparameters(bm::AbstractBM)
    nweights + nbiases
 end
 
-function nmodelparameters(gbrbm::GaussianBernoulliRBM)
+function nmodelparameters(gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2})
    invoke(nmodelparameters, (AbstractRBM,), gbrbm) + length(gbrbm.sd)
 end
 
-# TODO respect model parameters for MultimodalDBM with Gaussian nodes
 
 """
     reconstructionerror(rbm, x)

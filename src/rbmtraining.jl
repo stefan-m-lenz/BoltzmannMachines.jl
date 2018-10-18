@@ -202,6 +202,12 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       visbias = initvisiblebias(x/2)
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
+   elseif rbmtype == SoftmaxBernoulliRBM
+      error("Automatic initialization of `SoftmaxBernoulliRBM`s " .*
+            "needs the numbers of categories.\n" .*
+            "Please specify a pre-initialized RBM " .*
+            "with Argument `startrbm = SoftmaxBernoulliRBM(...)` in `fitrbm`.")
+
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
