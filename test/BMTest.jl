@@ -316,7 +316,7 @@ function test_softmaxvssigm()
    x2 = copy(x1)
    # softmax transfomation to each of the columns
    for i in 1:nvariables
-      BMs.softmax!(view(x1, :, i:i))
+      BMs.softmax0!(view(x1, :, i:i))
    end
    @test all(isapprox.(x1, BMs.sigm!(x2)))
 end

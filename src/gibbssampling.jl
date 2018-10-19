@@ -391,7 +391,7 @@ function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
 
    if biased
       v .= rbm.visbias'
-      softmax!(v, rbm.varranges)
+      softmax0!(v, rbm.varranges)
       samplevisiblepotential!(v, rbm)
    else
       v .= 0.0
@@ -715,12 +715,19 @@ function sigm_bernoulli!(input::Matrix{Float64})
    input
 end
 
-# TODO better documentation
+
 """
-    softmax!(x)
-Applies the softmax transformation to each of the rows in `x`.
+    softmax0!(x)
+    softmax0!(x, varranges)
+If `x` is a vector, `softmax0!(x)` will apply the softmax transformation
+to the  vector `[x; 0.0]` and store the results for the values of `x` in `x`.
+(The value for 0.0 is omitted since it is determined by `1 - sum(softmax!(x))`).
+
+If `x` is a matrix, the transformation will be applied to all rows of `x`.
+If an additional vector `varranges` with `UnitRange`s of column indices is
+specified, the transformation will be applied to the groups of columns separately.
 """
-function softmax!(x::V) where {V <: AbstractArray{Float64,1}}
+function softmax0!(x::V) where {V <: AbstractArray{Float64,1}}
    m = maximum(x)
    x .= exp.(x .- m)
    # divide through sum, account for zero element
@@ -728,18 +735,18 @@ function softmax!(x::V) where {V <: AbstractArray{Float64,1}}
    x
 end
 
-function softmax!(x::M) where {M <: AbstractArray{Float64,2}}
+function softmax0!(x::M) where {M <: AbstractArray{Float64,2}}
    for i in 1:size(x, 1)
-      @inbounds softmax!(view(x, i, :))
+      @inbounds softmax0!(view(x, i, :))
    end
    x
 end
 
-function softmax!(x::M, varranges::Vector{UnitRange}
+function softmax0!(x::M, varranges::Vector{UnitRange}
       ) where {M <: AbstractArray{Float64,2}}
 
    for varrange in varranges
-      softmax!(view(x, :, varrange))
+      softmax0!(view(x, :, varrange))
    end
    x
 end
@@ -899,7 +906,7 @@ function visiblepotential!(v::M, rbm::SoftmaxBernoulliRBM,
       v .*= factor
    end
    for varrange in rbm.varranges
-      softmax!(view(v, varrange))
+      softmax0!(view(v, varrange))
    end
    v
 end
@@ -911,7 +918,7 @@ function visiblepotential!(vv::M, rbm::SoftmaxBernoulliRBM,
    if factor != 1.0
       vv .*= factor
    end
-   softmax!(vv, rbm.varranges)
+   softmax0!(vv, rbm.varranges)
    vv
 end
 
