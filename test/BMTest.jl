@@ -312,7 +312,7 @@ end
 function test_softmaxvssigm()
    nsamples = 5
    nvariables = 6
-   x1 = 100 .* rand(nsamples, nvariables) .- 50
+   x1 = 6. .* rand(nsamples, nvariables) .- 3.
    x2 = copy(x1)
    # softmax transfomation to each of the columns
    for i in 1:nvariables
@@ -769,6 +769,19 @@ function check_mdbm_gaussianvisibles()
    @check abs((exactloglik - estloglik) / exactloglik) < 3.5 / 100
 end
 
+
+function check_softmaxsampling()
+   probs = [0.5 0.3; 0.2 0.25]
+   sampled = zeros(size(probs))
+   softrbm = BMs.SoftmaxBernoulliRBM(zeros(2,2), zeros(2), zeros(2), 3)
+   nsampled = 1000
+   for i = 1:nsampled
+      sampled .+= BMs.samplevisiblepotential!(copy(probs), softrbm)
+   end
+   @check all(1.12 .> (sampled ./ nsampled ./ probs) .> 0.88)
+end
+
+
 function test_mdbm_architectures()
    nsamples = 5
    data = hcat(float.(rand(nsamples, 3) .< 0.5), randn(nsamples, 3))
@@ -830,7 +843,8 @@ function test_beam()
                      sdlearningrate = 0.000001,
                      adversarialweight = 0.5), 20)
          ],
-         sampler = BMs.TemperatureDrivenSampler(nsteps = 50));
+         sampler = BMs.TemperatureDrivenSampler(nsteps = 50))
+   nothing
 end
 
 

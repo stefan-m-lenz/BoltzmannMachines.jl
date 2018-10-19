@@ -391,7 +391,7 @@ function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
 
    if biased
       v .= rbm.visbias'
-      softmax!(v)
+      softmax!(v, rbm.varranges)
       samplevisiblepotential!(v, rbm)
    else
       v .= 0.0
@@ -668,12 +668,14 @@ function samplevisiblepotential!(vv::M,
       for i in 1:size(vv, 1)
          probsum = 0.0
          p = rand()
-         for k = 1:length(varrange)
-            if probsum < p <= vv[i, varrange[k]]
-               vv[i, varrange[k]] = 1.0
+         for k in varrange
+            probsum += vv[i, k]
+            if p <= probsum
+               vv[i, k] = 1.0
+               vv[i, (k+1):varrange[end]] .= 0.0
+               break
             else
-               probsum += vv[i, varrange[k]]
-               vv[i, varrange[k]] = 0.0
+               vv[i, k] = 0.0
             end
          end
       end
@@ -729,6 +731,15 @@ end
 function softmax!(x::M) where {M <: AbstractArray{Float64,2}}
    for i in 1:size(x, 1)
       @inbounds softmax!(view(x, i, :))
+   end
+   x
+end
+
+function softmax!(x::M, varranges::Vector{UnitRange}
+      ) where {M <: AbstractArray{Float64,2}}
+
+   for varrange in varranges
+      softmax!(view(x, :, varrange))
    end
    x
 end
@@ -900,9 +911,7 @@ function visiblepotential!(vv::M, rbm::SoftmaxBernoulliRBM,
    if factor != 1.0
       vv .*= factor
    end
-   for varrange in rbm.varranges
-      softmax!(view(vv, :, varrange))
-   end
+   softmax!(vv, rbm.varranges)
    vv
 end
 

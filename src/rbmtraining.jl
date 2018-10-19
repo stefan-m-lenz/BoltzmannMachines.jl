@@ -104,6 +104,9 @@ function fitrbm(x::Matrix{Float64};
       startrbm::AbstractRBM = NoRBM(),
       monitoring::Function = nomonitoring,
 
+      # this argument is only relevant for SoftmaxBernoulliRBMs:
+      categories::Union{Int, Vector{Int}} = 0,
+
       # these arguments are only relevant for GaussianBernoulliRBMs:
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = fill(sdlearningrate, epochs),
@@ -114,7 +117,14 @@ function fitrbm(x::Matrix{Float64};
       sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)))
 
    if startrbm === NoRBM()
-      rbm = initrbm(x, nhidden, rbmtype)
+      if rbmtype == SoftmaxBernoulliRBM
+         if categories == 0
+            error("Argument `categories` required for `SoftmaxBernoulliRBM`s.")
+         end
+         rbm = initsoftmaxrbm(x, nhidden, categories)
+      else
+         rbm = initrbm(x, nhidden, rbmtype)
+      end
    else
       rbm = deepcopy(startrbm)
       nhidden = nhiddennodes(startrbm)
@@ -203,14 +213,25 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
    elseif rbmtype == SoftmaxBernoulliRBM
-      error("Automatic initialization of `SoftmaxBernoulliRBM`s " .*
-            "needs the numbers of categories.\n" .*
-            "Please specify a pre-initialized RBM " .*
-            "with Argument `startrbm = SoftmaxBernoulliRBM(...)` in `fitrbm`.")
+      error("For initialization of `SoftmaxBernoulliRBM`s, please use `initsoftmaxrbm`.")
 
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
    end
+end
+
+
+function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, ncategories::Int)
+   initsoftmaxrbm(x, nhidden, fill(ncategories, size(x, 2)))
+end
+
+function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, nscategories::Vector{Int})
+   if size(x, 2) != sum(nscategories) - length(nscategories)
+      error("Number of variables ($(size(x, 2))) does not match the length of " .*
+            "given categories ($(length(nscategories))).")
+   end
+   rbm = initrbm(x, nhidden)
+   SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, nscategories)
 end
 
 

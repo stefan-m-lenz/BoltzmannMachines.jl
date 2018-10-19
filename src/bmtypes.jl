@@ -62,7 +62,7 @@ function SoftmaxBernoulliRBM(
       visbias::Array{Float64,1},
       hidbias::Array{Float64,1}, ncategories::Int)
 
-   ncategoricalvariables = div(length(visbias), ncategories)
+   ncategoricalvariables = div(length(visbias), ncategories - 1)
 
    SoftmaxBernoulliRBM(weights, visbias, hidbias,
          fill(ncategories, ncategoricalvariables))

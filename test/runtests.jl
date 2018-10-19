@@ -60,6 +60,7 @@ using Test
 @test softly(BMTest.check_mdbm_rbm_b2brbm)
 @test softly(BMTest.check_mdbm_gaussianvisibles)
 @test softly(BMTest.check_exactsampling)
+@test softly(BMTest.check_softmaxsampling)
 
 
 ##########################################
