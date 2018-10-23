@@ -272,7 +272,50 @@ function piecewiselinearsequences(nsequences::Int, nvariables::Int;
 end
 
 
-function softmaxinputdata(x::M, nscategories::Vector{Int}
+"""
+    softmaxdecode(x, categories)
+Returns a dataset such that
+`x .== softmaxdecode(softmaxencode(x, categories), categories)`.
+
+For more, see `softmaxencode`.
+"""
+function softmaxdecode(x::Matrix{Float64}, ncategories::Int)
+   ncategoricalvariables, r = divrem(size(x, 2), ncategories - 1)
+   if r != 0
+      error("Wrong number of categories specified.")
+   end
+   softmaxdecode(x, fill(ncategories, ncategoricalvariables))
+end
+
+function softmaxdecode(x::Matrix{Float64}, nscategories::Vector{Int})
+   varranges = ranges(nscategories .- 1)
+   nsamples = size(x, 1)
+   ncategoricalvariables = length(nscategories)
+   xcategorical = zeros(nsamples, ncategoricalvariables)
+   for k in 1:ncategoricalvariables
+      for i in 1:nsamples
+         category = findfirst(x[i, varranges[k]] .== 1.0)
+         if category == nothing
+            xcategorical[i, k] = 0.0
+         else
+            xcategorical[i, k] = category
+         end
+      end
+   end
+   xcategorical
+end
+
+
+# TODO more documentation
+"""
+    softmaxencode(x, categories)
+Returns a datasets containing values 0.0, 1.0, 2.0 ... encoding the categories
+that are encoded by multiple variables (columns) with values 0.0 and 1.0 in `x`.
+The `categories` can be specified as
+ * integer number if all variables have the same number of categories or as
+ * integer vector, containing for each variable the number of categories encoded.
+"""
+function softmaxencode(x::M, nscategories::Vector{Int}
       ) where {N <: Number, M <:AbstractArray{N,2}}
 
    nsamples, norigvariables = size(x)
@@ -288,6 +331,12 @@ function softmaxinputdata(x::M, nscategories::Vector{Int}
       varoffset += nscategories[k] - 1
    end
    xout
+end
+
+function softmaxencode(x, ncategories::Int
+      ) where {N <: Number, M <:AbstractArray{N,2}}
+
+   softmaxencode(x, fill(ncategories, size(x, 2)))
 end
 
 

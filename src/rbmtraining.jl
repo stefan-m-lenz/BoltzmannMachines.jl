@@ -222,13 +222,14 @@ end
 
 
 function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, ncategories::Int)
-   initsoftmaxrbm(x, nhidden, fill(ncategories, size(x, 2)))
+   initsoftmaxrbm(x, nhidden, fill(ncategories, div(size(x, 2), ncategories - 1)))
 end
 
 function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, nscategories::Vector{Int})
+   println(nscategories)
    if size(x, 2) != sum(nscategories) - length(nscategories)
-      error("Number of variables ($(size(x, 2))) does not match the length of " .*
-            "given categories ($(length(nscategories))).")
+      error("Number of variables ($(size(x, 2))) is not consisten with the " .*
+            "given categories ($(nscategories)).")
    end
    rbm = initrbm(x, nhidden)
    SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, nscategories)

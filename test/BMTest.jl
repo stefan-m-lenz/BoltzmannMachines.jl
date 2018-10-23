@@ -332,6 +332,15 @@ function test_summing_out()
 end
 
 
+function test_softmaxencoding()
+   x = [1 2 3; 0 1 0; 3 0 1]
+   ncategories = 4
+   @test all(x .== BMs.softmaxdecode(BMs.softmaxencode(x, ncategories), ncategories))
+   nscategories = [4;3;4]
+   @test all(x .== BMs.softmaxdecode(BMs.softmaxencode(x, nscategories), nscategories))
+end
+
+
 function test_softmaxvssigm()
    nsamples = 5
    nvariables = 6
@@ -596,6 +605,16 @@ function check_rbm()
    rbm = BMs.fitrbm(x, epochs = 30,
          nhidden = 4, learningrate = 0.001)
    @check checklikelihoodempirically(rbm, x)
+end
+
+function check_softmaxrbm()
+   samerates = [0.2; 0.3; 0.4]
+   x = BMs.softmaxencode(BMTest.createsamples_categorical(100, 4), 3, samerates)
+   rbm = BMs.fitrbm(x, epochs = 30, rbmtype = BMs.SoftmaxBernoulliRBM,
+         categories = 3, nhidden = 4, learningrate = 0.001)
+   BMs.samples(rbm, 50)
+
+
 end
 
 function check_gbrbm(gbrbmtype::Type{GBRBM}

@@ -56,7 +56,7 @@ export
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
-   intensities, softmaxinputdata,
+   intensities, softmaxencode, softmaxdecode,
    barsandstripes, logit, splitdata
 
 include("bmtypes.jl")
