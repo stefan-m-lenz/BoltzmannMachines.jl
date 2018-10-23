@@ -38,7 +38,7 @@ function createsamples(nsamples::Int, nvariables::Int, samerate::Float64 = 0.7)
       addedsamerange = addedsamerange[1:nsameadded]
       x[addedsamerange, 3] = x[addedsamerange, 2] = x[addedsamerange, 1]
    else
-      subtractedsamerange = find(samerows)
+      subtractedsamerange = findall(samerows)
       shuffle!(subtractedsamerange)
       nsamesubtracted = round(Int, - sameratediff * nsamples)
       subtractedsamerange = subtractedsamerange[1:nsamesubtracted]
@@ -52,6 +52,29 @@ function createsamples(nsamples::Int, nvariables::Int, samerate::Float64 = 0.7)
    end
    x
 end
+
+
+function createsamples_categorical(nsamples::Int, nvariables::Int,
+      samerates::Vector{Float64} = [0.2; 0.2; 0.4])
+
+   x = zeros(nsamples, nvariables)
+   nsames = Int.(floor.(nsamples .* samerates))
+   sampleranges = BMs.ranges(nsames)
+   for i in eachindex(samerates)
+      samplerange = sampleranges[i]
+      x[samplerange, 2] .= x[samplerange, 3] .= x[samplerange, 1] .= i - 1
+   end
+
+   notsamerange = (sampleranges[end][end] + 1):nsamples
+   ncategories = length(samerates) - 1
+   for i in 1:ncategories
+      x[notsamerange, 1:3] .+= round.(rand(length(notsamerange), 3))
+      x[:, 4:end] .+= round.(rand(nsamples, nvariables - 3))
+   end
+   x = x[shuffle!(collect(1:size(x,1))), :]
+   x
+end
+
 
 function randrbm(nvisible, nhidden, factorw = 1.0, factora = 1.0, factorb = 1.0)
    w = factorw*randn(nvisible, nhidden)
