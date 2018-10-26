@@ -609,13 +609,22 @@ end
 
 function check_softmaxrbm()
    samerates = [0.2; 0.3; 0.4]
-   x = BMs.softmaxencode(BMTest.createsamples_categorical(100, 4), 3, samerates)
-   rbm = BMs.fitrbm(x, epochs = 30, rbmtype = BMs.SoftmaxBernoulliRBM,
-         categories = 3, nhidden = 4, learningrate = 0.001)
-   BMs.samples(rbm, 50)
-
-
+   categories = length(samerates)
+   x = BMs.softmaxencode(BMTest.createsamples_categorical(100, 5, samerates), categories)
+   datadict = BMs.DataDict("x" => x)
+   monitor = BMs.Monitor()
+   rbm = BMs.fitrbm(x, epochs = 150, rbmtype = BMs.SoftmaxBernoulliRBM,
+         categories = 3, nhidden = 4, learningrate = 0.01,
+         monitoring = (rbm, epoch) ->
+               BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict))
+   # BoltzmannMachinesPlots.plotevaluation(monitor)
+   # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
+   # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
+   # TODO not correct!!!!!
+   BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000)
+   false
 end
+
 
 function check_gbrbm(gbrbmtype::Type{GBRBM}
       ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}

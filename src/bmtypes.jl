@@ -54,7 +54,7 @@ struct SoftmaxBernoulliRBM <: AbstractXBernoulliRBM
    hidbias::Array{Float64,1}
 
    # length of range vor each variable is number the of classes minus 1
-   varranges::Vector{UnitRange}
+   varranges::Vector{UnitRange{Int}}
 end
 
 function SoftmaxBernoulliRBM(

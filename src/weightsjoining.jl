@@ -84,7 +84,7 @@ function joinweights(rbms::Vector{T}, visibleindexes = []) where {T <: AbstractR
 
    # if visibleindexes are not provided, construct them
    if isempty(visibleindexes)
-      visibleindexes = Array{UnitRange}(undef, length(rbms))
+      visibleindexes = Vector{UnitRange{Int}}(undef, length(rbms))
       for i in eachindex(rbms)
          nvisible = length(rbms[i].visbias)
          visibleindexes[i] = offset .+ (1:nvisible)

@@ -742,7 +742,7 @@ function softmax0!(x::M) where {M <: AbstractArray{Float64,2}}
    x
 end
 
-function softmax0!(x::M, varranges::Vector{UnitRange}
+function softmax0!(x::M, varranges::Vector{UnitRange{Int}}
       ) where {M <: AbstractArray{Float64,2}}
 
    for varrange in varranges
