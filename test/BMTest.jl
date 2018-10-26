@@ -617,11 +617,22 @@ function check_softmaxrbm()
          categories = 3, nhidden = 4, learningrate = 0.01,
          monitoring = (rbm, epoch) ->
                BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict))
+
+   # SoftmaxBernoulliRBM with two categories must be equivalent to BernoulliRBM
+   rbm2_softmax = BMs.SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, 2)
+   rbm2_bernoulli = BMs.BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias)
+   @test isapprox(BMs.exactloglikelihood(rbm2_softmax, x[1:5,:]),
+         BMs.exactloglikelihood(rbm2_bernoulli, x[1:5,:]))
+
+   @check isapprox(BMs.empiricalloglikelihood(rbm, x[1:5, :], 10000),
+         BMs.empiricalloglikelihood(rbm, x[1:5, :], 10000), rtol = 0.03)
+
    # BoltzmannMachinesPlots.plotevaluation(monitor)
    # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
    # TODO not correct!!!!!
    BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000)
+   BMs.loglikelihood(rbm, x)
    false
 end
 

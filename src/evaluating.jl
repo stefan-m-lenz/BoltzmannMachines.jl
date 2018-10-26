@@ -317,7 +317,7 @@ Copies all parameters that are to be annealed from the RBM `rbm` to the RBM
 `annealedrbm` and anneals them with the given `temperature`.
 """
 function copyannealed!(annealedrbm::BRBM, rbm::BRBM, temperature::Float64
-      ) where {BRBM <: Union{BernoulliRBM, Binomial2BernoulliRBM}}
+      ) where {BRBM <: Union{BernoulliRBM, Binomial2BernoulliRBM, SoftmaxBernoulliRBM}}
 
    annealedrbm.weights .= rbm.weights
    annealedrbm.weights .*= temperature
@@ -1046,6 +1046,11 @@ function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
    2*sum(log1p.(exp.(b2brbm.visbias)))
 end
 
+function logpartitionfunctionzeroweights_visterm(sbrbm::SoftmaxBernoulliRBM)
+   sum(log1p.(mapreduce(varrange -> exp.(sbrbm.visbias[varrange]), +, sbrbm.varranges)))
+end
+
+
 function logpartitionfunctionzeroweights_visterm(
       gbrbm::Union{GaussianBernoulliRBM, GaussianBernoulliRBM2})
 
@@ -1332,6 +1337,27 @@ function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
    wht = hh * gbrbm.weights'
    vec((temperature1 - temperature2) * sum(
          (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', dims = 2))
+end
+
+function unnormalizedproblogratios(sbrbm::SoftmaxBernoulliRBM,
+      hh::Matrix{Float64},
+      temperature1::Float64,
+      temperature2::Float64)
+
+   # TODO correct
+   nsamples = size(hh, 1)
+   weightsinput = hh * sbrbm.weights'
+   function groupedfactor(temperature::Float64)
+      factor = ones(nsamples, length(sbrbm.varranges))
+      for varrange in sbrbm.varranges
+         factor .+= sum(exp.(temperature .* weightsinput[:, varrange] .+
+               sbrbm.visbias[varrange]'), dims = 2)
+      end
+      factor
+   end
+
+   vec(sum(log.(groupedfactor(temperature1) ./ groupedfactor(temperature2)),
+         dims = 2))
 end
 
 function unnormalizedproblogratios(prbm::PartitionedRBM,
