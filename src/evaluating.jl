@@ -616,7 +616,7 @@ function exactlogpartitionfunction(softrbm::SoftmaxBernoulliRBM)
    z = 0.0
    while true
       z += exp.(-freeenergy(bernoullirbm, v))
-      softmaxnext!(v, softrbm.varranges) || break
+      nextvisibles!(v, softrbm) || break
    end
 
    log(z)
@@ -691,12 +691,12 @@ struct MultivariateBernoulliDistribution
 
       # create samples, a vector of vectors, covering all
       # theoretically possible combinations of the visible nodes' states
-      nviscombinations = 2^nvisible
-      samples = Vector{Vector{Float64}}(undef, nviscombinations)
+      nviscombs = nvisiblecombinations(bm)
+      samples = Vector{Vector{Float64}}(undef, nviscombs)
       v = zeros(nvisible)
-      for i = 1:nviscombinations
+      for i = 1:nviscombs
          samples[i] = copy(v)
-         next!(v)
+         nextvisibles!(v, bm)
       end
 
       # calculate unnormalized probabilities of all samples
@@ -1197,6 +1197,56 @@ function next!(particle::Particle)
 end
 
 
+function next_oneornone!(combination::T) where {T <: AbstractArray{Float64,1}}
+   i = 1
+
+   while i <= length(combination) && combination[i] == 0.0
+      i = i + 1
+   end
+
+   if i > length(combination)
+      combination[1] = 1.0
+      return true
+   else
+      combination[i] = 0.0
+      if i < length(combination)
+         combination[i + 1] = 1.0
+         return true
+      else
+         return false
+      end
+   end
+end
+
+
+"""
+    nextvisible!(v, bm)
+Sets `v` to a new combination of visible nodes' activations for the `bm`.
+Returns false, if there are no new combinations left; returns true otherwise.
+"""
+function nextvisibles!(combination::T, rbm::BernoulliRBM
+      ) where {T <: AbstractArray{Float64,1}}
+   next!(combination)
+end
+
+function nextvisibles!(combination::T, rbm::SoftmaxBernoulliRBM
+      ) where {T <: AbstractArray{Float64,1}}
+
+   i = 1
+   ret = false
+   while i <= length(rbm.varranges) && 
+         !(ret = next_oneornone!(view(combination, rbm.varranges[i])))
+      i = i + 1
+   end
+   ret
+end
+
+function nextvisibles!(combination::T, dbm::PartitionedBernoulliDBM
+      ) where {T <: AbstractArray{Float64,1}}
+   next!(combination)
+end
+
+
 """
     nunits(bm)
 Returns an integer vector that contans in the i'th entry the number of nodes
@@ -1225,6 +1275,28 @@ function nunits(dbm::MultimodalDBM)
    end
    nu[nlayers] = nhiddennodes(dbm[nlayers-1])
    nu
+end
+
+
+"""
+    nvisiblecombinations(bm)
+Returns the number of possible combinations of visible nodes' activations for 
+a given `bm` that has a discrete distribution of visible nodes.
+"""
+function nvisiblecombinations(rbm::Union{BernoulliRBM, BernoulliGaussianRBM})
+   2^length(rbm.visbias)
+end
+
+function nvisiblecombinations(rbm::SoftmaxBernoulliRBM)
+   mapreduce(varrange -> length(varrange) + 1, *, rbm.varranges)
+end
+
+function nvisiblecombinations(prbm::PartitionedRBM)
+   mapreduce(nvisiblecombinations, *, prbm.rbms)
+end
+
+function nvisiblecombinations(dbm::MultimodalDBM)
+   nvisiblecombinations(dbm[1])
 end
 
 
@@ -1418,38 +1490,6 @@ function setvisiblebias!(prbm::PartitionedRBM, v::Vector{Float64})
 end
 
 
-function softmaxnext!(combination::T) where {T <: AbstractArray{Float64,1}}
-   i = 1
-
-   while i <= length(combination) && combination[i] == 0.0
-      i = i + 1
-   end
-
-   if i > length(combination)
-      combination[1] = 1.0
-      return true
-   else
-      combination[i] = 0.0
-      if i < length(combination)
-         combination[i + 1] = 1.0
-         return true
-      else
-         return false
-      end
-   end
-end
-
-function softmaxnext!(combination::T, varranges::Vector{UnitRange{Int}}
-      ) where {T <: AbstractArray{Float64,1}}
-
-   i = 1
-   ret = false
-   while i <= length(varranges) && !(ret = softmaxnext!(view(combination, varranges[i])))
-      i = i + 1
-   end
-   ret
-end
-
 """
     unnormalizedlogprob(mdbm, x; ...)
 Estimates the mean unnormalized log probability of the samples (rows in `x`)
@@ -1503,9 +1543,7 @@ in the Boltzmann Machine `bm`.
 
 The visible nodes of the `bm` must be Bernoulli distributed.
 """
-function unnormalizedprobs(rbm::Union{BernoulliRBM, BernoulliGaussianRBM},
-      samples::Vector{Vector{Float64}})
-
+function unnormalizedprobs(rbm::AbstractRBM, samples::Vector{Vector{Float64}})
    nsamples = length(samples)
    probs = Vector{Float64}(undef, nsamples)
    for i = 1:nsamples

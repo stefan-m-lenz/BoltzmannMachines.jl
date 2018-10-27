@@ -397,9 +397,11 @@ function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
       v .= 0.0
       nsamples, nvariables = size(v)
       for i in 1:nsamples
-         k1 = rand(0:nvariables)
-         if k1 > 0
-            v[i, k1] = 1.0
+         for varrange in rbm.varranges
+            k1 = rand(-1:(length(varrange) - 1))
+            if k1 >= 0
+               v[i, varrange[1] + k1] = 1.0
+            end
          end
       end
    end

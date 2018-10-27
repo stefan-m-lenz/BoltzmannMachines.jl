@@ -618,19 +618,32 @@ function check_softmaxrbm()
          monitoring = (rbm, epoch) ->
                BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict))
 
+   xtest = x[1:5, :]
+
    # SoftmaxBernoulliRBM with two categories must be equivalent to BernoulliRBM
    rbm2_softmax = BMs.SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, 2)
    rbm2_bernoulli = BMs.BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias)
-   @test isapprox(BMs.exactloglikelihood(rbm2_softmax, x[1:5,:]),
-         BMs.exactloglikelihood(rbm2_bernoulli, x[1:5,:]))
+   @test isapprox(BMs.exactloglikelihood(rbm2_softmax, xtest),
+         BMs.exactloglikelihood(rbm2_bernoulli, xtest))
 
-   @check isapprox(BMs.empiricalloglikelihood(rbm, x[1:5, :], 10000),
-         BMs.empiricalloglikelihood(rbm, x[1:5, :], 10000), rtol = 0.03)
+   @check isapprox(BMs.empiricalloglikelihood(rbm, xtest, 10000),
+         BMs.empiricalloglikelihood(rbm, xtest, 10000), rtol = 0.03)
+
+
+   # check exact sampling
+   # exactdistribution = BMs.MultivariateBernoulliDistribution(rbm)
+   # samples_exactdist = BMs.samples(exactdistribution, 1000000)
+   # @check isapprox(
+   #       BMs.exactloglikelihood(rbm, xtest),
+   #       BMs.empiricalloglikelihood(xtest, samples_exactdist),
+   #       rtol = 0.03)
+   @check BMTest.check_exactsampling(rbm, xtest)
 
    # BoltzmannMachinesPlots.plotevaluation(monitor)
    # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
-   # TODO not correct!!!!!
+   
+   # TODO not equal: gibbs sampling must be wrong !!!!!
    BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000)
    BMs.loglikelihood(rbm, x)
    false
