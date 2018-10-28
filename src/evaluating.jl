@@ -366,7 +366,7 @@ steps (default 5) in the Boltzmann Machine `bm`.
 Throws an error if a sample in `x` is not contained in the generated data set.
 """
 function empiricalloglikelihood(bm::AbstractBM, x::M,
-      nparticles::Int, burnin::Int = 5) where {M <: AbstractArray{Float64, 2}}
+      nparticles::Int, burnin::Int = 50) where {M <: AbstractArray{Float64, 2}}
 
    empiricalloglikelihood(x, sampleparticles(bm, nparticles, burnin)[1])
 end
@@ -1047,7 +1047,7 @@ function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
 end
 
 function logpartitionfunctionzeroweights_visterm(sbrbm::SoftmaxBernoulliRBM)
-   sum(log1p.(mapreduce(varrange -> exp.(sbrbm.visbias[varrange]), +, sbrbm.varranges)))
+   sum(log1p.(map(varrange -> sum(exp.(sbrbm.visbias[varrange])), sbrbm.varranges)))
 end
 
 

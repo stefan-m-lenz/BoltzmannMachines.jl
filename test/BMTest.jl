@@ -469,10 +469,10 @@ function check_exactsampling()
 end
 
 function check_exactsampling(bm::BMs.AbstractBM, x::Matrix{Float64};
-      percentalloweddiff = 2.0)
+      percentalloweddiff = 2.0, nsamples::Int = 35000)
 
    mbdist = BMs.MultivariateBernoulliDistribution(bm)
-   exactsamples = BMs.samples(mbdist, 35000)
+   exactsamples = BMs.samples(mbdist, nsamples)
 
    emploglikexactsamples = BMs.empiricalloglikelihood(x, exactsamples)
    exactloglik = BMs.exactloglikelihood(bm, x)
@@ -626,25 +626,30 @@ function check_softmaxrbm()
    @test isapprox(BMs.exactloglikelihood(rbm2_softmax, xtest),
          BMs.exactloglikelihood(rbm2_bernoulli, xtest))
 
-   @check isapprox(BMs.empiricalloglikelihood(rbm, xtest, 10000),
-         BMs.empiricalloglikelihood(rbm, xtest, 10000), rtol = 0.03)
+
+   zeroweightsrbm = BMs.SoftmaxBernoulliRBM(
+         zeros(size(rbm.weights)), rbm.visbias, rbm.hidbias, 3)
+   @test isapprox(BMs.logpartitionfunctionzeroweights(zeroweightsrbm),
+         BMs.exactlogpartitionfunction(zeroweightsrbm))
+      
+   
+   @check BMTest.check_exactsampling(rbm, xtest; nsamples = 200000)
 
 
-   # check exact sampling
-   # exactdistribution = BMs.MultivariateBernoulliDistribution(rbm)
-   # samples_exactdist = BMs.samples(exactdistribution, 1000000)
-   # @check isapprox(
-   #       BMs.exactloglikelihood(rbm, xtest),
-   #       BMs.empiricalloglikelihood(xtest, samples_exactdist),
-   #       rtol = 0.03)
-   @check BMTest.check_exactsampling(rbm, xtest)
+   # TODO: fails
+   @check isapprox(BMs.exactloglikelihood(rbm, xtest),
+         BMs.empiricalloglikelihood(rbm, xtest, 10000000), rtol = 0.03)
 
    # BoltzmannMachinesPlots.plotevaluation(monitor)
    # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
    
-   # TODO not equal: gibbs sampling must be wrong !!!!!
-   BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000)
+   # TODO not equal
+   # with large burnin it gets better ... better initialization needed?
+   BMs.empiricalloglikelihood(x, BMs.samples(rbm, 100000, burnin = 50))
+   BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000, 100)
+
+   # TODO this is way off the exact likelihood. again problem with sampling / burnin?
    BMs.loglikelihood(rbm, x)
    false
 end
@@ -846,12 +851,14 @@ end
 
 
 function check_softmaxsampling()
-   probs = [0.5 0.3; 0.2 0.25]
+   probs = [0.5 0.3 0.7 0.2; 0.2 0.25 0.1 0.15]
    sampled = zeros(size(probs))
-   softrbm = BMs.SoftmaxBernoulliRBM(zeros(2,2), zeros(2), zeros(2), 3)
+   softrbm = BMs.SoftmaxBernoulliRBM(zeros(4,4), zeros(4), zeros(2), 3)
    nsampled = 1000
    for i = 1:nsampled
-      sampled .+= BMs.samplevisiblepotential!(copy(probs), softrbm)
+      newsamples = BMs.samplevisiblepotential!(copy(probs), softrbm)
+      @test all(map(s -> s in [1.0 0.0], newsamples))
+      sampled .+= newsamples
    end
    @check all(1.12 .> (sampled ./ nsampled ./ probs) .> 0.88)
 end
