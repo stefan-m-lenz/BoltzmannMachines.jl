@@ -635,23 +635,19 @@ function check_softmaxrbm()
    
    @check BMTest.check_exactsampling(rbm, xtest; nsamples = 200000)
 
-
-   # TODO: fails
-   @check isapprox(BMs.exactloglikelihood(rbm, xtest),
-         BMs.empiricalloglikelihood(rbm, xtest, 10000000), rtol = 0.03)
-
-   # BoltzmannMachinesPlots.plotevaluation(monitor)
+   # TODO evaluate quality of sample generation
    # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
    
-   # TODO not equal
-   # with large burnin it gets better ... better initialization needed?
-   BMs.empiricalloglikelihood(x, BMs.samples(rbm, 100000, burnin = 50))
-   BMs.exactloglikelihood(rbm, x) - BMs.empiricalloglikelihood(rbm, x, 100000, 100)
+   # TODO: sucha a large burnin is needed
+   #  ... better initialization required?
+   @check isapprox(BMs.exactloglikelihood(rbm, x),
+         BMs.empiricalloglikelihood(rbm, x, 500000, 100), rtol = 0.03)
 
-   # TODO this is way off the exact likelihood. again problem with sampling / burnin?
-   BMs.loglikelihood(rbm, x)
-   false
+   # Test AIS for estimation of partition function
+   logz_exact = BMs.exactlogpartitionfunction(rbm)
+   logz_ais = BMs.logpartitionfunction(rbm)
+   @check isapprox(logz_exact, logz_ais, rtol = 0.02)
 end
 
 

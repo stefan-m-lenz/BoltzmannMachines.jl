@@ -390,8 +390,7 @@ function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64, 2}}
 
    if biased
-      v .= rbm.visbias'
-      softmax0!(v, rbm.varranges)
+      v .= softmax0!(copy(rbm.visbias), rbm.varranges)'
       samplevisiblepotential!(v, rbm)
    else
       v .= 0.0

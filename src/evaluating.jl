@@ -1416,14 +1416,15 @@ function unnormalizedproblogratios(sbrbm::SoftmaxBernoulliRBM,
       temperature1::Float64,
       temperature2::Float64)
 
-   # TODO correct
    nsamples = size(hh, 1)
    weightsinput = hh * sbrbm.weights'
    function groupedfactor(temperature::Float64)
       factor = ones(nsamples, length(sbrbm.varranges))
-      for varrange in sbrbm.varranges
-         factor .+= sum(exp.(temperature .* weightsinput[:, varrange] .+
-               sbrbm.visbias[varrange]'), dims = 2)
+      for rngindex in eachindex(sbrbm.varranges)
+         for k in sbrbm.varranges[rngindex]
+            factor[:, rngindex] .+= exp.(temperature .* weightsinput[:, k] .+
+                  sbrbm.visbias[k])
+         end
       end
       factor
    end
