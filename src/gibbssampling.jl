@@ -536,23 +536,11 @@ a Gibbs sampler.
 # Optional keyword arguments:
 * `burnin`: Number of Gibbs sampling steps, defaults to 50.
 * `samplelast`: boolean to indicate whether to sample in last step (true, default)
-  or whether to use the activation potential.
+  or whether to use the activation potential. A vector of booleans may be specified
+  in case of a PartitionedRBM or MultimodalDBM, indicating individually
+  for each of the partitions whether they are to be sampled in the last step.
 """
-function samples(rbm::AbstractRBM, nsamples::Int;
-      burnin::Int = 50,
-      samplelast::Bool = true)
-
-   if samplelast
-      vv = sampleparticles(rbm, nsamples, burnin)[1]
-   else
-      particles = sampleparticles(rbm, nsamples, burnin - 1)
-      visiblepotential!(particles[1], rbm, particles[2])
-      vv = particles[1]
-   end
-   vv
-end
-
-function samples(dbm::MultimodalDBM, nsamples::Int;
+function samples(dbm::AbstractBM, nsamples::Int;
       burnin::Int = 50,
       samplelast::Union{Bool, Vector{Bool}} = true)
 
