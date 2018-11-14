@@ -14,6 +14,7 @@ mutable struct TrainLayer <: AbstractTrainLayer
    usedefaultlearningrate::Bool
    sdlearningrate::Float64
    sdlearningrates::Vector{Float64}
+   categories::Int
    monitoring::Function
    rbmtype::DataType
    nhidden::Int
@@ -33,7 +34,7 @@ Specify parameters for training one RBM-layer in a DBM.
 
 # Optional keyword arguments:
 * The optional keyword arguments `rbmtype`, `nhidden`, `epochs`,
-  `learningrate`/`learningrates`, `sdlearningrate`/`sdlearningrates`,
+  `learningrate`/`learningrates`, `sdlearningrate`/`sdlearningrates`, `categories`,
   `batchsize`, `pcd`, `cdsteps`, `startrbm` and `optimizer`/`optimizers`
   are passed to `fitrbm`. For a detailed description, see there.
   If a negative value is specified for `learningrate` or `epochs`, this indicates
@@ -52,6 +53,7 @@ function TrainLayer(;
       learningrates::Vector{Float64} = Vector{Float64}(),
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
+      categories::Union{Int, Vector{Int}} = 0,
       monitoring = nomonitoring,
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
@@ -73,6 +75,7 @@ function TrainLayer(;
          learningrates,
          usedefaultlearningrate,
          sdlearningrate, sdlearningrates,
+         categories,
          monitoring, rbmtype, nhidden, nvisible,
          (usedefaultbatchsize ? 1 : batchsize),
          usedefaultbatchsize,
@@ -356,7 +359,14 @@ function stackrbms_preparetrainlayers(
       elseif nvisiblestotal != nvariables
          error("Number of visible nodes for first layer " *
                "($nvisiblestotal) is not of same length as " *
-               "number of columns in `x` ($(size(x,2))).")
+               "number of columns in data set ($(size(x, 2))).")
+      end
+   else
+      # if first layer is not partitioned,
+      # assert that nvisible is not something nonsensical/misleading
+      if trainlayers[1].nvisible > 0 && trainlayers[1] != size(x, 2)
+         error("Specification of number of visible nodes ($(trainlayers[1].nvisible)) " *
+               "does not match number of columns in data set ($(size(x, 2))).")
       end
    end
 
@@ -390,6 +400,7 @@ function stackrbms_trainlayer(x::Matrix{Float64},
          pcd = trainlayer.pcd,
          sdlearningrate = trainlayer.sdlearningrate,
          sdlearningrates = trainlayer.sdlearningrates,
+         categories = trainlayer.categories,
          monitoring = monitoring,
          startrbm = trainlayer.startrbm,
          optimizer = trainlayer.optimizer,

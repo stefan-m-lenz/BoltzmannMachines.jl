@@ -104,7 +104,7 @@ function fitrbm(x::Matrix{Float64};
       startrbm::AbstractRBM = NoRBM(),
       monitoring::Function = nomonitoring,
 
-      # this argument is only relevant for SoftmaxBernoulliRBMs:
+      # this argument is only relevant for Softmax0BernoulliRBMs:
       categories::Union{Int, Vector{Int}} = 0,
 
       # these arguments are only relevant for GaussianBernoulliRBMs:
@@ -117,9 +117,9 @@ function fitrbm(x::Matrix{Float64};
       sampler::AbstractSampler = (cdsteps == 1 ? NoSampler() : GibbsSampler(cdsteps - 1)))
 
    if startrbm === NoRBM()
-      if rbmtype == SoftmaxBernoulliRBM
+      if rbmtype == Softmax0BernoulliRBM
          if categories == 0
-            error("Argument `categories` required for `SoftmaxBernoulliRBM`s.")
+            error("Argument `categories` required for `Softmax0BernoulliRBM`s.")
          end
          rbm = initsoftmaxrbm(x, nhidden, categories)
       else
@@ -212,8 +212,8 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       visbias = initvisiblebias(x/2)
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
-   elseif rbmtype == SoftmaxBernoulliRBM
-      error("For initialization of `SoftmaxBernoulliRBM`s, please use `initsoftmaxrbm`.")
+   elseif rbmtype == Softmax0BernoulliRBM
+      error("For initialization of `Softmax0BernoulliRBM`s, please use `initsoftmaxrbm`.")
 
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
@@ -231,7 +231,7 @@ function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, nscategories::Vector{I
             "given categories ($(nscategories)).")
    end
    rbm = initrbm(x, nhidden)
-   SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, nscategories)
+   Softmax0BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, nscategories)
 end
 
 

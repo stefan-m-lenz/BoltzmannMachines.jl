@@ -148,7 +148,7 @@ function logit(p::Float64)
 end
 
 
-function intensities(data::Matrix{Float64}, q1::Float64 = 0.0, q2::Float64 = 1.0)
+function intensities(data::Matrix{Float64}, q1::Float64 = 0.0, q2::Float64 = 1.0 - q1)
    mapslices(col -> begin
          bottomval = quantile(col, q1)
          topval = quantile(col, q2)
@@ -273,21 +273,21 @@ end
 
 
 """
-    softmaxdecode(x, categories)
+    oneornone_decode(x, categories)
 Returns a dataset such that
-`x .== softmaxdecode(softmaxencode(x, categories), categories)`.
+`x .== oneornone_decode(oneornone_encode(x, categories), categories)`.
 
-For more, see `softmaxencode`.
+For more, see `oneornone_encode`.
 """
-function softmaxdecode(x::Matrix{Float64}, ncategories::Int)
+function oneornone_decode(x::Matrix{Float64}, ncategories::Int)
    ncategoricalvariables, r = divrem(size(x, 2), ncategories - 1)
    if r != 0
       error("Wrong number of categories specified.")
    end
-   softmaxdecode(x, fill(ncategories, ncategoricalvariables))
+   oneornone_decode(x, fill(ncategories, ncategoricalvariables))
 end
 
-function softmaxdecode(x::Matrix{Float64}, nscategories::Vector{Int})
+function oneornone_decode(x::Matrix{Float64}, nscategories::Vector{Int})
    varranges = ranges(nscategories .- 1)
    nsamples = size(x, 1)
    ncategoricalvariables = length(nscategories)
@@ -308,14 +308,17 @@ end
 
 # TODO more documentation
 """
-    softmaxencode(x, categories)
-Returns a datasets containing values 0.0, 1.0, 2.0 ... encoding the categories
-that are encoded by multiple variables (columns) with values 0.0 and 1.0 in `x`.
+    oneornone_encode(x, categories)
+Expects a data set `x` containing values 0.0, 1.0, 2.0 ... encoding the categories.
+Returns a data set that encodes the variables/columns in `x` in multiple columns
+with only values 0.0 and 1.0, similiar to the one-hot encoding with the deviation that
+a zero is encoded as all-zeros.
+
 The `categories` can be specified as
  * integer number if all variables have the same number of categories or as
  * integer vector, containing for each variable the number of categories encoded.
 """
-function softmaxencode(x::M, nscategories::Vector{Int}
+function oneornone_encode(x::M, nscategories::Vector{Int}
       ) where {N <: Number, M <:AbstractArray{N,2}}
 
    nsamples, norigvariables = size(x)
@@ -333,10 +336,10 @@ function softmaxencode(x::M, nscategories::Vector{Int}
    xout
 end
 
-function softmaxencode(x, ncategories::Int
+function oneornone_encode(x, ncategories::Int
       ) where {N <: Number, M <:AbstractArray{N,2}}
 
-   softmaxencode(x, fill(ncategories, size(x, 2)))
+   oneornone_encode(x, fill(ncategories, size(x, 2)))
 end
 
 

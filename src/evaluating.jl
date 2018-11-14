@@ -317,7 +317,7 @@ Copies all parameters that are to be annealed from the RBM `rbm` to the RBM
 `annealedrbm` and anneals them with the given `temperature`.
 """
 function copyannealed!(annealedrbm::BRBM, rbm::BRBM, temperature::Float64
-      ) where {BRBM <: Union{BernoulliRBM, Binomial2BernoulliRBM, SoftmaxBernoulliRBM}}
+      ) where {BRBM <: Union{BernoulliRBM, Binomial2BernoulliRBM, Softmax0BernoulliRBM}}
 
    annealedrbm.weights .= rbm.weights
    annealedrbm.weights .*= temperature
@@ -409,7 +409,9 @@ end
 Computes the energy of the configuration of the visible nodes `v` and the
 hidden nodes `h`, specified as vectors, in the `rbm`.
 """
-function energy(rbm::BernoulliRBM, v::Vector{Float64}, h::Vector{Float64})
+function energy(rbm::Union{BernoulliRBM, Softmax0BernoulliRBM},
+      v::Vector{Float64}, h::Vector{Float64})
+
    - dot(v, rbm.weights*h) - dot(rbm.visbias, v) - dot(rbm.hidbias, h)
 end
 
@@ -608,15 +610,15 @@ function exactlogpartitionfunction(bgrbm::BernoulliGaussianRBM)
    exactlogpartitionfunction(reversedrbm(bgrbm))
 end
 
-function exactlogpartitionfunction(softrbm::SoftmaxBernoulliRBM)
+function exactlogpartitionfunction(s0brbm::Softmax0BernoulliRBM)
    # TODO make more efficient for reversedrbm?
 
-   bernoullirbm = BernoulliRBM(softrbm.weights, softrbm.visbias, softrbm.hidbias)
-   v = zeros(length(softrbm.visbias))
+   bernoullirbm = BernoulliRBM(s0brbm.weights, s0brbm.visbias, s0brbm.hidbias)
+   v = zeros(length(s0brbm.visbias))
    z = 0.0
    while true
       z += exp.(-freeenergy(bernoullirbm, v))
-      nextvisibles!(v, softrbm) || break
+      nextvisibles!(v, s0brbm) || break
    end
 
    log(z)
@@ -787,8 +789,8 @@ function freeenergy(gbrbm::GaussianBernoulliRBM2, v::Vector{Float64})
    freeenergy += 0.5 * sum(((v - gbrbm.visbias) ./ gbrbm.sd).^2)
 end
 
-function freeenergy(softrbm::SoftmaxBernoulliRBM, v::Vector{Float64})
-   freeenergy(BernoulliRBM(softrbm.weights, softrbm.visbias, softrbm.hidbias), v)
+function freeenergy(s0brbm::Softmax0BernoulliRBM, v::Vector{Float64})
+   freeenergy(BernoulliRBM(s0brbm.weights, s0brbm.visbias, s0brbm.hidbias), v)
 end
 
 
@@ -1046,7 +1048,7 @@ function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
    2*sum(log1p.(exp.(b2brbm.visbias)))
 end
 
-function logpartitionfunctionzeroweights_visterm(sbrbm::SoftmaxBernoulliRBM)
+function logpartitionfunctionzeroweights_visterm(sbrbm::Softmax0BernoulliRBM)
    sum(log1p.(map(varrange -> sum(exp.(sbrbm.visbias[varrange])), sbrbm.varranges)))
 end
 
@@ -1229,12 +1231,12 @@ function nextvisibles!(combination::T, rbm::BernoulliRBM
    next!(combination)
 end
 
-function nextvisibles!(combination::T, rbm::SoftmaxBernoulliRBM
+function nextvisibles!(combination::T, rbm::Softmax0BernoulliRBM
       ) where {T <: AbstractArray{Float64,1}}
 
    i = 1
    ret = false
-   while i <= length(rbm.varranges) && 
+   while i <= length(rbm.varranges) &&
          !(ret = next_oneornone!(view(combination, rbm.varranges[i])))
       i = i + 1
    end
@@ -1280,14 +1282,14 @@ end
 
 """
     nvisiblecombinations(bm)
-Returns the number of possible combinations of visible nodes' activations for 
+Returns the number of possible combinations of visible nodes' activations for
 a given `bm` that has a discrete distribution of visible nodes.
 """
 function nvisiblecombinations(rbm::Union{BernoulliRBM, BernoulliGaussianRBM})
    2^length(rbm.visbias)
 end
 
-function nvisiblecombinations(rbm::SoftmaxBernoulliRBM)
+function nvisiblecombinations(rbm::Softmax0BernoulliRBM)
    mapreduce(varrange -> length(varrange) + 1, *, rbm.varranges)
 end
 
@@ -1411,7 +1413,7 @@ function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
          (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', dims = 2))
 end
 
-function unnormalizedproblogratios(sbrbm::SoftmaxBernoulliRBM,
+function unnormalizedproblogratios(sbrbm::Softmax0BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)

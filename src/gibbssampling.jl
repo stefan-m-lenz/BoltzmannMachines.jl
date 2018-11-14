@@ -111,14 +111,14 @@ end
     hiddeninput!(h, rbm, v)
 Like `hiddeninput`, but stores the returned result in `h`.
 """
-function hiddeninput!(h::M, rbm::Union{BernoulliRBM, SoftmaxBernoulliRBM}, v::M
+function hiddeninput!(h::M, rbm::Union{BernoulliRBM, Softmax0BernoulliRBM}, v::M
       ) where{M <: AbstractArray{Float64,1}}
 
    mul!(h, transpose(rbm.weights), v)
    h .+= rbm.hidbias
 end
 
-function hiddeninput!(hh::M, rbm::Union{BernoulliRBM, SoftmaxBernoulliRBM}, vv::M
+function hiddeninput!(hh::M, rbm::Union{BernoulliRBM, Softmax0BernoulliRBM}, vv::M
       ) where{M <: AbstractArray{Float64,2}}
 
    mul!(hh, vv, rbm.weights)
@@ -386,11 +386,11 @@ function initvisiblenodes!(v::M, rbm::GaussianBernoulliRBM2, biased::Bool
    v
 end
 
-function initvisiblenodes!(v::M, rbm::SoftmaxBernoulliRBM, biased::Bool
+function initvisiblenodes!(v::M, rbm::Softmax0BernoulliRBM, biased::Bool
       ) where{M <: AbstractArray{Float64, 2}}
 
    if biased
-      v .= softmax0!(copy(rbm.visbias), rbm.varranges)'
+      v .= softmax0!(copy(rbm.visbias'), rbm.varranges)
       samplevisiblepotential!(v, rbm)
    else
       v .= 0.0
@@ -554,16 +554,30 @@ end
 
 function samples(dbm::MultimodalDBM, nsamples::Int;
       burnin::Int = 50,
-      samplelast::Bool = true)
+      samplelast::Union{Bool, Vector{Bool}} = true)
 
-   if samplelast
-      vv = sampleparticles(dbm, nsamples, burnin)[1]
-   else
-      particles = sampleparticles(dbm, nsamples, burnin - 1)
-      visiblepotential!(particles[1], dbm[1], particles[2])
-      vv = particles[1]
+   function samplevisibleorgetpotential!(vv::M, rbm::AbstractRBM,
+         hh::M, sample::Bool) where {M <:AbstractArray{Float64, 2}}
+
+      if sample
+         samplevisible!(vv, rbm, hh)
+      else
+         visiblepotential!(vv, rbm, hh)
+      end
    end
-   vv
+
+   function samplevisibleorgetpotential!(vv::M, prbm::PartitionedRBM,
+         hh::M, sample::Vector{Bool}) where {M <:AbstractArray{Float64, 2}}
+
+      for i in eachindex(prbm.rbms)
+         samplevisibleorgetpotential!(view(vv, :, prbm.visranges[i]),
+               prbm.rbms[i], view(hh, :, prbm.hidranges[i]), sample[i])
+      end
+   end
+
+   particles = sampleparticles(dbm, nsamples, burnin - 1)
+   samplevisibleorgetpotential!(particles[1], dbm[1], particles[2], samplelast)
+   particles[1]
 end
 
 
@@ -662,10 +676,10 @@ function samplevisiblepotential!(vv::M, prbm::PartitionedRBM
 end
 
 function samplevisiblepotential!(vv::M,
-      softrbm::SoftmaxBernoulliRBM
+      s0brbm::Softmax0BernoulliRBM
       ) where{M <: AbstractArray{Float64, 2}}
 
-   for varrange in softrbm.varranges
+   for varrange in s0brbm.varranges
       for i in 1:size(vv, 1)
          probsum = 0.0
          p = rand()
@@ -771,7 +785,7 @@ Like `visibleinput` but stores the returned result in `v`.
 """
 function visibleinput!(v::M,
       rbm::Union{BernoulliRBM, BernoulliGaussianRBM,
-            Binomial2BernoulliRBM, SoftmaxBernoulliRBM},
+            Binomial2BernoulliRBM, Softmax0BernoulliRBM},
       h::M) where {M <:AbstractArray{Float64,1}}
 
    mul!(v, rbm.weights, h)
@@ -780,7 +794,7 @@ end
 
 function visibleinput!(vv::M,
       rbm::Union{BernoulliRBM, BernoulliGaussianRBM,
-            Binomial2BernoulliRBM, SoftmaxBernoulliRBM},
+            Binomial2BernoulliRBM, Softmax0BernoulliRBM},
       hh::M) where {M <:AbstractArray{Float64,2}}
 
    mul!(vv, hh, transpose(rbm.weights))
@@ -899,7 +913,7 @@ function visiblepotential!(v::M,
    broadcast!(+, v, v, gbrbm.visbias')
 end
 
-function visiblepotential!(v::M, rbm::SoftmaxBernoulliRBM,
+function visiblepotential!(v::M, rbm::Softmax0BernoulliRBM,
       h::M, factor::Float64 = 1.0) where {M <: AbstractArray{Float64,1}}
 
    visibleinput!(v, rbm, h)
@@ -912,7 +926,7 @@ function visiblepotential!(v::M, rbm::SoftmaxBernoulliRBM,
    v
 end
 
-function visiblepotential!(vv::M, rbm::SoftmaxBernoulliRBM,
+function visiblepotential!(vv::M, rbm::Softmax0BernoulliRBM,
       hh::M, factor::Float64 = 1.0) where {M <: AbstractArray{Float64,2}}
 
    visibleinput!(vv, rbm, hh)

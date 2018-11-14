@@ -22,7 +22,7 @@ export
          Binomial2BernoulliRBM,
          GaussianBernoulliRBM,
          GaussianBernoulliRBM2,
-         SoftmaxBernoulliRBM,
+         Softmax0BernoulliRBM,
          PartitionedRBM,
          fitrbm, freeenergy, initrbm,
          joinrbms, joindbms,
@@ -56,7 +56,7 @@ export
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
-   intensities, softmaxencode, softmaxdecode,
+   intensities, oneornone_encode, oneornone_decode,
    barsandstripes, logit, splitdata
 
 include("bmtypes.jl")

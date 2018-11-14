@@ -287,6 +287,11 @@ function test_stackrbms_preparetrainlayers()
    @test trainlayers[2].optimizer.learningrate == learningrate2
    @test trainlayers[3].optimizer.learningrate == learningrate
 
+   # wrong/misleading specification of number of visible nodes
+   trainlayers[1].nvisible = 100
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+         x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+
    # partitioning
    trainlayers = [
          BMs.TrainPartitionedLayer([
@@ -316,6 +321,11 @@ function test_stackrbms_preparetrainlayers()
    @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
          x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
 
+   # too many visible nodes
+   trainlayers[1].parts[1].nvisible = 100
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+         x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+
    nothing
 end
 
@@ -332,12 +342,12 @@ function test_summing_out()
 end
 
 
-function test_softmaxencoding()
+function test_oneornone_encoding()
    x = [1 2 3; 0 1 0; 3 0 1]
    ncategories = 4
-   @test all(x .== BMs.softmaxdecode(BMs.softmaxencode(x, ncategories), ncategories))
+   @test all(x .== BMs.oneornone_decode(BMs.oneornone_encode(x, ncategories), ncategories))
    nscategories = [4;3;4]
-   @test all(x .== BMs.softmaxdecode(BMs.softmaxencode(x, nscategories), nscategories))
+   @test all(x .== BMs.oneornone_decode(BMs.oneornone_encode(x, nscategories), nscategories))
 end
 
 
@@ -610,35 +620,40 @@ end
 function check_softmaxrbm()
    samerates = [0.2; 0.3; 0.4]
    categories = length(samerates)
-   x = BMs.softmaxencode(BMTest.createsamples_categorical(100, 5, samerates), categories)
+   x = BMs.oneornone_encode(BMTest.createsamples_categorical(100, 5, samerates), categories)
    datadict = BMs.DataDict("x" => x)
    monitor = BMs.Monitor()
-   rbm = BMs.fitrbm(x, epochs = 150, rbmtype = BMs.SoftmaxBernoulliRBM,
+   rbm = BMs.fitrbm(x, epochs = 150, rbmtype = BMs.Softmax0BernoulliRBM,
          categories = 3, nhidden = 4, learningrate = 0.01,
-         monitoring = (rbm, epoch) ->
-               BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict))
+         monitoring = (rbm, epoch) -> begin
+            if epoch % 50 == 0
+               BMs.monitorreconstructionerror!(monitor, rbm, epoch, datadict)
+               BMs.monitorexactloglikelihood!(monitor, rbm, epoch, datadict)
+               BMs.monitorloglikelihood!(monitor, rbm, epoch, datadict)
+            end
+         end)
 
    xtest = x[1:5, :]
 
-   # SoftmaxBernoulliRBM with two categories must be equivalent to BernoulliRBM
-   rbm2_softmax = BMs.SoftmaxBernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, 2)
+   # Softmax0BernoulliRBM with two categories must be equivalent to BernoulliRBM
+   rbm2_softmax = BMs.Softmax0BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias, 2)
    rbm2_bernoulli = BMs.BernoulliRBM(rbm.weights, rbm.visbias, rbm.hidbias)
    @test isapprox(BMs.exactloglikelihood(rbm2_softmax, xtest),
          BMs.exactloglikelihood(rbm2_bernoulli, xtest))
 
 
-   zeroweightsrbm = BMs.SoftmaxBernoulliRBM(
+   zeroweightsrbm = BMs.Softmax0BernoulliRBM(
          zeros(size(rbm.weights)), rbm.visbias, rbm.hidbias, 3)
    @test isapprox(BMs.logpartitionfunctionzeroweights(zeroweightsrbm),
          BMs.exactlogpartitionfunction(zeroweightsrbm))
-      
-   
+
+
    @check BMTest.check_exactsampling(rbm, xtest; nsamples = 200000)
 
    # TODO evaluate quality of sample generation
-   # sampled = BMs.softmaxdecode(BMs.samples(rbm, 1500), categories)
+   # sampled = BMs.oneornone_decode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
-   
+
    # TODO: sucha a large burnin is needed
    #  ... better initialization required?
    @check isapprox(BMs.exactloglikelihood(rbm, x),
@@ -849,10 +864,10 @@ end
 function check_softmaxsampling()
    probs = [0.5 0.3 0.7 0.2; 0.2 0.25 0.1 0.15]
    sampled = zeros(size(probs))
-   softrbm = BMs.SoftmaxBernoulliRBM(zeros(4,4), zeros(4), zeros(2), 3)
+   s0brbm = BMs.Softmax0BernoulliRBM(zeros(4,4), zeros(4), zeros(2), 3)
    nsampled = 1000
    for i = 1:nsampled
-      newsamples = BMs.samplevisiblepotential!(copy(probs), softrbm)
+      newsamples = BMs.samplevisiblepotential!(copy(probs), s0brbm)
       @test all(map(s -> s in [1.0 0.0], newsamples))
       sampled .+= newsamples
    end

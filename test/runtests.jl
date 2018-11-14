@@ -30,7 +30,7 @@ BMTest.test_summing_out()
 BMTest.test_unevenbatches()
 BMTest.test_beam()
 BMTest.test_softmaxvssigm()
-BMTest.test_softmaxencoding()
+BMTest.test_oneornone_encoding()
 
 
 #########################################################################

@@ -48,7 +48,7 @@ struct GaussianBernoulliRBM2 <: AbstractXBernoulliRBM
 end
 
 
-struct SoftmaxBernoulliRBM <: AbstractXBernoulliRBM
+struct Softmax0BernoulliRBM <: AbstractXBernoulliRBM
    weights::Array{Float64,2}
    visbias::Array{Float64,1}
    hidbias::Array{Float64,1}
@@ -57,23 +57,23 @@ struct SoftmaxBernoulliRBM <: AbstractXBernoulliRBM
    varranges::Vector{UnitRange{Int}}
 end
 
-function SoftmaxBernoulliRBM(
+function Softmax0BernoulliRBM(
       weights::Array{Float64,2},
       visbias::Array{Float64,1},
       hidbias::Array{Float64,1}, ncategories::Int)
 
    ncategoricalvariables = div(length(visbias), ncategories - 1)
 
-   SoftmaxBernoulliRBM(weights, visbias, hidbias,
+   Softmax0BernoulliRBM(weights, visbias, hidbias,
          fill(ncategories, ncategoricalvariables))
 end
 
-function SoftmaxBernoulliRBM(
+function Softmax0BernoulliRBM(
       weights::Array{Float64,2},
       visbias::Array{Float64,1},
       hidbias::Array{Float64,1}, nscategories::Vector{Int})
 
-   SoftmaxBernoulliRBM(weights, visbias, hidbias, ranges(nscategories .- 1))
+   Softmax0BernoulliRBM(weights, visbias, hidbias, ranges(nscategories .- 1))
 end
 
 
