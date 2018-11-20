@@ -56,7 +56,7 @@ function TrainLayer(;
       categories::Union{Int, Vector{Int}} = 0,
       monitoring = nomonitoring,
       rbmtype::DataType = BernoulliRBM,
-      nhidden::Int = -1,
+      nhidden::Int,
       nvisible::Int = -1,
       batchsize::Int = -1,
       pcd::Bool = true,

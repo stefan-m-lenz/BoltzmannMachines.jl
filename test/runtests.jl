@@ -59,6 +59,8 @@ using Test
 @test softly(() ->
       BMTest.check_likelihoodconsistency_gaussian(BMs.GaussianBernoulliRBM2))
 @test softly(BMTest.check_mdbm_rbm_b2brbm)
+@test softly(BMTest.check_softmax0rbm)
+@test softly(BMTest.check_softmax0dbm)
 @test softly(BMTest.check_mdbm_gaussianvisibles)
 @test softly(BMTest.check_exactsampling)
 @test softly(BMTest.check_softmaxsampling)

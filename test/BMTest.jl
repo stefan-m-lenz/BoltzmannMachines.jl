@@ -620,7 +620,7 @@ function check_rbm()
    @check checklikelihoodempirically(rbm, x)
 end
 
-function check_softmaxrbm()
+function check_softmax0rbm()
    samerates = [0.2; 0.3; 0.4]
    categories = length(samerates)
    x = BMs.oneornone_encode(BMTest.createsamples_categorical(100, 5, samerates), categories)
@@ -657,8 +657,7 @@ function check_softmaxrbm()
    # sampled = BMs.oneornone_decode(BMs.samples(rbm, 1500), categories)
    # sampled[:, 1] .== sampled[:, 2] .== sampled[:, 3]
 
-   # TODO: sucha a large burnin is needed
-   #  ... better initialization required?
+   # Note: Needs a little bit more burnin than the default. Problem?
    @check isapprox(BMs.exactloglikelihood(rbm, x),
          BMs.empiricalloglikelihood(rbm, x, 500000, 100), rtol = 0.03)
 
@@ -666,6 +665,35 @@ function check_softmaxrbm()
    logz_exact = BMs.exactlogpartitionfunction(rbm)
    logz_ais = BMs.logpartitionfunction(rbm)
    @check isapprox(logz_exact, logz_ais, rtol = 0.02)
+end
+
+
+function check_softmax0dbm()
+   samerates = [0.2; 0.3; 0.4]
+   categories = length(samerates)
+   x = BMs.oneornone_encode(BMTest.createsamples_categorical(100, 5, samerates), categories)
+   dbm = BMs.fitdbm(x, epochs = 150,
+         pretraining = [
+               BMs.TrainLayer(rbmtype = BMs.Softmax0BernoulliRBM, categories = 3,
+                     nhidden = 5);
+               BMs.TrainLayer(nhidden = 4)])
+
+   xtest = x[1:5, :]
+
+   @check BMTest.check_exactsampling(dbm, xtest; nsamples = 200000)
+
+   # Test exact vs empirical loglikelihood
+   @check isapprox(BMs.exactloglikelihood(dbm, x),
+         BMs.empiricalloglikelihood(dbm, x, 50000, 150), rtol = 0.03)
+
+   # Test AIS for estimation of partition function
+   logz_exact = BMs.exactlogpartitionfunction(dbm)
+   logz_ais = BMs.logpartitionfunction(dbm)
+   @check isapprox(logz_exact, logz_ais, rtol = 0.02)
+
+   # Test AIS for likelihood estimation vs exact calculation
+   @check isapprox(BMs.loglikelihood(dbm, xtest; nparticles = 200, ntemperatures = 200),
+         BMs.exactloglikelihood(dbm, xtest), rtol = 0.05)
 end
 
 

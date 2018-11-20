@@ -563,8 +563,13 @@ function samples(dbm::AbstractBM, nsamples::Int;
       end
    end
 
+   # delegate main work to sampleparticles
    particles = sampleparticles(dbm, nsamples, burnin - 1)
+
+   # sample in last step or take only the potential
    samplevisibleorgetpotential!(particles[1], dbm[1], particles[2], samplelast)
+
+   # return the visible layer's activations or the activation potential, respectively
    particles[1]
 end
 

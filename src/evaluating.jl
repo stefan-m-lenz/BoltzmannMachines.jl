@@ -446,9 +446,10 @@ end
     energyzerohiddens(rbm, v)
 Computes the energy for the visible activations `v` in the RBM `rbm`, if all
 hidden nodes have zero activation, i. e. yields the same as
-`energy´(rbm, v, zeros(rbm.hidbias))`.
+`energy(rbm, v, zeros(rbm.hidbias))`.
 """
-function energyzerohiddens(rbm::BernoulliRBM, v::Vector{Float64})
+function energyzerohiddens(rbm::Union{BernoulliRBM, Softmax0BernoulliRBM},
+      v::Vector{Float64})
    - dot(rbm.visbias, v)
 end
 
@@ -1048,8 +1049,8 @@ function logpartitionfunctionzeroweights_visterm(b2brbm::Binomial2BernoulliRBM)
    2*sum(log1p.(exp.(b2brbm.visbias)))
 end
 
-function logpartitionfunctionzeroweights_visterm(sbrbm::Softmax0BernoulliRBM)
-   sum(log1p.(map(varrange -> sum(exp.(sbrbm.visbias[varrange])), sbrbm.varranges)))
+function logpartitionfunctionzeroweights_visterm(s0brbm::Softmax0BernoulliRBM)
+   sum(log1p.(map(varrange -> sum(exp.(s0brbm.visbias[varrange])), s0brbm.varranges)))
 end
 
 
@@ -1243,9 +1244,22 @@ function nextvisibles!(combination::T, rbm::Softmax0BernoulliRBM
    ret
 end
 
-function nextvisibles!(combination::T, dbm::PartitionedBernoulliDBM
+# TODO test (with Softmax0BernoulliRBM and BernoulliRBM)
+function nextvisibles!(combination::T, prbm::PartitionedRBM
       ) where {T <: AbstractArray{Float64,1}}
-   next!(combination)
+
+   i = 1
+   ret = false
+   while i <= length(prbm.rbms) &&
+         !(ret = nextvisibles!(view(combination, prbm.visranges[i]), prbm.rbms[i]))
+      i = i + 1
+   end
+   ret
+end
+
+function nextvisibles!(combination::T, dbm::MultimodalDBM
+      ) where {T <: AbstractArray{Float64,1}}
+   nextvisibles!(combination, dbm[1])
 end
 
 
@@ -1413,19 +1427,19 @@ function unnormalizedproblogratios(gbrbm::GaussianBernoulliRBM2,
          (0.5 * wht.^2 + wht .* gbrbm.visbias') ./ (gbrbm.sd .^2)', dims = 2))
 end
 
-function unnormalizedproblogratios(sbrbm::Softmax0BernoulliRBM,
+function unnormalizedproblogratios(s0brbm::Softmax0BernoulliRBM,
       hh::Matrix{Float64},
       temperature1::Float64,
       temperature2::Float64)
 
    nsamples = size(hh, 1)
-   weightsinput = hh * sbrbm.weights'
+   weightsinput = hh * s0brbm.weights'
    function groupedfactor(temperature::Float64)
-      factor = ones(nsamples, length(sbrbm.varranges))
-      for rngindex in eachindex(sbrbm.varranges)
-         for k in sbrbm.varranges[rngindex]
+      factor = ones(nsamples, length(s0brbm.varranges))
+      for rngindex in eachindex(s0brbm.varranges)
+         for k in s0brbm.varranges[rngindex]
             factor[:, rngindex] .+= exp.(temperature .* weightsinput[:, k] .+
-                  sbrbm.visbias[k])
+                  s0brbm.visbias[k])
          end
       end
       factor
@@ -1561,14 +1575,32 @@ function unnormalizedprobs(dbm::PartitionedBernoulliDBM,
    nsamples = length(samples)
    biases = combinedbiases(dbm)
    oddparticle = initcombinationoddlayersonly(dbm)
-   oddhiddenparticles = oddparticle[2:end]
-   probs = Vector{Float64}(undef, nsamples)
+   oddhiddenparticle = oddparticle[2:end]
+   probs = zeros(nsamples)
    for i = 1:nsamples
       oddparticle[1] = samples[i]
-      probs[i] = 0.0
       while true
          probs[i] += unnormalizedproboddlayers(dbm, oddparticle, biases)
-         next!(oddhiddenparticles) || break
+         next!(oddhiddenparticle) || break
+      end
+   end
+   probs
+end
+
+function unnormalizedprobs(dbm::MultimodalDBM,
+      samples::Vector{Vector{Float64}})
+
+   hiddbm::PartitionedBernoulliDBM = converttomostspecifictype(dbm[2:end])
+   nsamples = length(samples)
+   probs = zeros(nsamples)
+   oddhiddenparticle = initcombinationoddlayersonly(hiddbm)
+   hidbiases = combinedbiases(hiddbm)
+
+   for i = 1:nsamples
+      while true
+         probs[i] += exp(-energy(dbm[1], samples[i], oddhiddenparticle[1])) *
+               unnormalizedproboddlayers(hiddbm, oddhiddenparticle, hidbiases)
+         next!(oddhiddenparticle) || break
       end
    end
    probs
@@ -1629,6 +1661,12 @@ function unnormalizedprobhidden(gbrbm::GaussianBernoulliRBM2, h::Vector{Float64}
    exp(dot(gbrbm.hidbias, h) +
          sum((0.5*wh.^2 + gbrbm.visbias .* wh) ./ gbrbm.sd .^ 2)) *
          prod(gbrbm.sd) * sqrt2pi^nvisible
+end
+
+function unnormalizedprobhidden(s0brbm::Softmax0BernoulliRBM, h::Vector{Float64})
+   vexp = exp.(visibleinput(s0brbm, h))
+   exp(dot(s0brbm.hidbias, h)) *
+         prod(map(varrange -> 1.0 + sum(vexp[varrange]), s0brbm.varranges))
 end
 
 function unnormalizedprobhidden(prbm::PartitionedRBM, h::Vector{Float64})
