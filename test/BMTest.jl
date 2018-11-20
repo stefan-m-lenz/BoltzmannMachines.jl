@@ -288,11 +288,12 @@ function test_stackrbms_preparetrainlayers()
    @test trainlayers[3].optimizer.learningrate == learningrate
 
    # wrong/misleading specification of number of visible nodes
-   trainlayers[1].nvisible = 100
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+   badtrainlayers = deepcopy(trainlayers)
+   badtrainlayers[1].nvisible = 100
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
          x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
 
-   # partitioning
+   # partitioning in first layer
    trainlayers = [
          BMs.TrainPartitionedLayer([
             BMs.TrainLayer(learningrate = learningrate1, epochs = epochs1,
@@ -317,13 +318,15 @@ function test_stackrbms_preparetrainlayers()
          trainlayers[2].nhidden; trainlayers[3].nhidden] == nhiddens
 
    # incorrect partitioning must not be allowed
-   trainlayers[1].parts[1].nvisible = 20
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+   badtrainlayers = deepcopy(trainlayers)
+   badtrainlayers[1].parts[1].nvisible = 20
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
          x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
 
-   # too many visible nodes
-   trainlayers[1].parts[1].nvisible = 100
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(trainlayers,
+   # too many visible nodes in layer 1
+   badtrainlayers = deepcopy(trainlayers)
+   badtrainlayers[1].parts[1].nvisible = 100
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
          x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
 
    nothing
