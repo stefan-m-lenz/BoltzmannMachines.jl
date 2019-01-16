@@ -56,7 +56,7 @@ function TrainLayer(;
       categories::Union{Int, Vector{Int}} = 0,
       monitoring = nomonitoring,
       rbmtype::DataType = BernoulliRBM,
-      nhidden::Int,
+      nhidden::Int = -1,
       nvisible::Int = -1,
       batchsize::Int = -1,
       pcd::Bool = true,
@@ -68,6 +68,16 @@ function TrainLayer(;
    usedefaultepochs = (epochs < 0)
    usedefaultlearningrate = (learningrate < 0 && isempty(learningrates))
    usedefaultbatchsize = (batchsize <= 0)
+
+   if startrbm === NoRBM()
+      if nhidden == -1
+         error("Argument `nhidden` is needed (unless `startrbm` is used).")
+      end
+   else
+      nvisible = nvisiblenodes(startrbm)
+      nhidden = nhiddennodes(startrbm)
+   end
+
    TrainLayer(
          (usedefaultepochs ? 10 : epochs),
          usedefaultepochs,

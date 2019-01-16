@@ -32,15 +32,22 @@ BMTest.test_beam()
 BMTest.test_softmaxvssigm()
 BMTest.test_oneornone_encoding()
 
+println("Finished deterministic tests")
 
 #########################################################################
 # Tests which may fail sometimes due to stochastic nature of algorithms #
 #########################################################################
 
-# allow failures up to n times
+nondeterministictestidx = 0
+
+# Perform non-deterministic tests, allow failures up to n times
 function softly(fun, n::Int = 7)
    for i = 1:n
       if fun()
+         global nondeterministictestidx += 1
+         # print some output to keep Travis going
+         println("Non-deterministic test #$nondeterministictestidx passed" *
+               " after $i trie(s).")
          return true
       end
    end
