@@ -1075,7 +1075,9 @@ function logproblowerbound(dbm::MultimodalDBM,
       logimpweights::Array{Float64,1} = aislogimpweights(dbm);
       mu::Particles = meanfield(dbm, x))
 
-   logproblowerbound(dbm, x, logmeanexp(logimpweights); mu = mu)
+   logproblowerbound(dbm, x,
+         logpartitionfunction(dbm, logmeanexp(logimpweights));
+         mu = mu)
 end
 
 function logproblowerbound(dbm::MultimodalDBM,
