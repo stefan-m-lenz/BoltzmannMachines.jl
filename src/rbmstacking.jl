@@ -320,7 +320,7 @@ function stackrbms_preparetrainlayers(
    trainlayers = deepcopy(trainlayers)
 
    if !isempty(nhiddens)
-      warn("Argument `nhiddens` not used.")
+      @warn "Argument `nhiddens` not used."
    end
 
    setdefaultsforunspecified!(trainlayers,

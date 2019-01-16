@@ -97,6 +97,70 @@ end
 
 
 """
+    gibbssamplecond!(particles, bm, varmask, nsteps)
+Conditional Gibbs sampling on the `particles` in the `bm`.
+The variables that are marked in the boolean vector `varmask` are fixed
+to the initial values in `particles` during sampling. This way, conditional
+sampling is performed on these variables.
+(See also `Particles`, `initparticles`.)
+"""
+function gibbssamplecond!(particles::Particles, rbm::AbstractRBM,
+      varmask::AbstractVector{Bool},
+      nsteps::Int = 5)
+
+   nsamples = size(particles[1], 1)
+   mask = repeat(varmask', nsamples)
+   origvisibles = deepcopy(particles[1])
+
+   for i = 1:nsteps
+      samplevisible!(particles[1], rbm, particles[2])
+      particles[1][mask] = origvisibles[mask]
+      samplehidden!(particles[2], rbm, particles[1])
+   end
+   particles
+end
+
+function gibbssamplecond!(particles::Particles, dbm::MultimodalDBM,
+      varmask::AbstractVector{Bool},
+      nsteps::Int = 5)
+
+   input = newparticleslike(particles)
+   input2 = newparticleslike(particles)
+
+   tmp = Particles(undef, length(dbm) + 1)
+   nsamples = size(particles[1], 1)
+   mask = repeat(varmask', nsamples)
+   origvisibles = deepcopy(particles[1])
+
+   for step in 1:nsteps
+      # first layer gets input only from layer above
+      samplevisible!(input[1], dbm[1], particles[2])
+
+      # reset visible nodes to original values
+      input[1][mask] = origvisibles[mask]
+
+      # intermediate layers get input from layers above and below
+      for i = 2:(length(particles) - 1)
+         visibleinput!(input[i], dbm[i], particles[i+1])
+         hiddeninput!(input2[i], dbm[i-1], particles[i-1])
+         input[i] .+= input2[i]
+         sigm_bernoulli!(input[i]) # Bernoulli-sample from total input
+      end
+
+      # last layer gets only input from layer below
+      samplehidden!(input[end], dbm[end], particles[end-1])
+
+      # swap input and particles
+      tmp .= particles
+      particles .= input
+      input .= tmp
+   end
+
+   particles
+end
+
+
+"""
     hiddeninput(rbm, v)
 Computes the total input of the hidden units in the AbstractRBM `rbm`,
 given the activations of the visible units `v`.
@@ -532,44 +596,33 @@ end
     samples(bm, nsamples; ...)
 Generates `nsamples` samples from a Boltzmann machine model `bm` by running
 a Gibbs sampler.
+This can also be used for sampling from a *conditional distribution*
+(see argument `conditions` below.)
 
 # Optional keyword arguments:
 * `burnin`: Number of Gibbs sampling steps, defaults to 50.
-* `samplelast`: boolean to indicate whether to sample in last step (true, default)
-  or whether to use the activation potential. A vector of booleans may be specified
-  in case of a PartitionedRBM or MultimodalDBM, indicating individually
-  for each of the partitions whether they are to be sampled in the last step.
+* `conditions`: `Vector{Pair{Int,Float64}}`, containing pairs of variables
+  and their values that are to be conditioned on. E. g. `[1 => 1.0, 3 => 0.0]`
 """
 function samples(dbm::AbstractBM, nsamples::Int;
       burnin::Int = 50,
-      samplelast::Union{Bool, Vector{Bool}} = true)
+      conditions::Vector{Pair{Int,Float64}} = Vector{Pair{Int,Float64}}())
 
-   function samplevisibleorgetpotential!(vv::M, rbm::AbstractRBM,
-         hh::M, sample::Bool) where {M <:AbstractArray{Float64, 2}}
+   particles = initparticles(dbm, nsamples)
 
-      if sample
-         samplevisible!(vv, rbm, hh)
-      else
-         visiblepotential!(vv, rbm, hh)
+   # main work
+   if isempty(conditions)
+      gibbssample!(particles, dbm, burnin)
+   else
+      varmask = falses(size(particles[1], 2))
+      for condition in conditions
+         varmask[condition[1]] = true
+         particles[1][:, condition[1]] .= condition[2]
       end
+      gibbssamplecond!(particles, dbm, varmask, burnin)
    end
 
-   function samplevisibleorgetpotential!(vv::M, prbm::PartitionedRBM,
-         hh::M, sample::Vector{Bool}) where {M <:AbstractArray{Float64, 2}}
-
-      for i in eachindex(prbm.rbms)
-         samplevisibleorgetpotential!(view(vv, :, prbm.visranges[i]),
-               prbm.rbms[i], view(hh, :, prbm.hidranges[i]), sample[i])
-      end
-   end
-
-   # delegate main work to sampleparticles
-   particles = sampleparticles(dbm, nsamples, burnin - 1)
-
-   # sample in last step or take only the potential
-   samplevisibleorgetpotential!(particles[1], dbm[1], particles[2], samplelast)
-
-   # return the visible layer's activations or the activation potential, respectively
+   # return the visible layer's activations
    particles[1]
 end
 
