@@ -37,7 +37,7 @@ export
          BasicDBM,
          AbstractTrainLayer, AbstractTrainLayers,
          TrainLayer, TrainPartitionedLayer,
-         addlayer!, stackrbms,
+         stackrbms,
          initparticles, gibbssample!,
          meanfield, fitdbm, traindbm!,
    Particle, Particles,

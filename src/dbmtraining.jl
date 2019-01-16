@@ -3,59 +3,6 @@ function converttopartitionedbernoullidbm(mdbm::MultimodalDBM)
 end
 
 
-"""
-    addlayer!(dbm, x)
-Adds a pretrained layer to the BasicDBM `dbm`, given the dataset `x` as input
-for the visible layer of the `dbm`.
-
-# Optional keyword arguments:
-* `isfirst`, `islast`: indicating that the new RBM should be trained as
-   first (assumed if `dbm` is empty) or last layer of the DBM, respectively.
-   If those flags are not set, the added layer is trained as intermediate layer.
-   This information is needed to determine the factor for the weights during
-   pretraining.
-* `epochs`, `nhidden`, `learningrate`/`learningrates`, `pcd`, `cdsteps`,
-  `monitoring`: used for fitting the weights of the last layer, see `fitrbm(x)`
-"""
-function addlayer!(dbm::BasicDBM, x::Matrix{Float64};
-      isfirst::Bool = isempty(dbm),
-      islast::Bool = false,
-      nhidden::Int = size(x,2),
-      epochs::Int = 10,
-      learningrate::Float64 = 0.005,
-      learningrates::Vector{Float64} = learningrate * ones(epochs),
-      pcd::Bool = true,
-      cdsteps::Int = 1,
-      monitoring::Function = nomonitoring)
-
-   warn("`addlayer!`` is deprecated. Please use the options of `fitdbm` instead.")
-   # propagate input x up to last hidden layer
-   hh = x
-   for i = 1:length(dbm)
-      hh = hiddenpotential(dbm[i], hh, 2.0) # intermediate layer, factor is 2.0
-   end
-
-   upfactor = downfactor = 2.0
-   if isfirst
-      downfactor = 1.0
-   end
-   if islast
-      upfactor = 1.0
-   end
-
-   rbm = fitrbm(hh, nhidden = nhidden, epochs = epochs,
-         rbmtype = BernoulliRBM,
-         learningrate = learningrate,
-         learningrates = learningrates,
-         pcd = pcd, cdsteps = 1,
-         upfactor = upfactor, downfactor = downfactor,
-         monitoring = monitoring)
-
-   push!(dbm, rbm)
-   dbm
-end
-
-
 function defaultfinetuninglearningrates(learningrate, epochs)
    learningrate * 11.0 ./ (10.0 .+ (1:epochs))
 end
