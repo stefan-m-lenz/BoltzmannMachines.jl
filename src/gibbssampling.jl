@@ -612,23 +612,41 @@ This can also be used for sampling from a *conditional distribution*
 * `burnin`: Number of Gibbs sampling steps, defaults to 50.
 * `conditions`: `Vector{Pair{Int,Float64}}`, containing pairs of variables
   and their values that are to be conditioned on. E. g. `[1 => 1.0, 3 => 0.0]`
+* `samplelast`: boolean to indicate whether to sample in last step (true, default)
+  or whether to use the activation potential.
 """
-function samples(dbm::AbstractBM, nsamples::Int;
+function samples(bm::AbstractBM, nsamples::Int;
       burnin::Int = 50,
-      conditions::Vector{Pair{Int,Float64}} = Vector{Pair{Int,Float64}}())
+      conditions::Vector{Pair{Int,Float64}} = Vector{Pair{Int,Float64}}(),
+      samplelast::Bool = true)
 
-   particles = initparticles(dbm, nsamples)
+   particles = initparticles(bm, nsamples)
 
-   # main work
+   firstlayer(rbm::AbstractRBM) = rbm
+   firstlayer(dbm::MultimodalDBM) = dbm[1]
+
+   if !samplelast
+      burnin = burnin - 1
+   end
+
    if isempty(conditions)
-      gibbssample!(particles, dbm, burnin)
+      gibbssample!(particles, bm, burnin)
+      if !samplelast
+         visiblepotential!(particles[1], firstlayer(bm), particles[2])
+      end
    else
       varmask = falses(size(particles[1], 2))
       for condition in conditions
          varmask[condition[1]] = true
          particles[1][:, condition[1]] .= condition[2]
       end
-      gibbssamplecond!(particles, dbm, varmask, burnin)
+      gibbssamplecond!(particles, bm, varmask, burnin)
+      if !samplelast
+         visiblepotential!(particles[1], bm[1], particles[2])
+         for condition in conditions
+            particles[1][:, condition[1]] .= condition[2]
+         end
+      end
    end
 
    # return the visible layer's activations

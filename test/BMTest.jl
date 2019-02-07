@@ -620,6 +620,20 @@ function check_rbm()
    @check checklikelihoodempirically(rbm, x)
 end
 
+function check_sampling()
+   realsamerate = 0.8
+   x = BMTest.createsamples(100, 4, realsamerate)
+   rbm = BMs.fitrbm(x, epochs = 400, nhidden = 5, learningrate = 0.002)
+
+   samerate(x) = sum((x[:,1] .== x[:,2]) .& (x[:,2] .== x[:,3])) ./ size(x, 1)
+   ngensamples = 5000
+   @check abs(samerate(BMs.samples(rbm, ngensamples)) - realsamerate) < 0.1
+   @test samerate(BMs.samples(rbm, 5, conditions = [1 => 1.0, 2 => 1.0, 3 => 1.0])) == 1.0
+   @check samerate(BMs.samples(rbm, 5, samplelast = false)) == 0.0
+   @test samerate(BMs.samples(rbm, 5, conditions = [1 => 0.0, 2 => 0.0, 3 => 0.0],
+         samplelast = true)) == 1.0
+end
+
 function check_softmax0rbm()
    samerates = [0.2; 0.3; 0.4]
    categories = length(samerates)
