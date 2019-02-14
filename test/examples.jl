@@ -146,7 +146,7 @@ dbm = fitdbm(x);
 particles = initparticles(dbm, 500)
 variablestofixto1 = 1:3
 particles[1][:, variablestofixto1] .= 1.0
-gibbssamplecond!(particles, dbm, variablestofix1)
+gibbssamplecond!(particles, dbm, variablestofixto1)
 particles[1]
 
 # Short alternative, returns only the visible nodes
