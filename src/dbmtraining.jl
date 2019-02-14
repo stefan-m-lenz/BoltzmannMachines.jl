@@ -21,7 +21,7 @@ trained using the general Boltzmann Machine learning procedure
 * `nhiddens`: vector that defines the number of nodes in the hidden layers of
    the DBM. The default value specifies two hidden layers with the same size
    as the visible layer.
-* `epochs`: number of training epochs for joint training
+* `epochs`: number of training epochs for joint training, defaults to 10
 * `epochspretraining`: number of training epochs for pretraining,
    defaults to `epochs`
 * `learningrate`/`learningrates`:
@@ -189,7 +189,7 @@ updates.
 * `epoch`: number of training epochs
 * `learningrate`/`learningrates`: a vector of learning rates for each epoch to
    update the weights and biases. The learning rates should decrease with the
-   epochs, e. g. like `a / (b + epoch)`. If only one value is given as
+   epochs, e. g. with the factor `a / (b + epoch)`. If only one value is given as
    `learningrate`, `a` and `b` are 11.0 and 10.0, respectively.
 * `nparticles`: number of particles used for sampling, default 100
 * `monitoring`: A function that is executed after each training epoch.
