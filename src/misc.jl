@@ -148,6 +148,20 @@ function logit(p::Float64)
 end
 
 
+"""
+    intensities(x)
+    intensities(x, q1)
+    intesities(x, q1, q2)
+Performs a linear and monotonous transformation on the data set `x`
+to fit it into the interval [0.0, 1.0] and returns the transformed data set.
+
+If `q1` is specified, all values below or equal to the quantile specified  by `q1`
+are mapped to 0.0.
+All values above or equal to the quantile specified by `q2` are mapped to 1.0.
+`q2` defaults to `1 - q1`.
+
+The quantiles are calculated per column/variable.
+"""
 function intensities(data::Matrix{Float64}, q1::Float64 = 0.0, q2::Float64 = 1.0 - q1)
    mapslices(col -> begin
          bottomval = quantile(col, q1)
@@ -306,7 +320,6 @@ function oneornone_decode(x::Matrix{Float64}, nscategories::Vector{Int})
 end
 
 
-# TODO more documentation
 """
     oneornone_encode(x, categories)
 Expects a data set `x` containing values 0.0, 1.0, 2.0 ... encoding the categories.
@@ -317,6 +330,8 @@ a zero is encoded as all-zeros.
 The `categories` can be specified as
  * integer number if all variables have the same number of categories or as
  * integer vector, containing for each variable the number of categories encoded.
+
+See also `oneornone_decode` for the reverse transformation.
 """
 function oneornone_encode(x::M, nscategories::Vector{Int}
       ) where {N <: Number, M <:AbstractArray{N,2}}

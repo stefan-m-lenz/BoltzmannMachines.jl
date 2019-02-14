@@ -1,7 +1,7 @@
 # BoltzmannMachines.jl
 
 [![Build Status](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl.svg?branch=master)](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl)
-[![Coverage Status](https://coveralls.io/repos/github/stefan-m-lenz/BoltzmannMachines.jl/badge.svg?branch=master)](https://coveralls.io/github/stefan-m-lenz/BoltzmannMachines.jl?branch=master)
+<!--[![Coverage Status](https://coveralls.io/repos/github/stefan-m-lenz/BoltzmannMachines.jl/badge.svg?branch=master)](https://coveralls.io/github/stefan-m-lenz/BoltzmannMachines.jl?branch=master)-->
 
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
 
@@ -19,7 +19,8 @@ The package contains the following types of RBMs (subtypes of `AbstractRBM`):
 Type                    | Distribution of visible units    | Distribution of hidden units
 ------------------------|----------------------------------|-----------------------------
 `BernoulliRBM`          | Bernoulli                        | Bernoulli
-`GaussianBernoulliRBM`, `GaussianBernoulliRBM2` ([6])  | Gaussian                         | Bernoulli
+`Softmax0BernoulliRBM`  | Categorical (binary encoded)     | Bernoulli
+`GaussianBernoulliRBM`, `GaussianBernoulliRBM2` ([6])      | Gaussian                         | Bernoulli
 `Binomial2BernoulliRBM` | Binomial distribution with n = 2 | Bernoulli
 `BernoulliGaussianRBM`  | Bernoulli                        | Gaussian
 
@@ -35,6 +36,11 @@ All these types of DBMs can be trained using layerwise pre-training and fine-tun
 ## Overview of functions
 
 The following tables provide an overview of the functions of the package, together with a short description. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `?` at the beginning of the Julia command prompt).
+
+### Data preprocessing
+Continuously valued data or ordinal data can be transformed into probabilities via `intensities` and then fed to `BernoulliRBM`s, like it is usually done when handling grayscale or color intensities in images.
+
+Categorical data can be binary encoded as input for a `Softmax0BernoulliRBM` via `oneornone_encode`.
 
 ### Functions for Training
 
@@ -81,7 +87,7 @@ Function name          | Short description
 `logpartitionfunction` | Estimates the log of the partition function of a BM.
 `logproblowerbound`    | Estimates the mean lower bound of the log probability of a dataset in a DBM model.
 `reconstructionerror`  | Computes the mean reconstruction error of a dataset in an RBM model.
-`samples`              | Generates samples from the distribution defined by a BM model.
+`samples`              | Generates samples from the distribution defined by a BM model. (See also `gibbssample!` and `gibbsamplecond!` for (conditional) Gibbs sampling.)
 
 
 ### Monitoring the learning process
