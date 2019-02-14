@@ -134,6 +134,26 @@ BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 
 
 # ==============================================================================
+# Examples for conditional sampling
+# ------------------------------------------------------------------------------
+nsamples = 100;
+nvariables = 36;
+
+x = barsandstripes(100, 16);
+dbm = fitdbm(x);
+
+# Conditional gibbs sampling of particles
+particles = initparticles(dbm, 500)
+variablestofixto1 = 1:3
+particles[1][:, variablestofixto1] .= 1.0
+gibbssamplecond!(particles, dbm, variablestofix1)
+particles[1]
+
+# Short alternative, returns only the visible nodes
+samples(dbm, 500, conditions = [i => 1.0 for i in 1:3])
+
+
+# ==============================================================================
 # Examples for cross-validation
 # ------------------------------------------------------------------------------
 
