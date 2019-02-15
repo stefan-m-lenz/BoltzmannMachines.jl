@@ -632,6 +632,7 @@ function check_sampling()
    @check samerate(BMs.samples(rbm, 5, samplelast = false)) == 0.0
    @test samerate(BMs.samples(rbm, 5, conditions = [1 => 0.0, 2 => 0.0, 3 => 0.0],
          samplelast = true)) == 1.0
+   true
 end
 
 function check_softmax0rbm()
