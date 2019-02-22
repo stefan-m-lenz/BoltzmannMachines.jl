@@ -56,8 +56,10 @@ export
       monitorweightsnorm, monitorweightsnorm!,
       propagateforward,
    crossvalidation,
-   intensities, oneornone_encode, oneornone_decode,
-   barsandstripes, logit, splitdata
+   intensities, intensities_encode, intensities_decode,
+   oneornone_encode, oneornone_decode,
+   splitdata,
+   barsandstripes, logit
 
 include("bmtypes.jl")
 include("gibbssampling.jl")
@@ -71,6 +73,7 @@ include("evaluating.jl")
 include("monitoring.jl")
 include("beam.jl")
 include("misc.jl")
+include("datapreprocessing.jl")
 
 
 end # of module BoltzmannMachines

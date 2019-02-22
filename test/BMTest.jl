@@ -730,6 +730,14 @@ function check_gbrbm(gbrbmtype::Type{GBRBM}
    @check abs((exactloglik - estloglik) / exactloglik) < 2.5 / 100
 end
 
+
+function test_intensities()
+   x = randn(5, 3) .* [1 2 3]
+   transformed, transformation = BMs.intensities_encode(x)
+   @test isapprox(BMs.intensities_decode(transformed, transformation), x)
+end
+
+
 function test_rbm_monitoring(gbrbmtype::Type{GBRBM}
       ) where GBRBM <:Union{BMs.GaussianBernoulliRBM, BMs.GaussianBernoulliRBM2}
 
