@@ -130,6 +130,22 @@ function mostspecifictype(v::Vector)
 end
 
 
+function deepcopy_trainlayers(trainlayers::Vector{T}) where T <: AbstractTrainLayer
+   map(deepcopy_trainlayers, trainlayers)::Vector{T}
+end
+
+function deepcopy_trainlayers(trainlayer::TrainLayer)
+   ret = deepcopy(trainlayer)
+   # prevents using a copy of the function, if an anomymous function is given:
+   ret.monitoring = trainlayer.monitoring
+   ret
+end
+
+function deepcopy_trainlayers(trainlayer::TrainPartitionedLayer)
+   TrainPartitionedLayer(deepcopy_trainlayers(trainlayer.parts))
+end
+
+
 """
     propagateforward(rbm, datadict, factor)
 Returns a new `DataDict` containing the same labels as the given `datadict` but
@@ -317,7 +333,7 @@ function stackrbms_preparetrainlayers(
    # --> check for correct specification and derive/set some parameters
 
    # avoid modification of given object
-   trainlayers = deepcopy(trainlayers)
+   trainlayers = deepcopy_trainlayers(trainlayers)
 
    if !isempty(nhiddens)
       @warn "Argument `nhiddens` not used."
