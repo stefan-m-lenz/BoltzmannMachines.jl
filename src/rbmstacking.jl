@@ -239,8 +239,8 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    If a non-empty dictionary is given, the monitoring functions in the
    `trainlayers`-arguments must accept a `DataDict` as third argument.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
-   with sampled values instead of the deterministic potential,
-   which is the default.
+   with sampled values instead of the deterministic potential.
+   Using the deterministic potential (`false`) is the default.
 """
 function stackrbms(x::Array{Float64,2};
       nhiddens::Vector{Int} = Vector{Int}(),
