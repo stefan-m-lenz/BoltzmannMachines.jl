@@ -47,6 +47,7 @@ export
       loglikelihoodoptimizer,
       beamoptimizer,
    Monitor, MonitoringItem, DataDict,
+      monitored_fitrbm, monitored_fitdbm,
       monitorexactloglikelihood, monitorexactloglikelihood!,
       monitorfreeenergy, monitorfreeenergy!,
       monitorlogproblowerbound, monitorlogproblowerbound!,

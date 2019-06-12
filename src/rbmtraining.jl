@@ -72,6 +72,7 @@ with Contrastive Divergence (CD), and returns it.
    contrastive divergence, defaults to 1
 * `monitoring`: a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
+   See also `monitored_fitrbm` for another way of monitoring.
 * `upfactor`, `downfactor`: If this function is used for pretraining a part of
    a DBM, it is necessary to multiply the weights of the RBM with factors.
 * `sdlearningrate`/`sdlearningrates`: learning rate(s) for the

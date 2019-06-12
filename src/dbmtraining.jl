@@ -45,6 +45,7 @@ trained using the general Boltzmann Machine learning procedure
    `learningratepretraining` and `batchsizepretraining` are used.
 * `monitoring`: Monitoring function accepting a `dbm` and the number of epochs
    retuning nothing. Used for the monitoring of fine-tuning.
+   See also `monitored_fitdbm` for another way of monitoring.
 * `monitoringdatapretraining`: a `DataDict` that contains data used for
    monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)
 * `optimizer`/`optimizers`: an optimizer or a vector of optimizers for each epoch
