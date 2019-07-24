@@ -816,8 +816,9 @@ function test_monitored_fitrbm()
    @test length(monitor) == 3
 
    # two monitoring functions
-   monitor, rbm1 = BMs.monitored_fitrbm(x; epochs = 3,
-         monitoring = [BMs.monitorreconstructionerror!;
+   # (also test uneven batch size)
+   monitor, rbm1 = BMs.monitored_fitrbm(x; epochs = 3, batchsize = 3,
+         monitoring = [BMs.monitorfreeenergy!;
                BMs.monitorexactloglikelihood!])
    @test length(monitor) == 6
 
