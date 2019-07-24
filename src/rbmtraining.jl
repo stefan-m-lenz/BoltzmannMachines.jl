@@ -103,7 +103,7 @@ function fitrbm(x::Matrix{Float64};
       batchsize::Int = 1,
       rbmtype::DataType = BernoulliRBM,
       startrbm::AbstractRBM = NoRBM(),
-      monitoring::Function = nomonitoring,
+      monitoring::Function = emptyfunc,
 
       # this argument is only relevant for Softmax0BernoulliRBMs:
       categories::Union{Int, Vector{Int}} = 0,
@@ -251,14 +251,6 @@ function initvisiblebias(x::Array{Float64,2})
       end
    end
    initbias
-end
-
-
-"""
-    nomonitoring
-Accepts a model and a number of epochs and returns nothing.
-"""
-function nomonitoring(bm, epoch)
 end
 
 

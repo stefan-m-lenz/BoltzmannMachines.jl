@@ -243,7 +243,7 @@ function test_stackrbms_preparetrainlayers()
    epochs1 = 27
    epochs2 = 17
    batchsize = 5
-   batchsize1 = 1
+   batchsize1 = 2
    batchsize2 = 4
    optimizer = BMs.loglikelihoodoptimizer(learningrate = learningrate)
    optimizer1 = BMs.loglikelihoodoptimizer(learningrate = learningrate1)
@@ -251,8 +251,10 @@ function test_stackrbms_preparetrainlayers()
 
    # no layer-specific instructions
    trainlayers = Vector{BMs.TrainLayer}()
-   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, nhiddens, batchsize, optimizer)
+   trainlayers = BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = trainlayers, epochs = epochs,
+         learningrate = learningrate, nhiddens = nhiddens,
+         batchsize = batchsize, optimizer = optimizer)
    @test length(trainlayers) == length(nhiddens)
    @test all(map(t -> t.learningrate == learningrate, trainlayers))
    @test all(map(t -> t.epochs == epochs, trainlayers))
@@ -270,8 +272,10 @@ function test_stackrbms_preparetrainlayers()
                optimizer = optimizer2);
          BMs.TrainLayer(nhidden = nhiddens[3])
    ]
-   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, Vector{Int}(), batchsize, optimizer)
+   trainlayers = BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = trainlayers, epochs = epochs,
+         learningrate = learningrate, nhiddens = Vector{Int}(),
+         batchsize = batchsize, optimizer = optimizer)
    @test length(trainlayers) == length(nhiddens)
    @test trainlayers[1].learningrate == learningrate1
    @test trainlayers[2].learningrate == learningrate2
@@ -290,22 +294,24 @@ function test_stackrbms_preparetrainlayers()
    # wrong/misleading specification of number of visible nodes
    badtrainlayers = deepcopy(trainlayers)
    badtrainlayers[1].nvisible = 100
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
-         x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = badtrainlayers)
 
    # partitioning in first layer
    trainlayers = [
          BMs.TrainPartitionedLayer([
             BMs.TrainLayer(learningrate = learningrate1, epochs = epochs1,
                   rbmtype = BMs.GaussianBernoulliRBM, nhidden = 3,
-                  nvisible = 3);
+                  nvisible = 3, batchsize = batchsize2);
             BMs.TrainLayer(nhidden = 4, nvisible = 7)
          ]);
          BMs.TrainLayer(nhidden = 6);
          BMs.TrainLayer(nhidden = 5)
    ]
-   trainlayers = BMs.stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+   trainlayers = BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = trainlayers,
+         epochs = epochs, learningrate = learningrate,
+         batchsize = batchsize1)
    @test length(trainlayers) == length(nhiddens)
    @test trainlayers[1].parts[1].learningrate == learningrate1
    @test trainlayers[1].parts[2].learningrate == learningrate
@@ -316,18 +322,20 @@ function test_stackrbms_preparetrainlayers()
    @test trainlayers[3].epochs == epochs
    @test [trainlayers[1].parts[1].nhidden + trainlayers[1].parts[2].nhidden;
          trainlayers[2].nhidden; trainlayers[3].nhidden] == nhiddens
+   @test trainlayers[1].parts[1].batchsize == batchsize2
+   @test trainlayers[1].parts[2].batchsize == batchsize1
 
    # incorrect partitioning must not be allowed
    badtrainlayers = deepcopy(trainlayers)
    badtrainlayers[1].parts[1].nvisible = 20
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
-         x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = badtrainlayers)
 
    # too many visible nodes in layer 1
    badtrainlayers = deepcopy(trainlayers)
    badtrainlayers[1].parts[1].nvisible = 100
-   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(badtrainlayers,
-         x, epochs, learningrate, Vector{Int}(), batchsize, BMs.NoOptimizer())
+   @test_throws ErrorException BMs.stackrbms_preparetrainlayers(x;
+         trainlayers = badtrainlayers)
 
    nothing
 end
@@ -783,6 +791,47 @@ function test_mdbm_monitoring()
          BMs.TrainLayer(nhidden = 5)
       ],
       monitoring = (dbm, epoch) -> BMs.monitorlogproblowerbound!(monitor, dbm, epoch, datadict))
+   nothing
+end
+
+
+function test_monitored_stackrbms()
+   nvisible1 = 4
+   nvisible2 = 3
+   x = BMTest.createsamples(20, nvisible1)
+   xpart = hcat(x, rand(20, nvisible2))
+   nhiddens = [4; 3]
+
+   # Test whether monitored_stackrbm and stackrbm do the same thing
+   randomseed = abs(rand(Int))
+   Random.seed!(randomseed)
+   monitors1, dbm1 = BMs.monitored_stackrbms(x; predbm = true, nhiddens = nhiddens)
+   @test length(monitors1) == 2
+   @test all(isempty.(monitors1))
+   Random.seed!(randomseed)
+   dbm2 = BMs.stackrbms(x; predbm = true, nhiddens = nhiddens)
+   @test all([all(isapprox.(dbm1[i].weights, dbm2[i].weights)) for i in eachindex(dbm1)])
+
+   # partitioned
+   monitor1 = BMs.Monitor()
+   trainlayers = [
+      BMs.TrainPartitionedLayer([
+         BMs.TrainLayer(nvisible = nvisible1, nhidden = 2)
+         BMs.TrainLayer(nhidden = 2, rbmtype = BMs.GaussianBernoulliRBM2)
+      ]),
+      BMs.TrainLayer(nhidden = 4)
+   ]
+   epochs = 5
+   monitors1, dbm1 = BMs.monitored_stackrbms(x;
+         trainlayers = trainlayers,
+         monitoring = BMs.monitorexactloglikelihood!,
+         predbm = true, epochs = epochs)
+   @test length(monitors1) == 2
+   @test length(monitors1[1]) == 2 # layers with two partitions
+   @test length(monitors1[1][1]) == epochs
+   @test length(monitors1[1][2]) == epochs
+   @test length(monitors1[2]) == epochs
+
    nothing
 end
 

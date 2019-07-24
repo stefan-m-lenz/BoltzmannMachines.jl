@@ -32,6 +32,7 @@ BMTest.test_beam()
 BMTest.test_softmaxvssigm()
 BMTest.test_oneornone_encoding()
 BMTest.test_intensities()
+BMTest.test_monitored_stackrbms()
 
 println("Finished deterministic tests")
 

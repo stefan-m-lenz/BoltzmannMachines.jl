@@ -123,10 +123,10 @@ end
 
 
 """
-A function with no arguments doing nothing.
+A function accepting everything, doing nothing.
 Usable as default argument for functions as arguments.W
 """
-function emptyfunc
+function emptyfunc(x...; kwargs...)
 end
 
 

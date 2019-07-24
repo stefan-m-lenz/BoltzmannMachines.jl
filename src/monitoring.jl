@@ -31,28 +31,6 @@ const monitorsd = "sd"
 const monitorweightsnorm = "weightsnorm"
 
 
-function asmonitoringfun(f::Function, type)
-   if !isempty(methods(f, (type, Matrix{Float64})))
-      evaluation = string(f)
-      return (monitor, bm, epoch, monitoringdata) -> begin
-         for (datasetname, x) in monitoringdata
-            push!(monitor,
-               MonitoringItem(evaluation, epoch, f(bm, x), datasetname))
-         end
-      end
-   elseif !isempty(methods(f, (type,)))
-      evaluation = string(f)
-      return (monitor, bm, epoch, monitoringdata) -> begin
-         for (datasetname, x) in monitoringdata
-            push!(monitor,
-               MonitoringItem(evaluation, epoch, f(bm), datasetname))
-         end
-      end
-   else
-      error("Function $f cannot be used as a monitoring function.")
-   end
-end
-
 
 """
     correlations(datadict)
@@ -92,46 +70,6 @@ function monitorcordiff!(monitor::Monitor, bm::AbstractBM, epoch::Int,
    end
 
    monitor
-end
-
-
-function monitored_fitrbm(x::Matrix{Float64};
-      monitoring::Union{F, Vector{F}},
-      monitoringdata::DataDict = DataDict("Training data" => x),
-      kwargs...) where {F <: Function}
-
-   monitor = Monitor()
-   if monitoring isa Vector
-      monitoringfun = (rbm, epoch) ->
-            for f in monitoring
-               f(monitor, rbm, epoch, monitoringdata)
-            end
-   else
-      monitoringfun = (rbm, epoch) ->
-            monitoring(monitor, rbm, epoch, monitoringdata)
-   end
-
-   rbm = fitrbm(x; monitoring = monitoringfun, kwargs...)
-   monitor, rbm
-end
-
-
-function monitored_fitdbm(x::Matrix{Float64};
-      monitoring::Function,
-      monitoringdata::DataDict = DataDict("Training data" => x),
-      monitoringpretraining::Function = nomonitoring,
-      monitoringdatapretraining::DataDict = monitoringdata,
-      kwargs...)
-
-   monitor = Monitor()
-   rbm = fitdbm(x;
-         monitoring = (dbm, epoch) ->
-               monitoring(monitor, dbm, epoch, monitoringdata),
-         monitoringpretraining = (rbm, epoch, datadict) ->
-               monitoringpretraining(monitor, rbm, epoch, monitoringdatapretraining),
-         monitoringdatapretraining = monitoringdatapretraining,
-         kwargs...)
-   monitor, rbm
 end
 
 

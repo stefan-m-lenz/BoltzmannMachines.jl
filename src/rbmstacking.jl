@@ -54,7 +54,7 @@ function TrainLayer(;
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} = Vector{Float64}(),
       categories::Union{Int, Vector{Int}} = 0,
-      monitoring = nomonitoring,
+      monitoring = emptyfunc,
       rbmtype::DataType = BernoulliRBM,
       nhidden::Int = -1,
       nvisible::Int = -1,
@@ -245,80 +245,29 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    Using the deterministic potential (`false`) is the default.
 """
 function stackrbms(x::Array{Float64,2};
-      nhiddens::Vector{Int} = Vector{Int}(),
-      epochs::Int = 10,
       predbm::Bool = false,
       samplehidden::Bool = false,
-      learningrate::Float64 = 0.005,
-      batchsize::Int = 1,
-      optimizer::AbstractOptimizer = NoOptimizer(),
-      trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
-      monitoringdata::DataDict = DataDict())
+      monitoringdata::DataDict = DataDict(),
+      kwargs...)
+      # for the rest of the arguments see stackrbms_preparetrainlayers below
 
    stackrbms_checkmonitoringdata(x, monitoringdata)
+   trainlayers = stackrbms_preparetrainlayers(x; kwargs...)
 
-   trainlayers = stackrbms_preparetrainlayers(trainlayers, x, epochs,
-         learningrate, nhiddens, batchsize, optimizer)
-
-   nrbms = length(trainlayers)
-   dbmn = Vector{AbstractRBM}(undef, nrbms)
-
-   upfactor = downfactor = 1.0
-   if predbm
-      upfactor = 2.0
-   end
-
-   dbmn[1] = stackrbms_trainlayer(x, trainlayers[1];
+   stackrbms_trainlayers(x, trainlayers;
          monitoringdata = monitoringdata,
-         upfactor = upfactor, downfactor = downfactor)
-
-   hiddenval = x
-   for i = 2:nrbms
-      hiddenval = hiddenpotential(dbmn[i-1], hiddenval, upfactor)
-      if samplehidden
-         bernoulli!(hiddenval)
-      end
-
-      if !isempty(monitoringdata)
-         monitoringdata = propagateforward(dbmn[i-1], monitoringdata, upfactor)
-      end
-
-      if predbm
-         upfactor = downfactor = 2.0
-         if i == nrbms
-            upfactor = 1.0
-         end
-      else
-         upfactor = downfactor = 1.0
-      end
-
-      dbmn[i] = stackrbms_trainlayer(hiddenval, trainlayers[i];
-            monitoringdata = monitoringdata,
-            upfactor = upfactor, downfactor = downfactor)
-   end
-
-   dbmn = converttomostspecifictype(dbmn)
-   dbmn
-end
-
-function stackrbms_checkmonitoringdata(x::Matrix{Float64}, monitoringdata::DataDict)
-   if !isempty(monitoringdata)
-      if any(map(m -> size(m, 2), values(monitoringdata)) .!= size(x, 2))
-         error("Matrices in the dictionary `monitoringdata` must have the same number of columns as the input matrix.")
-      end
-   end
+         predbm = predbm, samplehidden = samplehidden)
 end
 
 
 """ Prepares the layerwise training specifications for `stackrbms` """
-function stackrbms_preparetrainlayers(
-      trainlayers::AbstractTrainLayers,
-      x::Matrix{Float64},
-      epochs::Int,
-      learningrate::Float64,
-      nhiddens::Vector{Int},
-      batchsize::Int,
-      optimizer::AbstractOptimizer)
+function stackrbms_preparetrainlayers(x::Matrix{Float64};
+      trainlayers::AbstractTrainLayers = Vector{TrainLayer}(),
+      epochs::Int = 10,
+      learningrate::Float64 = 0.005,
+      nhiddens::Vector{Int} = Vector{Int}(),
+      batchsize::Int = 1,
+      optimizer::AbstractOptimizer = NoOptimizer())
 
    if isempty(trainlayers)
       # construct default "trainlayers"
@@ -402,6 +351,61 @@ function stackrbms_preparetrainlayers(
 end
 
 
+""" The layerwise training, using, the specifications in `trainlayers`."""
+function stackrbms_trainlayers(x::Matrix{Float64}, trainlayers::AbstractTrainLayers;
+      monitoringdata = DataDict(), predbm::Bool = false, samplehidden::Bool = false)
+
+   nrbms = length(trainlayers)
+   dbmn = Vector{AbstractRBM}(undef, nrbms)
+
+   upfactor = downfactor = 1.0
+   if predbm
+      upfactor = 2.0
+   end
+
+   dbmn[1] = stackrbms_trainlayer(x, trainlayers[1];
+         monitoringdata = monitoringdata,
+         upfactor = upfactor, downfactor = downfactor)
+
+   hiddenval = x
+   for i = 2:nrbms
+      hiddenval = hiddenpotential(dbmn[i-1], hiddenval, upfactor)
+      if samplehidden
+         bernoulli!(hiddenval)
+      end
+
+      if !isempty(monitoringdata)
+         monitoringdata = propagateforward(dbmn[i-1], monitoringdata, upfactor)
+      end
+
+      if predbm
+         upfactor = downfactor = 2.0
+         if i == nrbms
+            upfactor = 1.0
+         end
+      else
+         upfactor = downfactor = 1.0
+      end
+
+      dbmn[i] = stackrbms_trainlayer(hiddenval, trainlayers[i];
+            monitoringdata = monitoringdata,
+            upfactor = upfactor, downfactor = downfactor)
+   end
+
+   dbmn = converttomostspecifictype(dbmn)
+   dbmn
+end
+
+
+function stackrbms_checkmonitoringdata(x::Matrix{Float64}, monitoringdata::DataDict)
+   if !isempty(monitoringdata)
+      if any(map(m -> size(m, 2), values(monitoringdata)) .!= size(x, 2))
+         error("Matrices in the dictionary `monitoringdata` must have the same number of columns as the input matrix.")
+      end
+   end
+end
+
+
 """ Trains a layer without partitioning for `stackrbms`. """
 function stackrbms_trainlayer(x::Matrix{Float64},
       trainlayer::TrainLayer;
@@ -410,11 +414,11 @@ function stackrbms_trainlayer(x::Matrix{Float64},
 
    if isempty(monitoringdata)
       monitoring = trainlayer.monitoring
-   elseif trainlayer.monitoring != nomonitoring
+   elseif trainlayer.monitoring != emptyfunc
       monitoring = (rbm, epoch) ->
             trainlayer.monitoring(rbm, epoch, monitoringdata)
    else
-      monitoring = nomonitoring
+      monitoring = emptyfunc
    end
 
    BMs.fitrbm(x;
@@ -443,21 +447,13 @@ function stackrbms_trainlayer(x::Matrix{Float64},
 
    visranges = ranges(map(t -> t.nvisible, trainpartitionedlayer.parts))
 
-   # prepare the arguments before the for-loop for each call
-   # to avoid unnecessary copying
-   trainingargs = map(
-         i -> (
-               x[:, visranges[i]],
-               trainpartitionedlayer.parts[i],
-               partitioneddata(monitoringdata, visranges[i])
-         ),
-         eachindex(trainpartitionedlayer.parts))
-
-   rbms = @distributed (vcat) for arg in trainingargs
-      stackrbms_trainlayer(arg[1], arg[2];
-            monitoringdata = arg[3],
+   function trainpart(i::Int)
+      stackrbms_trainlayer(x[:, visranges[i]], trainpartitionedlayer.parts[i];
+            monitoringdata = partitioneddata(monitoringdata, visranges[i]),
             upfactor = upfactor, downfactor = downfactor)
    end
+
+   rbms = [trainpart(i) for i in eachindex(trainpartitionedlayer.parts)]
 
    commontype = mostspecifictype(rbms)
    PartitionedRBM{commontype}(Vector{commontype}(rbms))

@@ -47,7 +47,7 @@ export
       loglikelihoodoptimizer,
       beamoptimizer,
    Monitor, MonitoringItem, DataDict,
-      monitored_fitrbm, monitored_fitdbm,
+      monitored_fitrbm, monitored_stackrbms, monitored_fitdbm,
       monitorexactloglikelihood, monitorexactloglikelihood!,
       monitorfreeenergy, monitorfreeenergy!,
       monitorlogproblowerbound, monitorlogproblowerbound!,
@@ -72,6 +72,7 @@ include("dbmtraining.jl")
 include("weightsjoining.jl")
 include("evaluating.jl")
 include("monitoring.jl")
+include("monitoredfitting.jl")
 include("beam.jl")
 include("misc.jl")
 include("datapreprocessing.jl")

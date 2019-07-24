@@ -67,7 +67,7 @@ function fitdbm(x::Matrix{Float64};
       epochspretraining::Int = epochs,
       batchsizepretraining::Int = 1,
       pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
-      monitoring::Function = nomonitoring,
+      monitoring::Function = emptyfunc,
       monitoringdatapretraining::DataDict = DataDict(),
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
@@ -205,7 +205,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} =
             defaultfinetuninglearningrates(sdlearningrate, epochs),
-      monitoring::Function = nomonitoring,
+      monitoring::Function = emptyfunc,
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
 
