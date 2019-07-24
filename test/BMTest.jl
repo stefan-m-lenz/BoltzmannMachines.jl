@@ -795,6 +795,36 @@ function test_mdbm_monitoring()
 end
 
 
+function test_monitored_fitrbm()
+   nvisible1 = 4
+   x = BMTest.createsamples(5, nvisible1)
+
+   # without monitoring:
+   # Test whether monitored_fitrbm and fitrbm do the same thing
+   randomseed = abs(rand(Int))
+   Random.seed!(randomseed)
+   monitor, rbm1 = BMs.monitored_fitrbm(x;
+         pcd = false, cdsteps = 3, nhidden = 5, epochs = 2)
+   @test isempty(monitor)
+   Random.seed!(randomseed)
+   rbm2 = BMs.fitrbm(x; pcd = false, cdsteps = 3, nhidden = 5, epochs = 2)
+   @test all(isapprox.(rbm1.weights, rbm2.weights))
+
+   # one monitoring function
+   monitor, rbm1 = BMs.monitored_fitrbm(x;
+         monitoring = BMs.monitorreconstructionerror!, batchsize = 4, epochs = 3)
+   @test length(monitor) == 3
+
+   # two monitoring functions
+   monitor, rbm1 = BMs.monitored_fitrbm(x; epochs = 3,
+         monitoring = [BMs.monitorreconstructionerror!;
+               BMs.monitorexactloglikelihood!])
+   @test length(monitor) == 6
+
+   nothing
+end
+
+
 function test_monitored_stackrbms()
    nvisible1 = 4
    nvisible2 = 3

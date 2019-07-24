@@ -31,6 +31,11 @@ function monitored_fitrbm(x::Matrix{Float64};
 end
 
 
+"""
+Creates monitors and sets the monitoring function in trainlayers such that
+the monitoring is recorded in the newly created monitors.
+Returns the created monitors.
+"""
 function setmonitorsup!(trainlayer::TrainLayer, monitoring::Function)
    monitor = Monitor()
    trainlayer.monitoring =
@@ -47,6 +52,7 @@ function setmonitorsup!(trainlayers::Vector{<:AbstractTrainLayer},
 
    [setmonitorsup!(t, monitoring) for t in trainlayers]
 end
+
 
 # TODO document
 function monitored_stackrbms(x::Matrix{Float64};
