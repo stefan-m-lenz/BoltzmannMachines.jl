@@ -238,6 +238,8 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
    network to monitor higher levels.
    If a non-empty dictionary is given, the monitoring functions in the
    `trainlayers`-arguments must accept a `DataDict` as third argument.
+* `optimizer`: an optimizer (of type `AbstractOptimizer`) that is used for
+   computing the gradients when training the individual RBMs.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential.
    Using the deterministic potential (`false`) is the default.
