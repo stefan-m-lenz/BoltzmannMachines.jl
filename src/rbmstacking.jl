@@ -287,7 +287,7 @@ function stackrbms_preparetrainlayers(x::Matrix{Float64};
    trainlayers = deepcopy_trainlayers(trainlayers)
 
    if !isempty(nhiddens)
-      @warn "Argument `nhiddens` not used."
+      @warn "Argument `nhiddens` not used due to specified `trainlayers`"
    end
 
    setdefaultsforunspecified!(trainlayers,
