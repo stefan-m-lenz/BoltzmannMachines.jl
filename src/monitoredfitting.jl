@@ -43,12 +43,23 @@ function setmonitorsup!(trainlayer::TrainLayer, monitoring::Function)
    monitor
 end
 
-function setmonitorsup!(trainlayer::TrainPartitionedLayer, monitoring::Function)
+function setmonitorsup!(trainlayer::TrainLayer, monitoring::Vector{Function})
+   monitor = Monitor()
+   trainlayer.monitoring =
+         (rbm, epoch, datadict) ->
+               for f in monitoring
+                  f(monitor, rbm, epoch, datadict)
+               end
+   monitor
+end
+
+function setmonitorsup!(trainlayer::TrainPartitionedLayer,
+      monitoring::Union{Function, Vector{Function}})
    setmonitorsup!(trainlayer.parts, monitoring)
 end
 
 function setmonitorsup!(trainlayers::Vector{<:AbstractTrainLayer},
-      monitoring::Function)
+      monitoring::Union{Function, Vector{Function}})
 
    [setmonitorsup!(t, monitoring) for t in trainlayers]
 end
@@ -75,7 +86,7 @@ function monitored_stackrbms(x::Matrix{Float64};
    trainlayers = stackrbms_preparetrainlayers(x; prepareargs...)
 
    # Update trainlayers with newly constructed monitoring functions.
-   monitors = setmonitorsup!(trainlayers, monitoring) # TODO array of functions
+   monitors = setmonitorsup!(trainlayers, monitoring)
 
    # The training is done with the new trainlayers argument that contains
    # the monitoring functions that write into monitors.

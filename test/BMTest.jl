@@ -863,6 +863,14 @@ function test_monitored_stackrbms()
    @test length(monitors1[1][2]) == epochs
    @test length(monitors1[2]) == epochs
 
+   # Vector of monitoring functions
+   monitors, dbn = BMs.monitored_stackrbms(x;
+         nhiddens = nhiddens,
+         monitoring = [BMs.monitorexactloglikelihood!, BMs.monitorreconstructionerror!],
+         predbm = false, epochs = epochs)
+   @test length(monitors) == length(nhiddens) == length(dbn)
+   @test all(map(length, monitors) .== 2*epochs)
+
    nothing
 end
 
