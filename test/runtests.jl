@@ -34,6 +34,7 @@ BMTest.test_oneornone_encoding()
 BMTest.test_intensities()
 BMTest.test_monitored_fitrbm()
 BMTest.test_monitored_stackrbms()
+BMTest.test_monitored_fitdbm()
 
 println("Finished deterministic tests")
 

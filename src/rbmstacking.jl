@@ -243,13 +243,16 @@ pretraining for Deep Boltzmann Machines and returns the trained model.
 * `samplehidden`: boolean indicating that consequent layers are to be trained
    with sampled values instead of the deterministic potential.
    Using the deterministic potential (`false`) is the default.
+See also: `monitored_stackrbms` for a more convenient monitoring.
 """
 function stackrbms(x::Array{Float64,2};
       predbm::Bool = false,
       samplehidden::Bool = false,
       monitoringdata::DataDict = DataDict(),
       kwargs...)
-      # for the rest of the arguments see stackrbms_preparetrainlayers below
+
+   # for the rest of the arguments see stackrbms_preparetrainlayers below
+   # when changing arguments, consider also potential changes in monitored_stackrbms
 
    stackrbms_checkmonitoringdata(x, monitoringdata)
    trainlayers = stackrbms_preparetrainlayers(x; kwargs...)

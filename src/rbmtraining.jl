@@ -90,6 +90,7 @@ with Contrastive Divergence (CD), and returns it.
    is used. For other types of optimizers, the learning rates must be specified
    in the `optimizer`. For more information on how to write your own optimizer,
    see `AbstractOptimizer`.
+See also: `monitored_fitrbm` for a convenient monitoring of the training.
 """
 function fitrbm(x::Matrix{Float64};
       nhidden::Int = size(x,2),

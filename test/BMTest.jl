@@ -853,7 +853,7 @@ function test_monitored_stackrbms()
       BMs.TrainLayer(nhidden = 4)
    ]
    epochs = 5
-   monitors1, dbm1 = BMs.monitored_stackrbms(x;
+   monitors1, dbm1 = BMs.monitored_stackrbms(xpart;
          trainlayers = trainlayers,
          monitoring = BMs.monitorexactloglikelihood!,
          predbm = true, epochs = epochs)
@@ -871,6 +871,59 @@ function test_monitored_stackrbms()
    @test length(monitors) == length(nhiddens) == length(dbn)
    @test all(map(length, monitors) .== 2*epochs)
 
+   nothing
+end
+
+
+function test_monitored_fitdbm()
+   nvisible1 = 4
+   nvisible2 = 3
+   x = BMTest.createsamples(20, nvisible1)
+   xpart = hcat(x, rand(20, nvisible2))
+
+   kwargs = Dict{Symbol, Any}(:epochs=> 5, :epochspretraining => 10,
+         :nhiddens => [4; 3], :batchsizepretraining => 5,
+         :learningrate => 0.001, :nparticles => 17)
+   # Test whether monitored_fitdbm and fitdbm do the same thing
+   randomseed = abs(rand(Int))
+   Random.seed!(randomseed)
+   monitors1, dbm1 = BMs.monitored_fitdbm(x; kwargs...)
+   @test length(monitors1) == 3
+   @test all(isempty.(monitors1))
+   Random.seed!(randomseed)
+   dbm2 = BMs.fitdbm(x; kwargs...)
+   @test all([all(isapprox.(dbm1[i].weights, dbm2[i].weights)) for i in eachindex(dbm1)])
+
+   # partitioned
+   monitoringdata = BMs.DataDict("Only part" => BMs.splitdata(xpart, 0.5)[1])
+   epochspretraining = 4
+   epochs = 5
+   trainlayers = [
+      BMs.TrainPartitionedLayer([
+         BMs.TrainLayer(nvisible = nvisible1, nhidden = 2)
+         BMs.TrainLayer(nhidden = 2, rbmtype = BMs.GaussianBernoulliRBM2)
+      ]),
+      BMs.TrainLayer(nhidden = 4)
+   ]
+   monitors, dbm = BMs.monitored_fitdbm(xpart;
+         pretraining = trainlayers,
+         monitoringpretraining = BMs.monitorfreeenergy!,
+         monitoring = [BMs.monitorexactloglikelihood!,
+               BMs.monitorlogproblowerbound!],
+         epochs = epochs,
+         epochspretraining = epochspretraining)
+   @test length(monitors) == 3
+   @test length(monitors[1]) == 2 # layers with two partitions
+   @test length(monitors[1][1]) == epochspretraining
+   @test length(monitors[1][2]) == epochspretraining
+   @test length(monitors[2]) == epochspretraining
+   lowerbounditems = filter(m -> m.evaluation == BMs.monitorlogproblowerbound, monitors[3])
+   exactloglikitems = filter(m -> m.evaluation == BMs.monitorexactloglikelihood, monitors[3])
+   @test length(lowerbounditems) == epochs
+   @test length(exactloglikitems) == epochs
+
+   # unknown argument
+   @test_throws ErrorException BMs.monitored_fitdbm(x; bla = 10, epochs = 5)
    nothing
 end
 

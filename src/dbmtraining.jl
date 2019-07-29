@@ -45,7 +45,7 @@ trained using the general Boltzmann Machine learning procedure
    `learningratepretraining` and `batchsizepretraining` are used.
 * `monitoring`: Monitoring function accepting a `dbm` and the number of epochs
    retuning nothing. Used for the monitoring of fine-tuning.
-   See also `monitored_fitdbm` for another way of monitoring.
+   See also `monitored_fitdbm` for a more convenient way of monitoring.
 * `monitoringdatapretraining`: a `DataDict` that contains data used for
    monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)
 * `optimizer`/`optimizers`: an optimizer or a vector of optimizers for each epoch
@@ -73,11 +73,7 @@ function fitdbm(x::Matrix{Float64};
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
       optimizerpretraining::AbstractOptimizer = optimizer)
 
-   if isempty(pretraining) && isempty(nhiddens)
-      # set default only if there is not any more detailed info
-      nvariables = size(x,2)
-      nhiddens = [nvariables; nvariables]
-   end
+   # when changing something here, consider also changing monitored_fitdbm
 
    # Layerwise pre-training
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
