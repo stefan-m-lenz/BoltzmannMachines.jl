@@ -43,8 +43,8 @@ trained using the general Boltzmann Machine learning procedure
    If the number of training epochs and the learning rate are not specified
    explicitly for a layer, the values of `epochspretraining`,
    `learningratepretraining` and `batchsizepretraining` are used.
-* `monitoring`: Monitoring function accepting a `dbm` and the number of epochs
-   retuning nothing. Used for the monitoring of fine-tuning.
+* `monitoring`: Monitoring function accepting a `dbm` and the number of epochs,
+   returning nothing. Used for the monitoring of fine-tuning.
    See also `monitored_fitdbm` for a more convenient way of monitoring.
 * `monitoringdatapretraining`: a `DataDict` that contains data used for
    monitoring the pretraining (see argument `monitoringdata` of `stackrbms`.)

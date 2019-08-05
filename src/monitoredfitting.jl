@@ -18,7 +18,42 @@ function combined_monitoring(monitoring::Vector{Function},
          end
 end
 
-# TODO document
+
+"""
+    monitored_fitrbm(x; ...)
+This function performs the same training procedure as `fitrbm`,
+but facilitates monitoring:
+It fits an RBM model on the data set `x` and collects monitoring results
+during the training in one `Monitor` object.
+Both the collected monitoring results and the trained RBM are returned.
+
+# Optional keyword arguments:
+* `monitoring`: A monitoring function or a vector of monitoring functions
+  that accept four arguments:
+  1. a `Monitor` object, which is used to collect the result of
+     the monitoring function(s)
+  2. the RBM
+  3. the epoch
+  4. the data used for monitoring.
+  By default, there is no monitoring.
+* `monitoringdata`: a `DataDict`, which contains the data that is used for
+   monitoring and passed to the `monitoring` functions(s).
+   By default, the training data `x` is used for monitoring.
+* Other specified keyword arguments are simply handed to `fitrbm`.
+  For more information, please see the documentation there.
+
+# Example:
+    using Random; Random.seed!(0)
+    xtrain, xtest = splitdata(barsandstripes(100, 4), 0.3)
+    monitor, rbm = monitored_fitrbm(xtrain;
+        monitoring = [monitorreconstructionerror!, monitorexactloglikelihood!],
+        monitoringdata = DataDict("Training data" => xtrain, "Test data" => xtest),
+        # some arguments for `fitrbm`:
+        nhidden = 10, learningrate = 0.002, epochs = 200)
+    using BoltzmannMachinesPlots
+    plotevaluation(monitor, monitorreconstructionerror)
+    plotevaluation(monitor, monitorexactloglikelihood)
+"""
 function monitored_fitrbm(x::Matrix{Float64};
       monitoring::Union{Function, Vector{Function}} = emptyfunc,
       monitoringdata::DataDict = DataDict("Training data" => x),
@@ -32,7 +67,7 @@ end
 
 
 """
-Creates monitors and sets the monitoring function in trainlayers such that
+Creates monitors and sets the monitoring function in `trainlayer` such that
 the monitoring is recorded in the newly created monitors.
 Returns the created monitors.
 """
@@ -65,7 +100,46 @@ function setmonitorsup!(trainlayers::Vector{<:AbstractTrainLayer},
 end
 
 
-# TODO document
+"""
+    monitored_stackrbms(x; ...)
+This function performs the same training procedure as `stackrbms`,
+but facilitates monitoring:
+It trains a stack of RBMs using the data set `x` as input to the first layer
+and collects all the monitoring results during the training in a vector of `Monitor`s,
+containing one element for each RBM layer.
+(Elements for partitioned layers are again vectors, containing one element for each
+partition.)
+Both the collected monitoring results and the stack of trained RBMs are returned.
+
+# Optional keyword arguments:
+* `monitoring`: A monitoring function or a vector of monitoring functions
+  that accept four arguments:
+  1. a `Monitor` object, which is used to collect the result of
+     the monitoring function(s)
+  2. the RBM
+  3. the epoch
+  4. the data used for monitoring.
+  By default, there is no monitoring.
+* `monitoringdata`: a `DataDict`, which contains the data that is used for
+   monitoring. For the first layer, the data is passed directly to the `monitoring`
+   function(s). For monitoring the training of the higher layers,
+   the data is propagated through the layers below first.
+   By default, the training data `x` is used for monitoring.
+* Other specified keyword arguments are simply handed to `stackrbms`.
+  For more information, please see the documentation there.
+
+# Example:
+    using Random; Random.seed!(0)
+    xtrain, xtest = splitdata(barsandstripes(100, 4), 0.5)
+    monitors, rbm = monitored_stackrbms(xtrain;
+        monitoring = monitorreconstructionerror!,
+        monitoringdata = DataDict("Training data" => xtrain, "Test data" => xtest),
+        # some arguments for `stackrbms`:
+        nhiddens = [4; 3], learningrate = 0.005, epochs = 100)
+    using BoltzmannMachinesPlots
+    plotevaluation(monitors[1]) # view monitoring of first RBM
+    plotevaluation(monitors[2]) # view monitoring of second RBM
+"""
 function monitored_stackrbms(x::Matrix{Float64};
       monitoring::Union{Function, Vector{Function}} = emptyfunc,
       monitoringdata::DataDict = DataDict("Training data" => x),
@@ -96,7 +170,42 @@ function monitored_stackrbms(x::Matrix{Float64};
    monitors, rbmstack
 end
 
-# TODO document
+
+"""
+    monitored_traindbm!(dbm, x; ...)
+This function performs the same training procedure as `traindbm!`,
+but facilitates monitoring:
+It performs fine-tuning of the given `dbm` on the data set `x`
+and collects monitoring results during the training in one `Monitor` object.
+Both the collected monitoring results and the trained `dbm` are returned.
+
+# Optional keyword arguments:
+* `monitoring`: A monitoring function or a vector of monitoring functions
+  that accept four arguments:
+  1. a `Monitor` object, which is used to collect the result of
+     the monitoring function(s)
+  2. the DBM
+  3. the epoch
+  4. the data used for monitoring.
+  By default, there is no monitoring.
+* `monitoringdata`: a `DataDict`, which contains the data that is used for
+   monitoring and passed to the `monitoring` functions(s).
+   By default, the training data `x` is used for monitoring.
+* Other specified keyword arguments are simply handed to `traindbm!`.
+  For more information, please see the documentation there.
+
+# Example:
+    using Random; Random.seed!(0)
+    xtrain, xtest = splitdata(barsandstripes(100, 4), 0.1)
+    dbm = stackrbms(xtrain; predbm = true, epochs = 20)
+    monitor, dbm = monitored_traindbm!(dbm, xtrain;
+        monitoring = monitorlogproblowerbound!,
+        monitoringdata = DataDict("Training data" => xtrain, "Test data" => xtest),
+        # some arguments for `traindbm!`:
+        epochs = 100, learningrate = 0.1)
+    using BoltzmannMachinesPlots
+    plotevaluation(monitor)
+"""
 function monitored_traindbm!(dbm::MultimodalDBM, x::Matrix{Float64};
       monitoring::Union{Function, Vector{Function}} = emptyfunc,
       monitoringdata::DataDict = DataDict("Training data" => x),
@@ -109,7 +218,59 @@ function monitored_traindbm!(dbm::MultimodalDBM, x::Matrix{Float64};
 end
 
 
-# TODO document
+"""
+    monitored_fitdbm(x; ...)
+This function performs the same training procedure as `fitdbm`,
+but facilitates monitoring:
+It fits an DBM model on the data set `x` using greedy layerwise pre-training and
+subsequent fine-tuning and collects all the monitoring results during the training.
+The monitoring results are stored in a vector of `Monitor`s,
+containing one element for each RBM layer and as last element the monitoring
+results for fine-tuning.
+(Monitoring elements from the pre-training of partitioned layers are again vectors,
+containing one element for each partition.)
+Both the collected monitoring results and the trained DBM are returned.
+
+See also: `monitored_stackrbms`, `monitored_traindbm!`
+
+# Optional keyword arguments:
+* `monitoring`: Used for fine-tuning.
+  A monitoring function or a vector of monitoring functions that accept four arguments:
+  1. a `Monitor` object, which is used to collect the result of
+     the monitoring function(s)
+  2. the DBM
+  3. the epoch
+  4. the data used for monitoring.
+  By default, there is no monitoring of fine-tuning.
+* `monitoringdata`: a `DataDict`, which contains the data that is used for the
+   monitoring. For the pre-training of the first layer and for fine-tuning,
+   the data is passed directly to the `monitoring` function(s).
+   For monitoring the pre-training of the higher RBM layers,
+   the data is propagated through the layers below first.
+   By default, the training data `x` is used for monitoring.
+* `monitoringpretraining`: Used for pre-training. A four-argument function like
+   `monitoring`, but accepts as second argument an RBM.
+   By default there is no monitoring of the pre-training.
+* `monitoringdatapretraining`: Monitoring data used only for pre-training.
+   Defaults to `monitoringdata`.
+* Other specified keyword arguments are simply handed to `fitdbm`.
+  For more information, please see the documentation there.
+
+# Example:
+    using Random; Random.seed!(1)
+    xtrain, xtest = splitdata(barsandstripes(100, 4), 0.5)
+    monitors, rbm = monitored_fitdbm(xtrain;
+        monitoringpretraining = monitorreconstructionerror!,
+        monitoring = monitorlogproblowerbound!,
+        monitoringdata = DataDict("Training data" => xtrain, "Test data" => xtest),
+        # some arguments for `fitdbm`:
+        nhiddens = [4; 3], learningratepretraining = 0.01,
+        learningrate = 0.05, epochspretraining = 100, epochs = 50)
+    using BoltzmannMachinesPlots
+    plotevaluation(monitors[1]) # view monitoring of first RBM
+    plotevaluation(monitors[2]) # view monitoring of second RBM
+    plotevaluation(monitors[3]) # view monitoring fine-tuning
+"""
 function monitored_fitdbm(x::Matrix{Float64};
       monitoring::Union{Function, Vector{Function}} = emptyfunc,
       monitoringdata::DataDict = DataDict("Training data" => x),
