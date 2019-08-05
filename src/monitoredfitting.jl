@@ -327,7 +327,7 @@ function monitored_fitdbm_split_kwargs(kwargs)
       ret
    end
 
-   stackrbms_kwargs = kwargs_without_nothings([
+   stackrbms_kwargs = kwargs_without_nothings(Pair{Symbol, Any}[
          :nhiddens => get(argsdict, :nhiddens, nothing),
          :epochs => get_key_or_altkey_else_nothing(argsdict, :epochspretraining, :epochs),
          :learningrate => get_key_or_altkey_else_nothing(

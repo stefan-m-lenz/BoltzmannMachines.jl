@@ -517,12 +517,12 @@ function check_likelihoodconsistency()
          parallelized = false, nparticles = 300, ntemperatures = 200)
    logp2 = BMs.loglikelihood(dbm, x[1:10,:];
          parallelized = true, nparticles = 300, ntemperatures = 200)
-   @test isapprox(logp1, logp2, rtol = 0.055)
+   @check isapprox(logp1, logp2, rtol = 0.055)
 
    rbm1 = BMs.fitrbm(x; epochs = 20)
    logz1 = BMs.logpartitionfunction(rbm1; parallelized = false)
    logz1_2 = BMs.logpartitionfunction(rbm1; parallelized = true)
-   @test isapprox(logz1, logz1_2, rtol = 0.02)
+   @check isapprox(logz1, logz1_2, rtol = 0.02)
 
    logp1 = BMs.loglikelihood(rbm1, x, logz1)
    rbm2 = BMs.fitrbm(x; epochs = 20, nhidden = 30)
@@ -893,6 +893,9 @@ function test_monitored_fitdbm()
    Random.seed!(randomseed)
    dbm2 = BMs.fitdbm(x; kwargs...)
    @test all([all(isapprox.(dbm1[i].weights, dbm2[i].weights)) for i in eachindex(dbm1)])
+
+   # ensure real types are not unified
+   BMs.monitored_fitdbm(x; epochs = 1, learningrate = 0.05)
 
    # partitioned
    monitoringdata = BMs.DataDict("Only part" => BMs.splitdata(xpart, 0.5)[1])
