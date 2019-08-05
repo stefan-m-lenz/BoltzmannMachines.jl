@@ -29,6 +29,12 @@ rbm = fitrbm(x; nhidden = 12,
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorreconstructionerror)
 
+# Simplified monitoring:
+monitor, rbm = monitored_fitrbm(x; nhidden = 12,
+      epochs = 80, learningrate = 0.006,
+      monitoringdata = datadict,
+      monitoring = [monitorexactloglikelihood!, monitorreconstructionerror!]);
+
 
 Random.seed!(12);
 
@@ -49,13 +55,20 @@ dbm = fitdbm(x, epochs = 20, learningrate = 0.05,
             monitorexactloglikelihood!(monitor, dbm, epoch, datadict));
 
 # Monitoring plots
-BoltzmannMachinesPlots.plotevaluation(monitor1, monitorreconstructionerror)
-BoltzmannMachinesPlots.plotevaluation(monitor2, monitorreconstructionerror)
-BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
+BoltzmannMachinesPlots.plotevaluation(monitor1)
+BoltzmannMachinesPlots.plotevaluation(monitor2)
+BoltzmannMachinesPlots.plotevaluation(monitor)
 
 # Evaluate final result with exact computation of likelihood
 exactloglikelihood(dbm, xtest)
 
+
+# Simplified monitoring
+monitors, dbm = monitored_fitdbm(x; nhiddens = [6,2],
+      epochs = 20, learningrate = 0.05,
+      monitoringpretraining = monitorreconstructionerror!,
+      monitoring = monitorexactloglikelihood!,
+      monitoringdata = datadict);
 
 # If the model has more parameters, in this case more hidden nodes,
 # the exact calclation is not feasible any more:
@@ -69,6 +82,12 @@ rbm = fitrbm(x, nhidden = 36, epochs = 100,
             monitorloglikelihood!(monitor, rbm, epoch, datadict));
 
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorloglikelihood; sdrange = 3.0)
+
+# Simplified monitoring:
+monitor, rbm = monitored_fitrbm(x, nhidden = 36, epochs = 100,
+      learningrates = [0.008*ones(80); 0.001*ones(20)],
+      monitoring = monitorloglikelihood!,
+      monitoringdata = datadict);
 
 
 # In the DBM, the estimation of the log likelihood is much slower than in the
@@ -85,6 +104,12 @@ traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
             monitorlogproblowerbound!(monitor, rbm, epoch, datadict));
 
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorlogproblowerbound; sdrange = 3.0)
+
+
+# Simplified monitoring:
+monitor, dbm = monitored_traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
+      monitoring = monitorlogproblowerbound!,
+      monitoringdata = datadict);
 
 # Evaluate final result with AIS-estimated likelihood
 loglikelihood(dbm, xtest)
