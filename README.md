@@ -100,11 +100,15 @@ The following words, corresponding to the denominated properties, may stand in p
 * `loglikelihood`
 * `logproblowerbound`
 * `reconstructionerror`
-* `weightsnorm`
 
-The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` in the submodule `BMPlots` as `BMPlots.plotevaluation(monitor, key)`, with the key being one of the constants `monitor*` defined in the module.
+The results of evaluations are stored in `Monitor` objects. The evaluations can be plotted by calling the function `plotevaluation` of the external plotting package `BoltzmannMachinesPlots`.
 
-For intended usage of these functions, best see the [examples](test/examples.jl).
+The monitoring mechanism is very flexible and allows the specification of callback functions that can be passed to the training functions `fitrbm`, `stackrbms`, `traindbm!`, and `fitdbm`.
+Monitoring can be streamlined with the functions `monitored_fitrbm`,
+`monitored_stackrbms`, `monitored_traindbm!` and `monitored_fitdbm`.
+These functions also allow user-defined monitoring functions that conform to the same argument schema as the above mentioned predefined monitoring functions.
+
+To see how these functions can be used together, best take a look at the [examples](test/examples.jl).
 
 
 ## Examples
