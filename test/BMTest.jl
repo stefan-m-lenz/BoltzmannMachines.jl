@@ -14,7 +14,7 @@ macro check(expr)
    msg = string(expr) # TODO: print vales
    quote
       if !($(esc(expr)))
-         @warn "Check failed: " $msg
+         @warn "Check failed:\n\t" * $msg
          return false
       else
          true # no return
