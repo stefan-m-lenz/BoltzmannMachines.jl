@@ -1133,8 +1133,7 @@ function test_beam()
                fill(BMs.beamoptimizer(learningrate = 0.0001,
                      sdlearningrate = 0.000001,
                      adversarialweight = 0.5), 20)
-         ],
-         sampler = BMs.TemperatureDrivenSampler(nsteps = 50))
+         ])
    nothing
 end
 
