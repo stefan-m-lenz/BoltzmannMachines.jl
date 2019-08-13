@@ -38,9 +38,11 @@ All these types of DBMs can be trained using layerwise pre-training and fine-tun
 The following tables provide an overview of the functions of the package, together with a short description. You can find more detailed descriptions for each function using the Julia help mode (entered by typing `?` at the beginning of the Julia command prompt).
 
 ### Data preprocessing
-Continuously valued data or ordinal data can be transformed into probabilities via `intensities` and then fed to `BernoulliRBM`s, like it is usually done when handling grayscale or color intensities in images.
+Continuously valued data or ordinal data can be transformed into probabilities via `intensities_encode` and then fed to `BernoulliRBM`s, like it is usually done when handling grayscale or color intensities in images.
 
 Categorical data can be binary encoded as input for a `Softmax0BernoulliRBM` via `oneornone_encode`.
+
+The back transformations are available via the functions `intensities_decode` and `oneornone_decode`.
 
 ### Functions for Training
 
