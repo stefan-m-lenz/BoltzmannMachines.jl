@@ -123,7 +123,7 @@ function fitrbm(x::Matrix{Float64};
          if categories == 0
             error("Argument `categories` required for `Softmax0BernoulliRBM`s.")
          end
-         rbm = initsoftmaxrbm(x, nhidden, categories)
+         rbm = initsoftmax0rbm(x, nhidden, categories)
       else
          rbm = initrbm(x, nhidden, rbmtype)
       end
@@ -215,7 +215,7 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
       return Binomial2BernoulliRBM(weights, visbias, hidbias)
 
    elseif rbmtype == Softmax0BernoulliRBM
-      error("For initialization of `Softmax0BernoulliRBM`s, please use `initsoftmaxrbm`.")
+      error("For initialization of `Softmax0BernoulliRBM`s, please use `initsoftmax0rbm`.")
 
    else
       error(string("Datatype for RBM is unsupported: ", rbmtype))
@@ -223,11 +223,11 @@ function initrbm(x::Array{Float64,2}, nhidden::Int,
 end
 
 
-function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, ncategories::Int)
-   initsoftmaxrbm(x, nhidden, fill(ncategories, div(size(x, 2), ncategories - 1)))
+function initsoftmax0rbm(x::Matrix{Float64}, nhidden::Int, ncategories::Int)
+   initsoftmax0rbm(x, nhidden, fill(ncategories, div(size(x, 2), ncategories - 1)))
 end
 
-function initsoftmaxrbm(x::Matrix{Float64}, nhidden::Int, nscategories::Vector{Int})
+function initsoftmax0rbm(x::Matrix{Float64}, nhidden::Int, nscategories::Vector{Int})
    if size(x, 2) != sum(nscategories) - length(nscategories)
       error("Number of variables ($(size(x, 2))) is not consisten with the " .*
             "given categories ($(nscategories)).")
