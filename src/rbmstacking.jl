@@ -14,7 +14,7 @@ mutable struct TrainLayer <: AbstractTrainLayer
    usedefaultlearningrate::Bool
    sdlearningrate::Float64
    sdlearningrates::Vector{Float64}
-   categories::Int
+   categories::Union{Int, Vector{Int}}
    monitoring::Function
    rbmtype::DataType
    nhidden::Int

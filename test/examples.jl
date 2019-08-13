@@ -71,7 +71,7 @@ monitors, dbm = monitored_fitdbm(x; nhiddens = [6,2],
       monitoringdata = datadict);
 
 # If the model has more parameters, in this case more hidden nodes,
-# the exact calclation is not feasible any more:
+# the exact calculation is not feasible any more:
 # We need to calculate the likelihood using AIS.
 
 Random.seed!(12);
@@ -113,6 +113,77 @@ monitor, dbm = monitored_traindbm!(dbm, x; epochs = 50, learningrate = 0.008,
 
 # Evaluate final result with AIS-estimated likelihood
 loglikelihood(dbm, xtest)
+
+
+# ==============================================================================
+# Mixing binary and categorical data: MultimodalDBM with Softmax0BernoulliRBM
+# ------------------------------------------------------------------------------
+
+# x1: binary data
+x1 = barsandstripes(100, 4);
+# x2: values with categories {0, 1, 2}, (not binomially distributed)
+x2 = map(v -> max(v, 0), x1 .+ barsandstripes(100, 4) .- barsandstripes(100, 4));
+x2 = oneornone_encode(x2, 3)
+x = hcat(x1, x2);
+x, xtest = splitdata(x, 0.3);
+datadict = DataDict("Training data" => x, "Test data" => xtest);
+monitor1 = Monitor(); monitor2 = Monitor(); monitor3 = Monitor(); monitor = Monitor();
+dbm = fitdbm(x; epochspretraining = 50, epochs = 15,
+      learningratepretraining = 0.05, learningrate = 0.1,
+      monitoringdatapretraining = datadict,
+      pretraining = [
+            TrainPartitionedLayer([
+               TrainLayer(nhidden = 5, nvisible = 4,
+                     monitoring = (rbm, epoch, datadict) ->
+                           monitorreconstructionerror!(monitor1, rbm, epoch, datadict));
+               TrainLayer(nhidden = 7,
+                     rbmtype = Softmax0BernoulliRBM, categories = 3,
+                     monitoring = (rbm, epoch, datadict) ->
+                           monitorreconstructionerror!(monitor2, rbm, epoch, datadict))
+            ]),
+            TrainLayer(nhidden = 6,
+                  monitoring = (rbm, epoch, datadict) ->
+                        monitorreconstructionerror!(monitor3, rbm, epoch, datadict))
+      ],
+      monitoring =
+            (dbm, epoch) -> monitorlogproblowerbound!(monitor, dbm, epoch, datadict));
+
+
+# Simplified monitoring
+Random.seed!(1)
+monitors, dbm = monitored_fitdbm(x, epochspretraining = 50, epochs = 15,
+      pretraining = [
+            TrainPartitionedLayer([
+                  TrainLayer(nhidden = 5, nvisible = 4);
+                  TrainLayer(nhidden = 7,
+                        rbmtype = Softmax0BernoulliRBM, categories = 2)]),
+            TrainLayer(nhidden = 6)
+      ],
+      learningratepretraining = 0.05,
+      learningrate = 0.1,
+      monitoringdata = datadict,
+      monitoringpretraining = monitorreconstructionerror!,
+      monitoring = monitorlogproblowerbound!);
+plotevaluation(monitors[1][1]) # Reconstructionerror of BernoulliRBM in first layer
+plotevaluation(monitors[1][2]) # Reconstructionerror of Softmax0BernoulliRBM
+plotevaluation(monitors[2])    # Reconstructionerror of second layer
+plotevaluation(monitors[3])    # Lower bound of likelihood during fine-tuning
+
+
+# It is also possible to combine binary and categorical variables in one RBM,
+# as a Softmax0BernoulliRBM with variables having two categories is equivalent
+# to a BernoulliRBM.
+# Here we do not have a partition then. We can use one Softmax0BernoulliRBM for
+# the visible layer and have to specify the number of categories for each of the
+# variables separately:
+
+categories = [fill(2, 4); fill(3, 4)];
+dbm = fitdbm(x;
+      pretraining = [
+         TrainLayer(nhidden = 7, categories = categories,
+               rbmtype = Softmax0BernoulliRBM);
+         TrainLayer(nhidden = 6)
+      ])
 
 
 # ==============================================================================
