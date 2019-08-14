@@ -116,12 +116,47 @@ loglikelihood(dbm, xtest)
 
 
 # ==============================================================================
-# Mixing binary and categorical data: MultimodalDBM with Softmax0BernoulliRBM
+# Categorical data: Softmax0BernoulliRBM
+# ------------------------------------------------------------------------------
+
+# Some data set with values in the categories {0, 1, 2}
+# Mixing variables with a different number of categories is also possible
+# (see also example below for a MultimodalDBM with binary and categorical
+# variables).
+xcat = map(v -> max(v, 0),
+      barsandstripes(100, 4) .+ barsandstripes(100, 4) .- barsandstripes(100, 4));
+
+# Encode values for Softmax0BernoulliRBM:
+# Each of the variables, which have three categories, are translated into
+# two binary variables.
+# This encoding is to similiar to the one-hot encoding with the deviation
+# that a zero is encoded as all-zeros.
+# (That way, the encoding of binary variables is not changed.)
+x01 = oneornone_encode(xcat, 3) # 3 categories
+rbm = fitrbm(x01, rbmtype = Softmax0BernoulliRBM, categories = 3,
+      nhidden = 4, epochs = 20);
+
+# The monitoring is omitted here for brevity:
+# The same monitoring and training options as those for BernoulliRBMs
+# are also available for Softmax0BernoulliRBMs.
+
+# A DBM with a Softmax0BernoulliRBM in the first layer and binary hidden layers:
+dbm = fitdbm(x01, pretraining = [
+         TrainLayer(rbmtype = Softmax0BernoulliRBM, categories = 3, nhidden = 4);
+         TrainLayer(nhidden = 4);
+         TrainLayer(nhidden = 2)])
+
+# Getting samples with values in the original sample space:
+oneornone_decode(samples(dbm, 5), 3)
+
+
+# ==============================================================================
+# Mixing binary and categorical data: MultimodalDBM
 # ------------------------------------------------------------------------------
 
 # x1: binary data
 x1 = barsandstripes(100, 4);
-# x2: values with categories {0, 1, 2}, (not binomially distributed)
+# x2: values with categories {0, 1, 2}
 x2 = map(v -> max(v, 0), x1 .+ barsandstripes(100, 4) .- barsandstripes(100, 4));
 x2 = oneornone_encode(x2, 3)
 x = hcat(x1, x2);
@@ -149,7 +184,7 @@ dbm = fitdbm(x; epochspretraining = 50, epochs = 15,
             (dbm, epoch) -> monitorlogproblowerbound!(monitor, dbm, epoch, datadict));
 
 
-# Simplified monitoring
+# The same with simplified monitoring:
 Random.seed!(1)
 monitors, dbm = monitored_fitdbm(x, epochspretraining = 50, epochs = 15,
       pretraining = [
@@ -187,24 +222,42 @@ dbm = fitdbm(x;
 
 
 # ==============================================================================
-# Real valued data: GaussianBernoulliRBM
+# Real valued data: Intensities, GaussianBernoulliRBM or GaussianBernoulliRBM2
 # ------------------------------------------------------------------------------
 
-# Use "iris" dataset as example data to train a GaussianBernoulliRBM
+# Use "iris" dataset as example data for continuous data
 using DelimitedFiles
-x = convert(Matrix{Float64}, readdlm(
-            joinpath(dirname(pathof(BoltzmannMachines)), "..", "test/data/iris.csv"), ',',
-            header = true)[1][:,1:4]);
+x = convert(Matrix{Float64},
+      readdlm(joinpath(dirname(pathof(BoltzmannMachines)), "..",
+            "test/data/iris.csv"), ',', header = true)[1][:,1:4]);
 Random.seed!(12);
 x, xtest = splitdata(x, 0.3);
 datadict = DataDict("Training data" => x, "Test data" => xtest);
+
+# Using the intensities transformation and a standard BernoulliRBM
+xintensities, xtrafo = intensities_encode(x)
+rbm = fitrbm(xintensities)
+# Transform samples back into the original sample space:
+intensities_decode(samples(rbm, 5), xtrafo)
+
+# Example using a GaussianBernoulliRBM
+Random.seed!(1);
 monitor = Monitor();
 rbm = fitrbm(x, rbmtype = GaussianBernoulliRBM,
-      nhidden = 3, epochs = 70, learningrate = 0.001,
+      nhidden = 3, epochs = 70, learningrate = 0.0005,
       monitoring = (rbm, epoch) ->
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict));
 
 BoltzmannMachinesPlots.plotevaluation(monitor, monitorexactloglikelihood)
+
+# The alternative variant of an RBM with Gaussian visible nodes and binary hidden
+# nodes, as described by Cho et. al. in "Improved learning of Gaussian-Bernoulli
+# restricted Boltzmann machines", is also available as "GaussianBernoulliRBM2".
+rbm = fitrbm(x, rbmtype = GaussianBernoulliRBM2,
+      nhidden = 3, epochs = 70, learningrate = 0.001);
+
+# The same monitoring options as for BernoulliRBMs are available
+# for GaussianBernoulliRBMs and GaussianBernoulliRBM2s.
 
 
 # ==============================================================================
