@@ -11,6 +11,13 @@ This Julia package implements algorithms for training and evaluating several typ
 * Exact calculation of the likelihood of BMs (only suitable for small models)
 * Annealed Importance Sampling (AIS) for estimating the likelihood of larger BMs
 
+## Installation
+
+The package is contained in the official Julia package registry and can be installed via
+
+    using Pkg
+    Pkg.add("BoltzmannMachines")
+
 ## Types of Boltzmann Machines
 
 ### Restricted Boltzmann Machines
@@ -71,12 +78,12 @@ Function name    | Short description
 
 ### Partitioned training and joining of models
 
-The following functions may be used to join models fitted on partitioned data sets. The weights cross-linking the models are initialized with zeros.
+To fit `MultimodalDBM`s, the arguments for training its (partitioned) layers can be
+specified using structs of type `TrainLayer` and `TrainPartitionedLayer`
+(best see the [examples](test/examples.jl) for how to use these arguments in `fitdbm` or `stackrbms`).
 
-Function name | Short description
---------------|------------------
-`joindbms`    | Joins two or more DBM models together.
-`joinrbms`    | Joins two or more RBM models to form a joint RBM model of the same type.
+The functions `joindbms` and `joinrbms` can be used to join the weights of two
+separately trained models.
 
 
 ### Functions for evaluating a trained model
