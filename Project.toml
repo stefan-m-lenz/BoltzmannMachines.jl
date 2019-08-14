@@ -1,6 +1,6 @@
 name = "BoltzmannMachines"
 uuid = "4f8fbe5d-35a6-506b-99b3-b5866748635b"
-version = "1.2.0-rc"
+version = "1.2.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
