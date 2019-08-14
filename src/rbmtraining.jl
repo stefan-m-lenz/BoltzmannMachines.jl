@@ -73,6 +73,10 @@ with Contrastive Divergence (CD), and returns it.
 * `monitoring`: a function that is executed after each training epoch.
    It takes an RBM and the epoch as arguments.
    See also `monitored_fitrbm` for another way of monitoring.
+* `categories`: only relevant if `rbmtype = Softmax0BernoulliRBM`.
+   The number of categories as `Int`, if all variables have the same number
+   of categories, or as `Vector{Int}` that contains the number of categories
+   of the i'th categorical variable in the i'th entry.
 * `upfactor`, `downfactor`: If this function is used for pretraining a part of
    a DBM, it is necessary to multiply the weights of the RBM with factors.
 * `sdlearningrate`/`sdlearningrates`: learning rate(s) for the
