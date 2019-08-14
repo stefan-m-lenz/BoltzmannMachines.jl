@@ -2,6 +2,7 @@
     joindbms(dbms)
     joindbms(dbms, visibleindexes)
 Joins the DBMs given by the vector `dbms` by joining each layer of RBMs.
+The weights cross-linking the models are initialized with zeros.
 
 If the vector `visibleindexes` is specified, it is supposed to contain in the
 i'th entry an indexing vector that determines the positions in the combined
@@ -24,6 +25,7 @@ end
     joinrbms(rbms, visibleindexes)
 Joins the given vector of `rbms` of the same type to form one RBM of this type
 and returns the joined RBM.
+The weights cross-linking the models are initialized with zeros.
 """
 function joinrbms(rbm1::T, rbm2::T) where {T<:AbstractRBM}
    joinrbms(T[rbm1, rbm2])
