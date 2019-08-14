@@ -199,10 +199,15 @@ monitors, dbm = monitored_fitdbm(x, epochspretraining = 50, epochs = 15,
       monitoringdata = datadict,
       monitoringpretraining = monitorreconstructionerror!,
       monitoring = monitorlogproblowerbound!);
-plotevaluation(monitors[1][1]) # Reconstructionerror of BernoulliRBM in first layer
-plotevaluation(monitors[1][2]) # Reconstructionerror of Softmax0BernoulliRBM
-plotevaluation(monitors[2])    # Reconstructionerror of second layer
-plotevaluation(monitors[3])    # Lower bound of likelihood during fine-tuning
+
+# Reconstructionerror of BernoulliRBM in first layer:
+BoltzmannMachinesPlots.plotevaluation(monitors[1][1])
+# Reconstructionerror of Softmax0BernoulliRBM:
+BoltzmannMachinesPlots.plotevaluation(monitors[1][2])
+# Reconstructionerror of second layer:
+BoltzmannMachinesPlots.plotevaluation(monitors[2])
+# Lower bound of likelihood during fine-tuning:
+BoltzmannMachinesPlots.plotevaluation(monitors[3])
 
 
 # It is also possible to combine binary and categorical variables in one RBM,
@@ -244,7 +249,7 @@ intensities_decode(samples(rbm, 5), xtrafo)
 Random.seed!(1);
 monitor = Monitor();
 rbm = fitrbm(x, rbmtype = GaussianBernoulliRBM,
-      nhidden = 3, epochs = 70, learningrate = 0.0005,
+      nhidden = 3, epochs = 80, learningrate = 0.0005,
       monitoring = (rbm, epoch) ->
             monitorexactloglikelihood!(monitor, rbm, epoch, datadict));
 
