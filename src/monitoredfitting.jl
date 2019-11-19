@@ -259,7 +259,7 @@ See also: `monitored_stackrbms`, `monitored_traindbm!`
 # Example:
     using Random; Random.seed!(1)
     xtrain, xtest = splitdata(barsandstripes(100, 4), 0.5)
-    monitors, rbm = monitored_fitdbm(xtrain;
+    monitors, dbm = monitored_fitdbm(xtrain;
         monitoringpretraining = monitorreconstructionerror!,
         monitoring = monitorlogproblowerbound!,
         monitoringdata = DataDict("Training data" => xtrain, "Test data" => xtest),
