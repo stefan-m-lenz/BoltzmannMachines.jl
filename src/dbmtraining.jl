@@ -201,6 +201,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} =
             defaultfinetuninglearningrates(sdlearningrate, epochs),
+      batchsize::Int = size(x, 2),
       monitoring::Function = emptyfunc,
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
@@ -214,8 +215,15 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
 
    particles = initparticles(dbm, nparticles)
 
+   nsamples = size(x, 1)
+   batchmasks = randombatchmasks(nsamples, batchsize)
+   nbatchmasks = length(batchmasks)
+   normalbatchsize = true
+
    for epoch = 1:epochs
-      traindbm!(dbm, x, particles, optimizers[epoch])
+      for batchindex in eachindex(batchmasks)
+         traindbm!(dbm, x, particles, optimizers[epoch])
+      end
 
       # monitoring the learning process at the end of epoch
       monitoring(dbm, epoch)
