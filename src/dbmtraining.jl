@@ -32,7 +32,13 @@ trained using the general Boltzmann Machine learning procedure
    (For more details see `traindbm!`).
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
+* `batchsize`: Number of samples in mini-batches for pretraining and fine tuning.
+   By default, a batchsize of 1 is used for pretraining.
+   For fine tuning, no mini-batches are used by default, which means that
+   the complete data set is used for calculating the gradient in each epoch.
 * `batchsizepretraining`: batchsize for pretraining, defaults to 1
+* `batchsizefinetuning`: batchsize for fine tuning. Defaults to the number of samples
+   in the data set, i.e., no mini batches are used.
 * `nparticles`: number of particles used for sampling during joint training of
    DBM, default 100
 * `pretraining`: The arguments for layerwise pretraining
@@ -65,7 +71,9 @@ function fitdbm(x::Matrix{Float64};
             defaultfinetuninglearningrates(sdlearningrate, epochs),
       learningratepretraining::Float64 = learningrate,
       epochspretraining::Int = epochs,
-      batchsizepretraining::Int = 1,
+      batchsize::Int = -1,
+      batchsizepretraining::Int = (batchsize < 0 ? 1 : batchsize),
+      batchsizefinetuning::Int = (batchsize < 0 ? size(x, 1) : batchsize)
       pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoring::Function = emptyfunc,
       monitoringdatapretraining::DataDict = DataDict(),
@@ -89,6 +97,7 @@ function fitdbm(x::Matrix{Float64};
    traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
          learningrate = learningrate, learningrates = learningrates,
          sdlearningrate = sdlearningrate, sdlearningrates = sdlearningrates,
+         batchsize = batchsizefinetuning,
          optimizer = optimizer, optimizers = optimizers,
          monitoring = monitoring)
 end
@@ -201,7 +210,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} =
             defaultfinetuninglearningrates(sdlearningrate, epochs),
-      batchsize::Int = size(x, 2),
+      batchsize::Int = size(x, 1),
       monitoring::Function = emptyfunc,
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}())
@@ -216,16 +225,24 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
    particles = initparticles(dbm, nparticles)
 
    nsamples = size(x, 1)
-   batchmasks = randombatchmasks(nsamples, batchsize)
-   nbatchmasks = length(batchmasks)
-   normalbatchsize = true
 
    for epoch = 1:epochs
-      for batchindex in eachindex(batchmasks)
+
+      # Perform training,...
+      if batchsize != nsamples
+         # ... either using mini batches  ...
+         batchmasks = randombatchmasks(nsamples, batchsize)
+
+         for batchmask in batchmasks
+            batch = view(x, batchmask, :)
+            traindbm!(dbm, batch, particles, optimizers[epoch])
+         end
+      else
+         # ... or computing the gradient with the complete data set.
          traindbm!(dbm, x, particles, optimizers[epoch])
       end
 
-      # monitoring the learning process at the end of epoch
+      # monitor the learning process at the end of epoch
       monitoring(dbm, epoch)
    end
 
@@ -237,7 +254,7 @@ end
     traindbm!(dbm, x, particles, learningrate)
 Trains the given `dbm` for one epoch.
 """
-function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2}, particles::Particles,
+function traindbm!(dbm::MultimodalDBM, x::AbstractArray{Float64,2}, particles::Particles,
       optimizer::AbstractOptimizer)
 
    gibbssample!(particles, dbm)
