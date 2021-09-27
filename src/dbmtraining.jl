@@ -73,7 +73,7 @@ function fitdbm(x::Matrix{Float64};
       epochspretraining::Int = epochs,
       batchsize::Int = -1,
       batchsizepretraining::Int = (batchsize < 0 ? 1 : batchsize),
-      batchsizefinetuning::Int = (batchsize < 0 ? size(x, 1) : batchsize)
+      batchsizefinetuning::Int = (batchsize < 0 ? size(x, 1) : batchsize),
       pretraining::AbstractTrainLayers = Vector{TrainLayer}(),
       monitoring::Function = emptyfunc,
       monitoringdatapretraining::DataDict = DataDict(),
@@ -126,7 +126,7 @@ The number of particles is equal to the number of samples in `x`.
 `eps` is the convergence criterion for the fix-point iteration, default 0.001.
 It is assumed that all nodes in in-between-layers are Bernoulli distributed.
 """
-function meanfield(dbm::MultimodalDBM, x::Array{Float64,2}, eps::Float64 = 0.001)
+function meanfield(dbm::MultimodalDBM, x::AbstractArray{Float64,2}, eps::Float64 = 0.001)
 
    nlayers = length(dbm) + 1
    mu = Particles(undef, nlayers)
