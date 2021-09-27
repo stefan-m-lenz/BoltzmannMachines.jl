@@ -60,6 +60,7 @@ trained using the general Boltzmann Machine learning procedure
    Defaults to the `optimizer`.
 """
 function fitdbm(x::Matrix{Float64};
+      # !!! when changing arguments here, consider also changing monitored_fitdbm !!!
       nhiddens::Vector{Int} = Vector{Int}(),
       epochs::Int = 10,
       nparticles::Int = 100,
@@ -80,8 +81,6 @@ function fitdbm(x::Matrix{Float64};
       optimizer::AbstractOptimizer = NoOptimizer(),
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
       optimizerpretraining::AbstractOptimizer = optimizer)
-
-   # when changing something here, consider also changing monitored_fitdbm
 
    # Layerwise pre-training
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,

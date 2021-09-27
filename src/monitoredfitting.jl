@@ -296,18 +296,21 @@ function monitored_fitdbm(x::Matrix{Float64};
 end
 
 
-const traindbm_argkeys = [:epochs, :nparticles, :learningrate, :learningrates,
-      :sdlearningrate, :sdlearningrates, :optimizer, :optimizers]
+const traindbm_argkeys = [:epochs, :nparticles,
+      :learningrate, :learningrates, :sdlearningrate, :sdlearningrates,
+      :batchsize, :optimizer, :optimizers]
 
 const fitrbm_argkeys_for_stackrbm = [:nhiddens, :epochspretraining, :batchsizepretraining,
-      :learningratepretraining, :optimizer, :pretraining]
+      :learningratepretraining, :optimizer, :optimizerpretraining, :pretraining]
 
-const monitored_fitrbm_argkeys = union(traindbm_argkeys, fitrbm_argkeys_for_stackrbm)
+const finetuning_argkeys = [:batchsizefinetuning] # TODO
+
+const monitored_fitdbm_argkeys = union(traindbm_argkeys, fitrbm_argkeys_for_stackrbm)
 
 function monitored_fitdbm_split_kwargs(kwargs)
    argsdict = Dict{Symbol, Any}(kwargs)
 
-   unknownarguments = setdiff(keys(kwargs), monitored_fitrbm_argkeys)
+   unknownarguments = setdiff(keys(kwargs), monitored_fitdbm_argkeys)
    if !isempty(unknownarguments)
       error("Unknown keyword arguments: " * string(unknownarguments))
    end
@@ -315,7 +318,7 @@ function monitored_fitdbm_split_kwargs(kwargs)
    # a function to filter out the arguments with value "nothing":
    # the default values do not need to be touched.
    function kwargs_without_nothings(args)
-      Dict{Symbol, Any}(filter(k_v -> k_v[2] != nothing, args))
+      Dict{Symbol, Any}(filter(k_v -> k_v[2] !== nothing, args))
    end
 
    # used to handle the precedence of the default values
@@ -332,7 +335,8 @@ function monitored_fitdbm_split_kwargs(kwargs)
          :epochs => get_key_or_altkey_else_nothing(argsdict, :epochspretraining, :epochs),
          :learningrate => get_key_or_altkey_else_nothing(
                argsdict, :learningratepretraining, :learningrate),
-         :batchsize => get(argsdict, :batchsizepretraining, nothing),
+         :batchsize =>  get_key_or_altkey_else_nothing(
+               argsdict, :batchsizepretraining, :batchsize),
          :optimizer => get_key_or_altkey_else_nothing(
                argsdict, :optimizerpretraining, :optimizer),
          :trainlayers => get(argsdict, :pretraining, nothing)
