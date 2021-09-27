@@ -88,7 +88,7 @@ function fitdbm(x::Matrix{Float64};
          epochs = epochspretraining, predbm = true,
          batchsize = batchsizepretraining,
          learningrate = learningratepretraining,
-         optimizer = optimizer,
+         optimizer = optimizerpretraining,
          trainlayers = pretraining,
          monitoringdata = monitoringdatapretraining)
 
