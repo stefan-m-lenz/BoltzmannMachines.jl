@@ -63,15 +63,16 @@ function fitdbm(x::Matrix{Float64};
       # !!! when changing arguments here, consider also changing monitored_fitdbm !!!
       nhiddens::Vector{Int} = Vector{Int}(),
       epochs::Int = 10,
+      epochspretraining::Int = epochs,
+      epochsfinetuning::Int = epochs,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
       learningrates::Vector{Float64} =
-            defaultfinetuninglearningrates(learningrate, epochs),
+            defaultfinetuninglearningrates(learningrate, epochsfinetuning),
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} =
-            defaultfinetuninglearningrates(sdlearningrate, epochs),
+            defaultfinetuninglearningrates(sdlearningrate, epochsfinetuning),
       learningratepretraining::Float64 = learningrate,
-      epochspretraining::Int = epochs,
       batchsize::Int = -1,
       batchsizepretraining::Int = (batchsize < 0 ? 1 : batchsize),
       batchsizefinetuning::Int = (batchsize < 0 ? size(x, 1) : batchsize),
@@ -93,7 +94,8 @@ function fitdbm(x::Matrix{Float64};
 
    # Fine-tuning using mean-field approximation in algorithm for
    # training a general Boltzmann machine
-   traindbm!(pretraineddbm, x, epochs = epochs, nparticles = nparticles,
+   traindbm!(pretraineddbm, x,
+         epochs = epochsfinetuning, nparticles = nparticles,
          learningrate = learningrate, learningrates = learningrates,
          sdlearningrate = sdlearningrate, sdlearningrates = sdlearningrates,
          batchsize = batchsizefinetuning,

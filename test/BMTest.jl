@@ -875,6 +875,11 @@ function test_monitored_stackrbms()
 end
 
 
+function dbms_are_approx_equal(dbm1, dbm2)
+   all([all(isapprox.(dbm1[i].weights, dbm2[i].weights)) for i in eachindex(dbm1)])
+end
+
+
 function test_monitored_fitdbm()
    nvisible1 = 4
    nvisible2 = 3
@@ -892,7 +897,7 @@ function test_monitored_fitdbm()
    @test all(isempty.(monitors1))
    Random.seed!(randomseed)
    dbm2 = BMs.fitdbm(x; kwargs...)
-   @test all([all(isapprox.(dbm1[i].weights, dbm2[i].weights)) for i in eachindex(dbm1)])
+   @test dbms_are_approx_equal(dbm1, dbm2)
 
    # ensure real types are not unified
    BMs.monitored_fitdbm(x; epochs = 1, learningrate = 0.05)
@@ -925,8 +930,63 @@ function test_monitored_fitdbm()
    @test length(lowerbounditems) == epochs
    @test length(exactloglikitems) == epochs
 
-   # unknown argument
+   # passing an unknown argument must throw an exception
    @test_throws ErrorException BMs.monitored_fitdbm(x; bla = 10, epochs = 5)
+
+   nothing
+end
+
+
+function test_batchsize_dbm_training()
+   x = BMTest.createsamples(20, 4)
+
+   randomseed = abs(rand(Int))
+   # Test correct defaults for batchsize
+   Random.seed!(randomseed)
+   dbm1 = BMs.fitdbm(x; epochs = 2)
+   Random.seed!(randomseed)
+   _, dbm2 = BMs.monitored_fitdbm(x; epochs = 2, batchsize = 1, batchsizefinetuning = size(x,1))
+   @test BMTest.dbms_are_approx_equal(dbm1, dbm2)
+
+   # Test specifying different batchsizefinetuning
+   Random.seed!(randomseed)
+   dbm2 = BMs.fitdbm(x; epochs = 2, batchsizefinetuning = 2)
+   Random.seed!(randomseed)
+   _, dbm3 = BMs.monitored_fitdbm(x; epochs = 2, batchsize = 1, batchsizefinetuning = 2)
+   @test BMTest.dbms_are_approx_equal(dbm2, dbm3)
+   @test !BMTest.dbms_are_approx_equal(dbm1, dbm3)
+
+   # Test that batchsize argument determines both fine-tuning and pretraining
+   Random.seed!(randomseed)
+   dbm4 = BMs.fitdbm(x; epochs = 2, batchsize = 2)
+   Random.seed!(randomseed)
+   _, dbm5 = BMs.monitored_fitdbm(x; epochs = 2, batchsizepretraining = 2,  batchsizefinetuning = 2)
+   @test BMTest.dbms_are_approx_equal(dbm4, dbm5)
+   @test !BMTest.dbms_are_approx_equal(dbm3, dbm5)
+
+   nothing
+end
+
+
+function test_epochs_dbm_training()
+   x = BMTest.createsamples(20, 4)
+
+   randomseed = abs(rand(Int))
+   # Test correct defaults for epochs
+   Random.seed!(randomseed)
+   dbm1 = BMs.fitdbm(x; epochs = 2)
+   Random.seed!(randomseed)
+   _, dbm2 = BMs.monitored_fitdbm(x; epochspretraining = 2, epochsfinetuning = 2)
+   @test BMTest.dbms_are_approx_equal(dbm1, dbm2)
+
+   # Test specifying different epochs for finetuning
+   Random.seed!(randomseed)
+   dbm2 = BMs.fitdbm(x; epochs = 1, epochsfinetuning = 2)
+   Random.seed!(randomseed)
+   _, dbm3 = BMs.monitored_fitdbm(x; epochspretraining = 1, epochsfinetuning = 2)
+   @test BMTest.dbms_are_approx_equal(dbm2, dbm3)
+   @test !BMTest.dbms_are_approx_equal(dbm1, dbm3)
+
    nothing
 end
 
