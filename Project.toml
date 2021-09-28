@@ -1,6 +1,6 @@
 name = "BoltzmannMachines"
 uuid = "4f8fbe5d-35a6-506b-99b3-b5866748635b"
-version = "1.2.0"
+version = "1.3.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -9,7 +9,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
-julia = "≥ 0.7.0"
+julia = "≥ 1.0"
 
 [extras]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
