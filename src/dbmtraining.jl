@@ -15,7 +15,7 @@ The procedure consists of two parts:
 First a stack of RBMs is pretrained in a greedy layerwise manner
 (see `stackrbms(x)`). Then the weights of all layers are jointly
 trained using the general Boltzmann Machine learning procedure
-(see `traindbm!(dbm,x)`).
+(fine tuning, see `traindbm!(dbm,x)`).
 
 # Optional keyword arguments (ordered by importance):
 * `nhiddens`: vector that defines the number of nodes in the hidden layers of
@@ -24,15 +24,22 @@ trained using the general Boltzmann Machine learning procedure
 * `epochs`: number of training epochs for joint training, defaults to 10
 * `epochspretraining`: number of training epochs for pretraining,
    defaults to `epochs`
-* `learningrate`/`learningrates`:
-   learning rate(s) for joint training of layers (= fine tuning)
-   using the learning algorithm for a general Boltzmann Machine.
+* `learningrate`: learning rate for pretraining.
+   Also used as initial value for the decaying fine tuning learning rate.
+* `learningrates` (deprecated) / `learningratesfinetuning`:
    The learning rate for fine tuning is by default decaying with the number of epochs,
-   starting with the given value for the `learningrate`.
-   (For more details see `traindbm!`).
+   starting with the value of the `learningrate`.
+   (For more details see `traindbm!`.)
+   The value of the learning rate for each epoch of fine tuning can be specified
+   via the argument `learningratesfinetuning` as a vector
+   with an entry for each of the epochs.
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
-* `batchsize`: Number of samples in mini-batches for pretraining and fine tuning.
+* `learningratefinetuning`: initial learning rate for fine tuning.
+   The learning rate for fine tuning is decaying with the number of epochs,
+   starting with the given value for the `learningratefinetuning` or the `learningrate`.
+   (For more details see `traindbm!`.)
+* `batchsize`: number of samples in mini-batches for pretraining and fine tuning.
    By default, a batchsize of 1 is used for pretraining.
    For fine tuning, no mini-batches are used by default, which means that
    the complete data set is used for calculating the gradient in each epoch.
@@ -67,8 +74,9 @@ function fitdbm(x::Matrix{Float64};
       epochsfinetuning::Int = epochs,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
-      learningrates::Vector{Float64} =
-            defaultfinetuninglearningrates(learningrate, epochsfinetuning),
+      learningratefinetuning::Float64 = learningrate,
+      learningrates::Vector{Float64} = Vector{Float64}(),
+      learningratesfinetuning::Vector{Float64} = Vector{Float64}(),
       sdlearningrate::Float64 = 0.0,
       sdlearningrates::Vector{Float64} =
             defaultfinetuninglearningrates(sdlearningrate, epochsfinetuning),
@@ -83,6 +91,18 @@ function fitdbm(x::Matrix{Float64};
       optimizers::Vector{<:AbstractOptimizer} = Vector{AbstractOptimizer}(),
       optimizerpretraining::AbstractOptimizer = optimizer)
 
+   if !isempty(learningrates)
+      Base.depwarn("Argument `learningrates` in fitdbm is deprecated, use `learningratesfinetuning` instead.",
+            :fitdbm)
+      if isempty(learningratesfinetuning)
+         learningratesfinetuning = learningrates
+      end
+   end
+   if isempty(learningratesfinetuning)
+      learningratesfinetuning =
+            defaultfinetuninglearningrates(learningratefinetuning, epochsfinetuning)
+   end
+
    # Layerwise pre-training
    pretraineddbm = stackrbms(x, nhiddens = nhiddens,
          epochs = epochspretraining, predbm = true,
@@ -96,7 +116,7 @@ function fitdbm(x::Matrix{Float64};
    # training a general Boltzmann machine
    traindbm!(pretraineddbm, x,
          epochs = epochsfinetuning, nparticles = nparticles,
-         learningrate = learningrate, learningrates = learningrates,
+         learningrate = learningratefinetuning, learningrates = learningratesfinetuning,
          sdlearningrate = sdlearningrate, sdlearningrates = sdlearningrates,
          batchsize = batchsizefinetuning,
          optimizer = optimizer, optimizers = optimizers,

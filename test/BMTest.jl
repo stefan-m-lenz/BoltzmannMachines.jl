@@ -991,6 +991,29 @@ function test_epochs_dbm_training()
 end
 
 
+function test_learningrates_dbm_training()
+   x = BMTest.createsamples(20, 4)
+
+   randomseed = abs(rand(Int))
+
+   Random.seed!(randomseed)
+   dbm1 = BMs.fitdbm(x; learningratefinetuning = 0.1, learningratepretraining = 0.2, epochs = 1)
+   Random.seed!(randomseed)
+   # arguments learningratefinetuning and learningratepretraining work
+   _, dbm2 = BMs.monitored_fitdbm(x; learningratefinetuning = 0.1, learningratepretraining = 0.2,
+         epochs = 1)
+   @test BMTest.dbms_are_approx_equal(dbm1, dbm2)
+
+   Random.seed!(randomseed)
+   # learningratefinetuning used as starting value for fine tuning learning rates
+   _, dbm3 = BMs.monitored_fitdbm(x; learningratesfinetuning = [0.1], learningratepretraining = 0.2,
+         epochs = 1)
+   @test BMTest.dbms_are_approx_equal(dbm1, dbm3)
+
+   nothing
+end
+
+
 function check_mdbm_rbm_b2brbm()
    nsamples = 100
    nvariables = 4
@@ -1098,7 +1121,7 @@ function check_mdbm_gaussianvisibles()
          epochspretraining = 20,
          learningratepretraining = 0.001,
          pretraining = trainlayers,
-         learningrates = learningrates)
+         learningratesfinetuning = learningrates)
 
    # first and second dbm must be equal
    @test length(dbm1) == length(dbm2)

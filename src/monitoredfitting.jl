@@ -303,7 +303,8 @@ const traindbm_argkeys = [:epochs, :nparticles,
 const fitdbm_argkeys_for_stackrbm = [:nhiddens, :epochspretraining, :batchsizepretraining,
       :learningratepretraining, :optimizer, :optimizerpretraining, :pretraining]
 
-const finetuning_argkeys = [:batchsizefinetuning, :epochsfinetuning]
+const finetuning_argkeys = [:batchsizefinetuning, :epochsfinetuning,
+      :learningratefinetuning, :learningratesfinetuning]
 
 const monitored_fitdbm_argkeys =
       union(traindbm_argkeys, fitdbm_argkeys_for_stackrbm, finetuning_argkeys)
@@ -350,6 +351,12 @@ function monitored_fitdbm_split_kwargs(kwargs)
    end
    if haskey(argsdict, :epochsfinetuning)
       traindbm_kwargs[:epochs] = argsdict[:epochsfinetuning]
+   end
+   if haskey(argsdict, :learningratefinetuning)
+      traindbm_kwargs[:learningrate] = argsdict[:learningratefinetuning]
+   end
+   if haskey(argsdict, :learningratesfinetuning)
+      traindbm_kwargs[:learningrates] = argsdict[:learningratesfinetuning]
    end
 
    stackrbms_kwargs, traindbm_kwargs
