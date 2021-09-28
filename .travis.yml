@@ -1,5 +1,0 @@
-language: julia
-julia:
-  - 1.0
-after_success:
-  - julia -e 'import BoltzmannMachines; cd(joinpath(dirname(pathof(BoltzmannMachines)), "..")); using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
