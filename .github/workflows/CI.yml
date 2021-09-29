@@ -11,6 +11,7 @@ jobs:
       matrix:
         version:
           - '1'
+          - '1.6'
         os:
           - ubuntu-latest
         arch:
@@ -34,8 +35,13 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
-      - name: Coveralls GitHub Action
-        uses: coverallsapp/github-action@v1.1.2
-        with:
-          github-token: ${{ github.token }}
-          path-to-lcov: lcov.info
+  uploadcoverage:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@1
+      with:
+        github-token: ${{ secrets.github_token }}
+        parallel-finished: true
+        path-to-lcov: lcov.info
