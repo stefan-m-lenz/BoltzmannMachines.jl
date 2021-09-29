@@ -1,6 +1,6 @@
 # BoltzmannMachines.jl
 
-[![Build Status](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl.svg?branch=master)](https://travis-ci.org/stefan-m-lenz/BoltzmannMachines.jl)
+[![Build Status](https://github.com/stefan-m-lenz/BoltzmannMachines.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/stefan-m-lenz/BoltzmannMachines.jl/actions)
 <!--[![Coverage Status](https://coveralls.io/repos/github/stefan-m-lenz/BoltzmannMachines.jl/badge.svg?branch=master)](https://coveralls.io/github/stefan-m-lenz/BoltzmannMachines.jl?branch=master)-->
 
 This Julia package implements algorithms for training and evaluating several types of Boltzmann Machines (BMs):
