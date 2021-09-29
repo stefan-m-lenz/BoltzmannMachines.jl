@@ -48,9 +48,24 @@ println("Finished deterministic tests")
 nondeterministictestidx = 0
 
 # Perform non-deterministic tests, allow failures up to n times
-function softly(fun, n::Int = 7)
-   for i = 1:n
-      if fun()
+function softly(fun; nfail::Int = 7)
+
+   treatasfail = [ErrorException("Not enough samples")]
+
+   for i = 1:nfail
+      pass = false
+      try
+         pass = fun()
+      catch ex
+         if ex in treatasfail
+            pass = false
+            @warn ex
+         else
+            rethrow(ex)
+         end
+      end
+
+      if pass
          global nondeterministictestidx += 1
          # print some output to keep Travis going
          println("Non-deterministic test #$nondeterministictestidx passed" *
