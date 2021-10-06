@@ -257,3 +257,41 @@ function piecewiselinearsequences(nsequences::Int, nvariables::Int;
    end
    x
 end
+
+
+"""
+    top2latentdims(dbm, x)
+Get a two-dimensional representation for all the samples/rows
+in the data set `x`, employing a given `dbm` for the dimension reduction.
+For achieving the dimension reduction,
+at first the mean-field activation induced by the samples
+in the hidden nodes of the last/top hidden layer of the `dbm` is calculated.
+The mean-field activation of the top hidden nodes is logit-transformed
+to get a better separation.
+If the number of hidden nodes in the last hidden layer is greater than 2, a
+principal component analysis (PCA) is used
+on these logit-transformed mean-field values to obtain a two-dimensional representation.
+The result is a matrix with 2 columns, each row belonging to a sample/row in `x`.
+"""
+function top2latentdims(dbm::MultimodalDBM, x::AbstractArray)
+   h = meanfield(dbm, x)[end]
+
+   # logit transform
+   h .= -log.(1 ./ h .- 1)
+
+   function standardize(x)
+      (x.- mean(x, dims = 1)) ./ std(x, dims = 1)
+   end
+
+   ntophidden = size(h, 2)
+   if ntophidden > 2
+      # reduce top activations further with PCA
+      u, s, v = svd(standardize(x))
+      return u[:, 1:2]
+   elseif ntophidden == 2
+      return h
+   else
+      # if there is only one hidden node, add zeros as 2nd dimension
+      return hcat(h, zeros(eltype(h), size(h)...))
+   end
+end

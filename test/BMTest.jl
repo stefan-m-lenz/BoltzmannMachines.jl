@@ -1014,6 +1014,26 @@ function test_learningrates_dbm_training()
 end
 
 
+function test_top2latentdims()
+   nsamples = 10
+   x = BMTest.createsamples(nsamples, 4)
+
+   dbm = BMs.fitdbm(x, nhiddens = [3, 2], epochs = 1)
+   dimred = BMs.top2latentdims(dbm, x)
+   @test size(dimred) == (nsamples, 2)
+
+   dbm = BMs.fitdbm(x, nhiddens = [4, 4], epochs = 1)
+   dimred = BMs.top2latentdims(dbm, x)
+   @test size(dimred) == (nsamples, 2)
+
+   dbm = BMs.fitdbm(x, nhiddens = [2, 1], epochs = 1)
+   dimred = BMs.top2latentdims(dbm, x)
+   @test size(dimred) == (nsamples, 2)
+
+   nothing
+end
+
+
 function check_mdbm_rbm_b2brbm()
    nsamples = 100
    nvariables = 4

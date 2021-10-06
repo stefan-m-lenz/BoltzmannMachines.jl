@@ -38,6 +38,7 @@ BMTest.test_monitored_fitdbm()
 BMTest.test_batchsize_dbm_training()
 BMTest.test_epochs_dbm_training()
 BMTest.test_learningrates_dbm_training()
+BMTest.test_top2latentdims()
 
 println("Finished deterministic tests")
 
