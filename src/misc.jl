@@ -318,7 +318,7 @@ function top2latentdims(dbm::MultimodalDBM, x::AbstractArray)
    ntophidden = size(h, 2)
    if ntophidden > 2
       # reduce top activations further with PCA
-      u, s, v = svd(standardize(x))
+      u, s, v = svd(standardize(h))
       return u[:, 1:2]
    elseif ntophidden == 2
       return h

@@ -119,21 +119,31 @@ loglikelihood(dbm, xtest)
 # Dimension reduction using DBMs
 # ------------------------------------------------------------------------------
 
-Random.seed!(1);
+Random.seed!(0);
 # Calculate a two dimensional dimension reduction on the data
-x, xlabels = blocksinnoise(500, 50, blocklen = 5, nblocks = 3)
-monitor, dbm = monitored_fitdbm(x, nhiddens = [50, 40, 25, 15],
+x, xlabels = blocksinnoise(500, 50, blocklen = 5, nblocks = 5)
+dbm = fitdbm(x, nhiddens = [50, 30, 15],
       batchsize = 5,
       epochspretraining = 100,
       learningratepretraining = 0.005,
       epochsfinetuning = 30,
       learningratefinetuning = 0.001)
 
+# Calculate a two-dimensional representation of the data
 dimred = top2latentdims(dbm, x)
+# ( ... can be plotted easily ...) # TODO with scatter?
 
-# Calculate and plot dimension reduction in one command
-dimred = BoltzmannMachinesPlots.plottop2latentdims(dbm, x, labels = xlabels)
+# Calculate and plot dimension reduction in one convenient command
+BoltzmannMachinesPlots.plottop2latentdims(dbm, x, labels = xlabels)
 
+# Comparison with PCA
+using LinearAlgebra
+using Statistics
+standardize(x) = (x.- mean(x, dims = 1)) ./ std(x, dims = 1)
+u, s, v = svd(standardize(x))
+BoltzmannMachinesPlots.scatter(u[:,1:2], labels = string.(xlabels))
+
+# TODO remove plottop2latentdims and make scatter public?
 
 # ==============================================================================
 # Categorical data: Softmax0BernoulliRBM
