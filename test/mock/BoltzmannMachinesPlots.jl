@@ -6,4 +6,5 @@ module BoltzmannMachinesPlots
 function plotevaluation(args1...; kwargs...) end
 function crossvalidationcurve(args1...; kwargs...) end
 function plottop2latentdims(args...; kwargs...) end
+function scatter(args...; kwargs...) end
 end

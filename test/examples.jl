@@ -141,9 +141,9 @@ using LinearAlgebra
 using Statistics
 standardize(x) = (x.- mean(x, dims = 1)) ./ std(x, dims = 1)
 u, s, v = svd(standardize(x))
-BoltzmannMachinesPlots.scatter(u[:,1:2], labels = string.(xlabels))
+BoltzmannMachinesPlots.scatter(u[:,1:2], labels = xlabels)
 
-# TODO remove plottop2latentdims and make scatter public?
+# TODO remove plottop2latentdims and export/document scatter
 
 # ==============================================================================
 # Categorical data: Softmax0BernoulliRBM
