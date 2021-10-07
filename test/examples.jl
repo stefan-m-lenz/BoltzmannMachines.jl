@@ -116,6 +116,26 @@ loglikelihood(dbm, xtest)
 
 
 # ==============================================================================
+# Dimension reduction using DBMs
+# ------------------------------------------------------------------------------
+
+Random.seed!(1);
+# Calculate a two dimensional dimension reduction on the data
+x, xlabels = blocksinnoise(500, 50, blocklen = 5, nblocks = 3)
+monitor, dbm = monitored_fitdbm(x, nhiddens = [50, 40, 25, 15],
+      batchsize = 5,
+      epochspretraining = 100,
+      learningratepretraining = 0.005,
+      epochsfinetuning = 30,
+      learningratefinetuning = 0.001)
+
+dimred = top2latentdims(dbm, x)
+
+# Calculate and plot dimension reduction in one command
+dimred = BoltzmannMachinesPlots.plottop2latentdims(dbm, x, labels = xlabels)
+
+
+# ==============================================================================
 # Categorical data: Softmax0BernoulliRBM
 # ------------------------------------------------------------------------------
 

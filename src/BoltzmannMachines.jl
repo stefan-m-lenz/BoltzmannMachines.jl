@@ -60,7 +60,7 @@ export
    intensities, intensities_encode, intensities_decode,
    oneornone_encode, oneornone_decode,
    splitdata,
-   barsandstripes, logit,
+   barsandstripes, blocksinnoise, logit,
    top2latentdims
 
 include("bmtypes.jl")
