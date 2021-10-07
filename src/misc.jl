@@ -48,7 +48,7 @@ end
 
 
 """
-   blocksinnoise(nsamples, nvariables; ...)
+    blocksinnoise(nsamples, nvariables; ...)
 Produces an artificial data set where there are sequences of consecutive 1s
 in half of the binary samples.
 The samples are labeled whether they belong one of the `nblocks`.
