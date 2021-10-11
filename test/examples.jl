@@ -131,10 +131,8 @@ dbm = fitdbm(x, nhiddens = [50, 30, 15],
 
 # Calculate a two-dimensional representation of the data
 dimred = top2latentdims(dbm, x)
-# ( ... can be plotted easily ...) # TODO with scatter?
-
-# Calculate and plot dimension reduction in one convenient command
-BoltzmannMachinesPlots.plottop2latentdims(dbm, x, labels = xlabels)
+# The result can be plotted easily, e.g., via:
+BoltzmannMachinesPlots.scatter(dimred, labels = xlabels)
 
 # Comparison with PCA
 using LinearAlgebra
@@ -143,7 +141,6 @@ standardize(x) = (x.- mean(x, dims = 1)) ./ std(x, dims = 1)
 u, s, v = svd(standardize(x))
 BoltzmannMachinesPlots.scatter(u[:,1:2], labels = xlabels)
 
-# TODO remove plottop2latentdims and export/document scatter
 
 # ==============================================================================
 # Categorical data: Softmax0BernoulliRBM
