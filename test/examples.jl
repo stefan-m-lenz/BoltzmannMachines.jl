@@ -132,7 +132,7 @@ dbm = fitdbm(x, nhiddens = [50, 30, 15],
 # Calculate a two-dimensional representation of the data
 dimred = top2latentdims(dbm, x)
 # The result can be plotted easily, e.g., via:
-BoltzmannMachinesPlots.scatter(dimred, labels = xlabels)
+BoltzmannMachinesPlots.scatter(dimred, labels = xlabels, opacity = 0.5)
 
 # Comparison with PCA
 using LinearAlgebra
