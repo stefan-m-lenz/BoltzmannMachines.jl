@@ -26,19 +26,20 @@ trained using the general Boltzmann Machine learning procedure
    defaults to `epochs`
 * `learningrate`: learning rate for pretraining.
    Also used as initial value for the decaying fine tuning learning rate.
-* `learningrates` (deprecated) / `learningratesfinetuning`:
-   The learning rate for fine tuning is by default decaying with the number of epochs,
-   starting with the value of the `learningrate`.
-   (For more details see `traindbm!`.)
-   The value of the learning rate for each epoch of fine tuning can be specified
-   via the argument `learningratesfinetuning` as a vector
-   with an entry for each of the epochs.
 * `learningratepretraining`: learning rate for pretraining,
    defaults to `learningrate`
 * `learningratefinetuning`: initial learning rate for fine tuning.
    The learning rate for fine tuning is decaying with the number of epochs,
    starting with the given value for the `learningratefinetuning` or the `learningrate`.
    (For more details see `traindbm!`.)
+* `learningratesfinetuning`:
+   The learning rate for fine tuning is by default decaying with the number of epochs,
+   starting with the value of the `learningrate`.
+   (For more details see `traindbm!`.)
+   The value of the learning rate for each epoch of fine tuning can be specified
+   via the argument `learningratesfinetuning` as a vector
+   with an entry for each of the epochs.
+* `learningrates`: deprecated, otherwise equivalent to `learningratesfinetuning`
 * `batchsize`: number of samples in mini-batches for pretraining and fine tuning.
    By default, a batchsize of 1 is used for pretraining.
    For fine tuning, no mini-batches are used by default, which means that
@@ -218,11 +219,14 @@ updates.
    update the weights and biases. The learning rates should decrease with the
    epochs, e. g. with the factor `a / (b + epoch)`. If only one value is given as
    `learningrate`, `a` and `b` are 11.0 and 10.0, respectively.
+* `batchsize`: number of samples in mini-batches.
+   No mini-batches are used by default, which means that
+   the complete data set is used for calculating the gradient in each epoch.
 * `nparticles`: number of particles used for sampling, default 100
 * `monitoring`: A function that is executed after each training epoch.
    It has to accept the trained DBM and the current epoch as arguments.
 """
-function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
+function traindbm!(dbm::MultimodalDBM, x::AbstractArray{Float64,2};
       epochs::Int = 10,
       nparticles::Int = 100,
       learningrate::Float64 = 0.005,
@@ -240,7 +244,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
 
    optimizer = converttodbmoptimizer(optimizer, dbm)
    map!(opt -> converttodbmoptimizer(opt, dbm), optimizers, optimizers)
-   optimizers = assertinitoptimizers(optimizer, optimizers, dbm,
+   optimizers = assert_initoptimizers(optimizer, optimizers, dbm,
          learningrates, sdlearningrates, epochs)
 
    particles = initparticles(dbm, nparticles)
@@ -263,7 +267,7 @@ function traindbm!(dbm::MultimodalDBM, x::Array{Float64,2};
          traindbm!(dbm, x, particles, optimizers[epoch])
       end
 
-      # monitor the learning process at the end of epoch
+      # monitor the learning process at the end of each epoch
       monitoring(dbm, epoch)
    end
 

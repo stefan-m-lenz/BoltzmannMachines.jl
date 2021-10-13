@@ -6,7 +6,7 @@ function assert_enoughvaluesforepochs(vname::String, v::Vector, epochs::Int)
 end
 
 
-function assertinitoptimizers(optimizer::AbstractOptimizer,
+function assert_initoptimizers(optimizer::AbstractOptimizer,
       optimizers::Vector{<:AbstractOptimizer}, bm::BM,
       learningrates::Vector{Float64}, sdlearningrates::Vector{Float64},
       epochs::Int
@@ -144,7 +144,7 @@ function fitrbm(x::Matrix{Float64};
       rbm.sd .*= sdinitfactor
    end
 
-   optimizers = assertinitoptimizers(optimizer, optimizers, rbm,
+   optimizers = assert_initoptimizers(optimizer, optimizers, rbm,
          learningrates, sdlearningrates, epochs)
 
    if pcd

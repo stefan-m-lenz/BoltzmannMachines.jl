@@ -120,7 +120,6 @@ loglikelihood(dbm, xtest)
 # ------------------------------------------------------------------------------
 
 Random.seed!(0);
-# Calculate a two dimensional dimension reduction on the data
 x, xlabels = blocksinnoise(500, 50, blocklen = 5, nblocks = 5)
 dbm = fitdbm(x, nhiddens = [50, 30, 15],
       batchsize = 5,
